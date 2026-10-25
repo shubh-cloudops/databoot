@@ -123,6 +123,9 @@ def make_client(monkeypatch, tmp_path):
     def make(folder):
         monkeypatch.setenv("DATABOOT_DATA", str(folder))
         monkeypatch.setenv("DATABOOT_OUT", str(tmp_path / "out"))
+        from app import catalog
+        catalog.scan.cache_clear()
+        catalog.load.cache_clear()
         from app.main import app
         return TestClient(app)
     return make

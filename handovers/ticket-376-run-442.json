@@ -1,0 +1,89 @@
+{
+  "header": {
+    "ticket": 376,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1953601
+  },
+  "goal": "Catalog scan and load: walk the data folder, stable ids, unreadable list and file inventory (G-2) in app/catalog.py",
+  "acceptance_criteria": [
+    {
+      "text": "scan(folder) walks subfolders without following symlinks, skips names starting with '.', sorts by relative path, and returns Catalog(datasets, unreadable, others); a missing folder gives an empty catalog",
+      "passes": true
+    },
+    {
+      "text": "Kinds by lower-case extension: csv, tsv/tab, xlsx/xlsm (one Dataset per sheet), json, jsonl/ndjson, geojson; each Dataset has id = sha1(f'{path}|{sheet or \"\"}')[:12], row count and column list; parquet is added by a later ticket through the same kind table",
+      "passes": true
+    },
+    {
+      "text": "Any reader exception is caught per file into Unreadable(path, reason): empty.csv -> 'empty file', broken.xlsx -> 'not a valid xlsx'; other datasets still scan and load (AC-12)",
+      "passes": true
+    },
+    {
+      "text": "Unrecognised extensions (manual.pdf, old .xls) go to others with type, size in bytes and modified date YYYY-MM-DD; they are never parsed",
+      "passes": true
+    },
+    {
+      "text": "load(dataset, max_rows) returns the first max_rows rows and is lru_cache(4)-wrapped; scan is lru_cache(1) by folder and tests/conftest make_client clears both caches",
+      "passes": true
+    },
+    {
+      "text": "tests/test_catalog.py on the data_dir fixture: 8 datasets with paths, Revenue and Lookup sheets, correct row and column counts, 2 unreadable, manual.pdf in others with type pdf and size 9, .hidden.csv absent",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-1, AC-12 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "............................                                             [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n28 passed, 1 warning in 4.99s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "load() resolves the file via config.get().data + dataset.path; Dataset is unsafe_hash with columns compare=False so lru_cache can key on it",
+      "why": "Dataset has no folder field and holds a list column; the ticket requires lru_cache(4) on load",
+      "evidence": "app/catalog.py Dataset, load"
+    },
+    {
+      "what": "Symlinked files are skipped as well as symlinked folders",
+      "why": "Ticket says walk without following symlinks",
+      "evidence": "app/catalog.py scan; tests/test_catalog.py::test_missing_folder_and_symlinks"
+    },
+    {
+      "what": "Non-ReadError exceptions become the note 'could not read file'; a sheet that fails gives Unreadable(path, reason) while the other sheets still load",
+      "why": "Any reader exception must be caught per file (AC-12); Unreadable has only path and reason",
+      "evidence": "app/catalog.py scan, FAILED"
+    },
+    {
+      "what": "conftest make_client clears catalog.scan and catalog.load caches before importing app.main",
+      "why": "Ticket requires both caches cleared per test client",
+      "evidence": "tests/conftest.py make_client"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Parquet will be added to KINDS and READERS by a later ticket",
+    "A workbook with zero sheets is reported as 'not a valid xlsx'",
+    "Row counts come from reading each file once at scan time (xlsx and text alike), not a streaming count"
+  ],
+  "open_questions": [
+    "'could not read file' is not in the architecture's fixed list of notes; add it to docs/ARCHITECTURE.md?",
+    "A failing sheet in a workbook shows only the workbook path in Unreadable, with no sheet name; should Unreadable get a sheet field?"
+  ],
+  "lessons": [
+    {
+      "lesson": "A dataclass used as an lru_cache key must be hashable: use unsafe_hash=True with the list field set compare=False",
+      "when": "caching a function whose argument is a dataclass with list fields",
+      "evidence": "app/catalog.py Dataset"
+    }
+  ],
+  "problems": []
+}
