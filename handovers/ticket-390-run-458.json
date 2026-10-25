@@ -1,0 +1,63 @@
+{
+  "header": {
+    "ticket": 390,
+    "project": "you-think-of-the-project-name",
+    "from_role": "coach",
+    "phase": "learn",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "847e9e9f8b68",
+    "tokens_left": 1927235
+  },
+  "goal": "Learn from round 1: update the shared skills and lessons and this project's MEMORY.md from /logs/digest.md.",
+  "acceptance_criteria": [
+    {
+      "text": "Skills and lessons come only from evidence in the digest",
+      "passes": true
+    },
+    {
+      "text": "MEMORY.md is current and short",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py learn",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Added two skills (office exports on real libraries with reopen tests; Playwright tests for Plotly chart pages) and one pitfall line each to acceptance-tests-per-item and resume-ticket-check-existing-work",
+      "why": "Gates 162-164 and tickets 381-389 show recurring work on exports and browser checks, and a retry loop caused by a missing library",
+      "evidence": "/logs/digest.md gates 162-164, tickets 385, 386, 388, 389"
+    },
+    {
+      "what": "Merged older LESSONS.md lines to stay under 80 lines while adding new rules",
+      "why": "File limit is under 80 lines",
+      "evidence": "wc -l /learning/LESSONS.md = 78"
+    },
+    {
+      "what": "MEMORY.md records the unfinished gate 162-164 work and the verify-environment gap as the open state",
+      "why": "Round parked with test_G_5 failing and the library rewrite not done",
+      "evidence": "digest ticket 389, git log, app/xlsx.py still hand-written"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The digest contains no Faded history list, so no re-confirmation was needed",
+    "MEMORY.md ticket 389 state is accurate: libraries missing in the verify environment (python3 import of xlsxwriter and openpyxl fails here)"
+  ],
+  "open_questions": [
+    "Gate 164 says the verify step runs pip install -r requirements.txt, but check.py (per ticket 389) never does; who makes openpyxl, python-pptx and xlsxwriter available to verify?",
+    "Is the .gitattributes line-ending fix still pending (no .gitattributes in /work)?"
+  ],
+  "lessons": [
+    {
+      "lesson": "Probe that a chosen dependency imports in the verify environment before designing on it; raise a blocker at once if not",
+      "when": "Any ticket that adds a third-party library",
+      "evidence": "ticket 389 attempts 1-3, gate 164"
+    }
+  ],
+  "problems": []
+}
