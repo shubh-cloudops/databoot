@@ -1,0 +1,86 @@
+{
+  "header": {
+    "ticket": 381,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1913524
+  },
+  "goal": "XLSX export with native editable charts (G-5, gate 160) in app/xlsx.py and the export.xlsx route",
+  "acceptance_criteria": [
+    {
+      "text": "xlsx.write(dataset, rows, charts) returns bytes: sheet Data (header + loaded rows), then one sheet per chart with its data table at A1 and a drawing holding a native chart (c:lineChart, c:barChart, c:doughnutChart, c:scatterChart; histogram as column c:barChart of counts) that references that range",
+      "passes": true
+    },
+    {
+      "text": "heatmap sheet holds the matrix with a 3-colour colorScale conditional format; map3d becomes a c:scatterChart of lon/lat and country_map a bar chart (no Office map charts because they need Bing)",
+      "passes": true
+    },
+    {
+      "text": "GET /datasets/{id}/export.xlsx returns 200, the xlsx content type and Content-Disposition attachment with filename <stem>[-<sheet>].xlsx; 404 for unknown id",
+      "passes": true
+    },
+    {
+      "text": "tests/test_export_xlsx.py: the zip opens, every XML part parses with xml.etree, [Content_Types].xml lists every part, and there is one chart part per chart",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-4, AC-5, AC-6 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "..................................ss.................................... [ 81%]\n................                                                         [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n86 passed, 2 skipped, 1 warning in 9.03s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Heatmap gets a matrix sheet with colorScale and no chart part, so chart parts equal charts minus heatmaps",
+      "why": "Office has no heatmap chart type; the ticket asks for the matrix with a conditional format",
+      "evidence": "app/xlsx.py write; tests/test_export_xlsx.py::test_heatmap_sheet_has_color_scale_and_no_chart"
+    },
+    {
+      "what": "Chart sheets are named 'chart-N <kind>' (N = position in the list)",
+      "why": "Unique by construction, under 31 chars, no characters Excel forbids",
+      "evidence": "app/xlsx.py write"
+    },
+    {
+      "what": "Series carry cached values (strCache/numCache) as well as the range references",
+      "why": "Previewers and PowerPoint read the cache; Excel refreshes from the range",
+      "evidence": "app/xlsx.py _ref"
+    },
+    {
+      "what": "Content-Disposition is the plain filename form unless the name is non-ASCII or has a quote or backslash; then a filename* (RFC 5987) form with an ASCII fallback is used",
+      "why": "Header values are latin-1; a plain header keeps the exact form the ticket names",
+      "evidence": "app/main.py export_xlsx"
+    },
+    {
+      "what": "Extracted _charts(d) in main.py and reused it for the charts API and the export",
+      "why": "Same dicts must feed page and exports (ARCHITECTURE.md Chart contract)",
+      "evidence": "app/main.py _charts"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Dates in Data are written as numeric serials with a date style; chart tables keep ISO strings from the chart dicts",
+    "Histogram bin labels are 'lo to hi' strings in the chart table",
+    "Rows beyond the loaded max_rows are not exported (the Data sheet holds the loaded rows)"
+  ],
+  "open_questions": [
+    "ARCHITECTURE.md lists export.xlsx(dataset, rows, charts) in app/export.py but the ticket puts the writer in xlsx.write; export.py was left empty",
+    "Chart XML was not opened in Excel or LibreOffice here (neither installed); element order follows the OOXML schema from memory"
+  ],
+  "lessons": [
+    {
+      "lesson": "Rules.charts on the shared fixtures also yields a histogram for records.json, so export tests must count the histogram bar chart as well",
+      "when": "writing tests on per-dataset chart counts",
+      "evidence": "tests/test_export_xlsx.py::test_map3d_and_country_map"
+    }
+  ],
+  "problems": []
+}
