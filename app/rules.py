@@ -1,5 +1,7 @@
 """Routing rules: charts(columns, rows, mapping, settings) -> list of chart dicts (ARCHITECTURE.md "Chart contract")."""
 import math
+import re
+import statistics
 from datetime import date, datetime
 
 from app.profile import DATE_FORMATS, NUMBER
@@ -7,6 +9,10 @@ from app.profile import DATE_FORMATS, NUMBER
 MAX_CHARTS = 8
 LAT = {"lat", "latitude"}
 LON = {"lon", "lng", "longitude"}
+COUNTRY = {"country", "country_name", "nation", "iso3", "iso_a3"}
+ISO3 = re.compile(r"[A-Z]{3}")
+BINS = 20
+HEATMAP_COLS = 12
 
 
 def _num(v):
@@ -113,7 +119,105 @@ def _bars(columns, rows, mapping, settings):
     return out
 
 
+def _country_map(columns, rows, mapping, settings):
+    # "text column": categorical or other (a column of mostly distinct names is classified other)
+    c = next((i for i, h in enumerate(columns)
+              if h.strip().lower() in COUNTRY and mapping.get(h) in ("categorical", "other")), None)
+    if c is None:
+        return []
+    n = next(iter(_first(columns, mapping, "numerical")), None)
+    sums, used = {}, 0
+    for r in rows:
+        v = 1 if n is None else _num(r[n])
+        if r[c] not in (None, "") and v is not None:
+            sums[str(r[c])] = sums.get(str(r[c]), 0) + v
+            used += 1
+    if not sums:
+        return []
+    mode = "ISO-3" if all(ISO3.fullmatch(k) for k in sums) else "country names"
+    what = "rows" if n is None else columns[n]
+    return [_chart("country_map", f"{what} by {columns[c]}", columns[c], "count" if n is None else f"{what} (sum)",
+                   f"text {columns[c]}" + ("" if n is None else f" + numerical {columns[n]}")
+                   + f": country map, {'count' if n is None else 'sum'} per {columns[c]} ({mode})",
+                   used, used, {"locations": list(sums), "values": [_clean(v) for v in sums.values()],
+                                "locationmode": mode})]
+
+
+def _donut(columns, rows, mapping, settings):
+    (c,) = _first(columns, mapping, "categorical") or [None]
+    if c is None:
+        return []
+    counts = {}
+    for r in rows:
+        if r[c] not in (None, ""):
+            counts[str(r[c])] = counts.get(str(r[c]), 0) + 1
+    if not 2 <= len(counts) <= 6:
+        return []
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    used = sum(counts.values())
+    return [_chart("donut", f"rows by {columns[c]}", columns[c], "count",
+                   f"categorical {columns[c]} ({len(counts)} values): donut, count per {columns[c]}", used, used,
+                   {"labels": [k for k, _ in ranked], "values": [v for _, v in ranked]})]
+
+
+def _histogram(columns, rows, mapping, settings):
+    (n,) = _first(columns, mapping, "numerical") or [None]
+    if n is None:
+        return []
+    vals = [v for v in (_num(r[n]) for r in rows) if v is not None]
+    if not vals:
+        return []
+    lo, hi = min(vals), max(vals)
+    bins = BINS if hi > lo else 1
+    counts = [0] * bins
+    for v in vals:
+        try:
+            i = int((v - lo) * bins / (hi - lo)) if hi > lo else 0
+        except OverflowError:  # range near the float limit
+            i = int((v - lo) / (hi - lo) * bins)
+        counts[min(i, bins - 1)] += 1
+    edges = [lo + (hi - lo) * i / bins for i in range(bins)] + [hi]
+    return [_chart("histogram", f"{columns[n]} distribution", columns[n], "count",
+                   f"numerical {columns[n]}: histogram, {bins} equal-width {'bins' if bins > 1 else 'bin'}",
+                   len(vals), len(vals), {"edges": [_clean(e) for e in edges], "counts": counts})]
+
+
+def _scatter(columns, rows, mapping, settings):
+    ix = _first(columns, mapping, "numerical", 2)
+    if len(ix) < 2:
+        return []
+    a, b = ix
+    points = [(x, y) for x, y in ((_num(r[a]), _num(r[b])) for r in rows) if x is not None and y is not None]
+    shown = _sample(points, settings.chart_cap)
+    xs, ys = zip(*shown) if shown else ([], [])
+    return [_chart("scatter", f"{columns[b]} vs {columns[a]}", columns[a], columns[b],
+                   f"numerical {columns[a]} + numerical {columns[b]}: scatter", len(shown), len(points),
+                   {"x": list(xs), "y": list(ys)})]
+
+
+def _heatmap(columns, rows, mapping, settings):
+    ix = _first(columns, mapping, "numerical", HEATMAP_COLS)
+    if len(ix) < 3:
+        return []
+    cols = [[_num(r[i]) for r in rows] for i in ix]
+
+    def pearson(a, b):
+        pairs = [(x, y) for x, y in zip(a, b) if x is not None and y is not None]
+        try:
+            return max(-1.0, min(1.0, statistics.correlation(*zip(*pairs))))
+        except (statistics.StatisticsError, OverflowError, ZeroDivisionError, TypeError):
+            return None  # fewer than 2 pairs or a constant column: undefined
+
+    z = [[1 if i == j else pearson(a, b) for j, b in enumerate(cols)] for i, a in enumerate(cols)]
+    used = sum(sum(v is not None for v in vs) >= 2 for vs in zip(*cols))
+    names = [columns[i] for i in ix]
+    return [_chart("heatmap", "correlation of numerical columns", "column", "column",
+                   f"numerical {', '.join(names)}: Pearson correlation, pairwise complete rows",
+                   used, used, {"labels": names, "z": z})]
+
+
 def charts(columns, rows, mapping, settings):
     """Chart dicts for one dataset; mapping is profile.classify's {column: type}. [] when no rule matches (AC-7)."""
-    found = [c for rule in (_map3d, _lines, _bars) for c in rule(columns, rows, mapping, settings)][:MAX_CHARTS]
+    rules = (_map3d, _country_map, _lines, _bars, _donut, _histogram, _scatter, _heatmap)
+    found = [c for rule in rules for c in rule(columns, rows, mapping, settings)][:MAX_CHARTS]
     return [{"id": f"chart-{i}", **c} for i, c in enumerate(found, 1)]

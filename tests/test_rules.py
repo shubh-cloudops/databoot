@@ -12,8 +12,9 @@ def charts_of(folder, path, sheet=None):
 def test_sales_bar_and_line(make_client, data_dir):
     make_client(data_dir)
     cs = charts_of(data_dir, "sales.csv")
-    assert [c["id"] for c in cs] == ["chart-1", "chart-2"]
-    line, bar = cs
+    assert [c["id"] for c in cs] == ["chart-1", "chart-2", "chart-3", "chart-4"]
+    assert [c["kind"] for c in cs] == ["line", "bar", "donut", "histogram"]
+    line, bar = cs[:2]
     assert line["kind"] == "line" and line["data"]["x"][0] == "2024-01-01" and line["data"]["y"] == [10, 20, 5, 7, 3, 1]
     assert bar["kind"] == "bar" and dict(zip(bar["data"]["x"], bar["data"]["y"])) == {"North": 16, "South": 23, "East": 7}
     assert bar["data"]["x"] == ["South", "North", "East"]
@@ -48,7 +49,8 @@ def test_map_without_numerical_z_is_zero():
 
 def test_no_map_with_only_one_geo_column():
     cols, rows = ["lat", "n"], [["1", "2"]]
-    assert rules.charts(cols, rows, profile.classify(cols, rows), config.get()) == []
+    cs = rules.charts(cols, rows, profile.classify(cols, rows), config.get())
+    assert [c["kind"] for c in cs] == ["histogram"]
 
 
 def test_big_map_is_sampled(make_client, big_csv):
@@ -85,5 +87,5 @@ def test_charts_route(make_client, data_dir):
     r = client.get(f"/api/datasets/{d['id']}/charts")
     assert r.status_code == 200
     body = r.json()
-    assert body["dataset"] == d["id"] and [c["kind"] for c in body["charts"]] == ["line", "bar"]
+    assert body["dataset"] == d["id"] and [c["kind"] for c in body["charts"]] == ["line", "bar", "donut", "histogram"]
     assert client.get("/api/datasets/nope/charts").status_code == 404

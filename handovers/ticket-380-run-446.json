@@ -1,0 +1,90 @@
+{
+  "header": {
+    "ticket": 380,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1940032
+  },
+  "goal": "Extra chart rules: donut, histogram, scatter, correlation heatmap and country map (G-3) with the 8-chart cap",
+  "acceptance_criteria": [
+    {
+      "text": "donut: first categorical column with 2 to 6 distinct values, row count per value; histogram: first numerical column, 20 equal-width bins over min..max (max in last bin, 1 bin when min = max) with edges and counts",
+      "passes": true
+    },
+    {
+      "text": "scatter: first two numerical columns on rows with both, sampled to chart_cap; heatmap: Pearson correlation of the first 12 numerical columns on pairwise-complete rows, null when undefined, r = 1 on the diagonal",
+      "passes": true
+    },
+    {
+      "text": "country_map: text column headed country, country_name, nation, iso3 or iso_a3; sum of first numerical per country (count if none); locationmode ISO-3 when every value is 3 upper-case letters else country names",
+      "passes": true
+    },
+    {
+      "text": "Charts are produced in the architecture's rule order (map3d, country_map, line, bar, donut, histogram, scatter, heatmap) with at most 2 line and 2 bar charts and then cut to 8",
+      "passes": true
+    },
+    {
+      "text": "tests/test_rules_extra.py: one hand-computed test per kind on inline rows (histogram edges/counts, r values, ISO-3 FRA/JPN versus names from records.json) and a test of the order and the cap",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-4, AC-5 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "...........................ss........................................... [ 88%]\n.........                                                                [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n79 passed, 2 skipped, 1 warning in 9.04s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "country_map accepts a header-matched column typed categorical or other",
+      "why": "records.json country has 3 distinct values in 3 rows, so profile.classify types it other (over 50% distinct)",
+      "evidence": "app/rules.py _country_map; tests/test_rules_extra.py::test_country_map_iso3_and_names"
+    },
+    {
+      "what": "Histogram bin index is int((v-lo)*bins/(hi-lo)) with an OverflowError fallback to the ratio form",
+      "why": "Multiplying before dividing avoids float misbinning such as 3/20*20; the fallback handles ranges near 1e308",
+      "evidence": "app/rules.py _histogram; test_nan_inf_become_null_and_json_is_valid"
+    },
+    {
+      "what": "Heatmap uses statistics.correlation, clamps r to [-1,1], returns null on StatisticsError, and puts 1 on the diagonal even for constant columns",
+      "why": "Ticket: null when undefined, r = 1 on the diagonal",
+      "evidence": "app/rules.py _heatmap; tests/test_rules_extra.py::test_heatmap_pearson_pairwise_and_null"
+    },
+    {
+      "what": "Heatmap shown/total is the count of rows with at least 2 numeric values among the used columns",
+      "why": "Architecture says rows used but does not define it for the heatmap",
+      "evidence": "app/rules.py _heatmap"
+    },
+    {
+      "what": "Updated two existing tests in test_rules.py",
+      "why": "sales.csv now also yields donut and histogram, and a lone numeric column yields a histogram",
+      "evidence": "tests/test_rules.py"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "country_map locations keep first-appearance order (not sorted)",
+    "Histogram with min = max has edges [v, v] and one count entry, per the ticket's 1 bin rather than the contract's 21 edges",
+    "A donut needs 2 to 6 distinct non-empty values, counted over all rows"
+  ],
+  "open_questions": [
+    "Should the architecture's histogram contract note that edges has 2 entries when min = max?",
+    "Should country_map locations be sorted by value like bars?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When adding a chart rule, grep tests for exact chart lists and ids (sales.csv kinds, chart-N) and the 'no chart' cases; a lone numeric column now gives a histogram.",
+      "when": "Adding any new routing rule to app/rules.py",
+      "evidence": "tests/test_rules.py needed two edits"
+    }
+  ],
+  "problems": []
+}
