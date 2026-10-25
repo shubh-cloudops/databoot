@@ -1,0 +1,99 @@
+{
+  "header": {
+    "ticket": 388,
+    "project": "you-think-of-the-project-name",
+    "from_role": "qa",
+    "phase": "qa",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "e14d1b175e03",
+    "tokens_left": 1906290
+  },
+  "goal": "Revise your earlier work for the qa phase. The Board rejected it with this comment: Before round 1 closes:\r\n1. PM: reword AC-13 to Start-DataBoot.ps1 and AC-6 to \"Plotly 3D scatter\". Add AC ids for G-1..G-7 (file types incl. Parquet, extra charts, XLSX/PPTX exports, file inventory, rule caption, thousands separators).\r\n2. QA: one test per new AC. Export tests must reopen the XLSX with openpyxl and the PPTX with python-pptx and assert chart count > 0.\r\n3. QA: open the heatmap and a Parquet dataset in the browser sweep.\r\n4. Confirm in the handover whether exports now use xlsxwriter / python-pptx (gate 162). If not, do it first.\r\nBoth assumptions OK (injected open_browser for AC-11; WebGL canvas check for AC-6).",
+  "acceptance_criteria": [
+    {
+      "text": "One test per acceptance item, named after its id",
+      "passes": false
+    },
+    {
+      "text": "Failures are reported, not hidden",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa",
+    "passed": false,
+    "output_tail": ".................F...................................................... [ 52%]\n...........ss....................................................        [100%]\n=================================== FAILURES ===================================\n___________________________________ test_G_5 ___________________________________\n\nmake_client = <function make_client.<locals>.make at 0x7a433ef66340>\ndata_dir = PosixPath('/tmp/pytest-of-node/pytest-0/test_G_50/data')\n\n    def test_G_5(make_client, data_dir):\n        \"\"\"Exports: XLSX reopens in openpyxl and PPTX in python-pptx, each with native charts (count > 0).\"\"\"\n>       from openpyxl import load_workbook\nE       ModuleNotFoundError: No module named 'openpyxl'\n\ntests/test_acceptance.py:404: ModuleNotFoundError\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED tests/test_acceptance.py::test_G_5 - ModuleNotFoundError: No module na...\n1 failed, 134 passed, 2 skipped, 1 warning in 64.15s (0:01:04)\ntests failed\n"
+  },
+  "decisions": [
+    {
+      "what": "Named the new tests test_G_1..test_G_7 and test_G_thousands instead of inventing AC-14..AC-21",
+      "why": "acceptance.json still has only AC-1..AC-13, so the PM has not assigned ids; a guessed number could mislabel an item",
+      "evidence": "docs/acceptance.json (13 items); tests/test_acceptance.py module docstring"
+    },
+    {
+      "what": "test_G_5 imports openpyxl and python-pptx at the top of the test with no skip, and is left failing",
+      "why": "Board: failures are reported not hidden; the libraries are not installed and the exports are not yet built on them",
+      "evidence": "python3 -m pytest -q tests: 1 failed (test_G_5 ModuleNotFoundError openpyxl), 134 passed, 2 skipped"
+    },
+    {
+      "what": "Did not rewrite exports to xlsxwriter / python-pptx",
+      "why": "QA must not change application code; it needs an engineer ticket and installed packages",
+      "evidence": "app/xlsx.py:7-14 and app/export.py:2-8 import zipfile/xml.etree only; requirements.txt has no xlsxwriter, python-pptx or openpyxl"
+    },
+    {
+      "what": "Validated test_G_5 with openpyxl and python-pptx installed to /tmp/libs via PYTHONPATH, not into the environment",
+      "why": "To show the test logic is correct and that the current hand-written files open and hold charts",
+      "evidence": "PYTHONPATH=/tmp/libs python3 -m pytest -q tests/test_acceptance.py -k 'G_5 or G_thousands' -> 2 passed"
+    },
+    {
+      "what": "test_G_thousands compares against the page's own map3d 'shown' value (30,000 under stride sampling) rather than 50,000",
+      "why": "The page shows 30,000 of 60,000 points; AC-10 only requires at most the cap",
+      "evidence": "tests/test_acceptance.py test_G_thousands; test_AC_10"
+    },
+    {
+      "what": "test_G_7 branches on whether pyarrow is importable",
+      "why": "Gate 162 keeps pyarrow as a runtime dependency; with it zstd would decode and not be listed as unsupported",
+      "evidence": "tests/test_acceptance.py test_G_7"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First draft of test_G_2 and test_G_thousands used a greedy regex over table rows and the cap value 50,000",
+      "why_it_failed": "The regex matched across rows, and the page shows 30,000 of 60,000 points; both were test bugs and were fixed"
+    }
+  ],
+  "assumptions": [
+    "Pasting the test names as G ids is temporary; the PM will assign AC ids and the tests are renamed then",
+    "The heatmap, like the other kinds, counts as one slide in the pptx (slide count == 1 + charts); chart count is only asserted > 0",
+    "Two fixture CSVs (flat.csv, optional.csv) show as modified in git from line endings only; not touched by this ticket"
+  ],
+  "open_questions": [
+    "BUG/BLOCKER: gate 162 not done. Exports are hand-written OOXML (app/xlsx.py, app/export.py), the zipfile xlsx reader has not been replaced by openpyxl, and xlsxwriter, python-pptx, openpyxl and pyarrow are not installed nor listed in requirements.txt (only pyarrow is). test_G_5 fails with ModuleNotFoundError: No module named 'openpyxl' until an engineer ticket does this and the environment has the packages",
+    "docs/acceptance.json has no ids for G-1..G-7 and AC-6 / AC-13 are not reworded yet (PM). Rename test_G_* to the new ids when added",
+    "docs/ARCHITECTURE.md still says 'standard library only' for exports and 'No pandas, openpyxl, pyarrow or python-pptx'; stale after gate 162",
+    "Gate 162 asked table captions (Columns, First 20 rows) to become h2; app/templates/dataset.html has no <h2> and they are still <caption>",
+    "Plotly mode bar still hover-only; gate 162 asked for always visible and keyboard reachable (not tested)",
+    "Column headers in the first-rows table render upper-cased (A B C for a, b, c) from CSS; confirm that is intended as the data's column names are lower case",
+    "Exports were not opened in Excel or PowerPoint; only openpyxl and python-pptx (installed temporarily to /tmp/libs, which also emitted 'Workbook contains no default style')"
+  ],
+  "lessons": [
+    {
+      "lesson": "When the Board asks for tests of items that have no ids in acceptance.json, name them after the work item (test_G_n), say so in the module docstring and open_questions, and do not invent AC numbers",
+      "when": "QA round where the PM has not yet added the ids",
+      "evidence": "ticket 388, docs/acceptance.json"
+    },
+    {
+      "when": "A test needs a library that is missing from the environment",
+      "lesson": "pip install --target /tmp/libs and run with PYTHONPATH=/tmp/libs to validate the test, but leave the committed test failing in the real environment and report it",
+      "evidence": "ticket 388, test_G_5"
+    },
+    {
+      "when": "Browser sweep of many pages and two widths",
+      "lesson": "Start the app from a Python subprocess with start_new_session and a pid file, then sweep all pages x widths in one browser_run_code_unsafe call while the full suite runs in the background",
+      "evidence": "ticket 388, /tmp/sweep/srv.py"
+    }
+  ],
+  "problems": []
+}

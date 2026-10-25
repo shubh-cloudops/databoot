@@ -3,7 +3,13 @@ Playwright is used where only a browser can show the result (drawn charts).
 
 AC-13 names Start-DataOS.ps1; Board gate 161 renamed it Start-DataBoot.ps1, and AC-13 / AC-6 ("Deck.gl") wording is
 stale in acceptance.json. These tests follow the gate.
+
+Board gate 162 asked the PM for AC ids for work items G-1..G-7 (docs/ARCHITECTURE.md "Work items without AC ids")
+and docs/acceptance.json still has none. Their tests are named test_G_<n> after the work item and must be
+renamed to the AC ids once the PM adds them. test_G_thousands is the Board's "thousands separators" item
+(gate 161), which has no G number.
 """
+import io
 import json
 import re
 import threading
@@ -285,3 +291,176 @@ def test_AC_13():
     assert re.search(r"docker info.*\n?.*exit 1", ps1, re.S)
     docker = (ROOT / "Dockerfile").read_text()
     assert docker.startswith("FROM ") and "uvicorn" in docker and "app.main:app" in docker
+
+
+# ---- Work items G-1..G-7 (gates 160-162), no AC ids yet ----
+
+def _dir_with_parquet(data_dir):
+    import shutil
+    for f in (ROOT / "tests/fixtures").glob("*.parquet"):
+        shutil.copy(f, data_dir / f.name)
+    shutil.copy(ROOT / "tests/fixtures/flat.csv", data_dir / "flat.csv")
+    return data_dir
+
+
+def _rows_of(html, caption):
+    """Text of each <td> row of the table with this caption."""
+    table = re.search(rf"<caption>{caption}</caption>.*?</table>", html, re.S).group(0)
+    return [re.sub(r"<[^>]+>", " ", r).split() for r in re.findall(r"<tr>(.*?)</tr>", table, re.S) if "<td" in r]
+
+
+def test_G_1(make_client, data_dir):
+    """File types: TSV, JSON, JSONL, GeoJSON and Parquet are listed with row and column counts."""
+    client = make_client(_dir_with_parquet(data_dir))
+    got = {d["path"]: (d["rows"], d["columns"]) for d in client.get("/api/datasets").json()}
+    assert got["points.tsv"] == (4, 3)
+    assert got["sub/records.json"] == (3, 2)
+    assert got["sub/events.jsonl"] == (10, 2)
+    assert got["sub/cities.geojson"] == (4, 3)
+    parquets = [n for n in got if n.endswith(".parquet")]
+    assert len(parquets) == 8  # every fixture except zstd.parquet, which G-7 covers
+    home = client.get("/").text
+    for name in parquets:
+        assert got[name] == (40, 6) and name in home
+    # a Parquet file gives the same profile and the same charts as its CSV twin
+    ids = _ids(client)
+    for name in ("plain", "gzip", "snappy", "dict", "int96", "groups"):
+        a, b = ids[(f"{name}.parquet", None)], ids[("flat.csv", None)]
+        assert client.get(f"/api/datasets/{a}/profile").json() == client.get(f"/api/datasets/{b}/profile").json()
+        ca = [(c["kind"], c["data"]) for c in client.get(f"/api/datasets/{a}/charts").json()["charts"]]
+        cb = [(c["kind"], c["data"]) for c in client.get(f"/api/datasets/{b}/charts").json()["charts"]]
+        assert ca == cb and ca
+        assert client.get(f"/datasets/{a}").status_code == 200
+
+
+def test_G_2(make_client, data_dir):
+    """File inventory: unrecognised files are listed with type, size and date, and have no dashboard."""
+    (data_dir / "old.xls").write_bytes(b"xx")
+    client = make_client(data_dir)
+    home = client.get("/").text
+    rows = _rows_of(home, "Other files")
+    by_name = {r[0]: r for r in rows}
+    assert by_name["manual.pdf"][1:3] == ["pdf", "9"]
+    assert by_name["old.xls"][1:3] == ["xls", "2"]
+    today = time.strftime("%Y-%m-%d", time.localtime((data_dir / "manual.pdf").stat().st_mtime))
+    assert by_name["manual.pdf"][3] == today
+    assert ".hidden.csv" not in home
+    assert not any(d["path"] in ("manual.pdf", "old.xls") for d in client.get("/api/datasets").json())
+    other = re.search(r"<caption>Other files</caption>.*?</table>", home, re.S).group(0)
+    assert "<a " not in other
+
+
+def test_G_3(make_client, data_dir):
+    """Extra charts: donut, histogram, scatter, correlation heatmap and country map, max 8 per dataset."""
+    (data_dir / "num.csv").write_text("a,b,c\n" + "".join(f"{i},{(i * 7) % 11},{2 * i + 1}\n" for i in range(12)))
+    (data_dir / "many.csv").write_text("date,region,country,lat,lon,a,b,c\n" + "".join(
+        f"2024-01-{i + 1:02d},{'NSEW'[i % 4]},{['France', 'Japan', 'Brazil'][i % 3]},{i * 3 - 20},{i * 5 - 30},{i},{(i * 7) % 11},{i * i}\n"
+        for i in range(12)))
+    client = make_client(data_dir)
+    _, ev = _charts(client, "sub/events.jsonl")
+    donut = next(c for c in ev if c["kind"] == "donut")
+    assert dict(zip(donut["data"]["labels"], donut["data"]["values"])) == {"a": 5, "b": 5}
+    hist = next(c for c in ev if c["kind"] == "histogram")
+    assert sum(hist["data"]["counts"]) == 10 and len(hist["data"]["edges"]) == len(hist["data"]["counts"]) + 1
+    assert hist["data"]["edges"][0] == 0 and hist["data"]["edges"][-1] == 9
+    _, num = _charts(client, "num.csv")
+    scatter = next(c for c in num if c["kind"] == "scatter")
+    assert scatter["data"]["x"] == [float(i) for i in range(12)] and len(scatter["data"]["y"]) == 12
+    heat = next(c for c in num if c["kind"] == "heatmap")
+    z = heat["data"]["z"]
+    assert heat["data"]["labels"] == ["a", "b", "c"] and [z[i][i] for i in range(3)] == [1, 1, 1]
+    assert abs(z[0][2] - 1) < 1e-9 and abs(z[0][1] - z[1][0]) < 1e-12  # c = 2a + 1; symmetric
+    _, rec = _charts(client, "sub/records.json")
+    cmap = next(c for c in rec if c["kind"] == "country_map")
+    assert dict(zip(cmap["data"]["locations"], cmap["data"]["values"])) == {"France": 68, "Japan": 125, "Brazil": 203}
+    assert cmap["data"]["locationmode"] == "country names"
+    i, many = _charts(client, "many.csv")
+    assert 1 < len(many) <= 8
+    assert client.get(f"/datasets/{i}").text.count("<figure") == len(many)
+
+
+def test_G_4(make_client, data_dir):
+    """Caption and text: one rule caption and one 'N of M' per figure; no other prose in <main>."""
+    client = make_client(data_dir)
+    for d in client.get("/api/datasets").json():
+        if d["rows"] == 0:
+            continue
+        html = client.get(f"/datasets/{d['id']}").text
+        charts = client.get(f"/api/datasets/{d['id']}/charts").json()["charts"]
+        figs = re.findall(r"<figure.*?</figure>", html, re.S)
+        assert len(figs) == len(charts), d["path"]
+        for fig, c in zip(figs, charts):
+            assert len(re.findall(r'class="chart-rule"', fig)) == 1
+            assert c["rule"] in fig
+            counts = re.findall(r'class="chart-count">([^<]*)<', fig)
+            assert len(counts) == 1 and re.fullmatch(r"[\d,]+ of [\d,]+ (points|rows)", counts[0]), counts
+        main = re.search(r"<main.*?</main>", html, re.S).group(0)
+        main = re.sub(r"<figcaption.*?</figcaption>", "", main, flags=re.S)
+        assert [p for p in re.findall(r"<p[ >].*", main) if "path" not in p and "folder" not in p.lower()] == [], d["path"]
+
+
+def test_G_5(make_client, data_dir):
+    """Exports: XLSX reopens in openpyxl and PPTX in python-pptx, each with native charts (count > 0)."""
+    from openpyxl import load_workbook
+    from pptx import Presentation
+    (data_dir / "num.csv").write_text("a,b,c\n" + "".join(f"{i},{(i * 7) % 11},{2 * i + 1}\n" for i in range(12)))
+    client = make_client(data_dir)
+    ids = _ids(client)
+    for name in ("sales.csv", "num.csv", "points.tsv"):
+        i = ids[(name, None)]
+        charts = client.get(f"/api/datasets/{i}/charts").json()["charts"]
+        assert charts, name
+        r = client.get(f"/datasets/{i}/export.xlsx")
+        assert r.status_code == 200 and r.headers["content-type"].endswith("spreadsheetml.sheet"), name
+        assert "attachment" in r.headers["content-disposition"] and name.rsplit(".", 1)[0] + ".xlsx" in r.headers["content-disposition"]
+        wb = load_workbook(io.BytesIO(r.content))
+        assert wb.sheetnames[0] == "Data" and len(wb.sheetnames) > 1, name
+        assert [c.value for c in wb["Data"][1]] == list(client.get(f"/api/datasets/{i}/profile").json())
+        assert sum(len(ws._charts) for ws in wb.worksheets) > 0, name
+        r = client.get(f"/datasets/{i}/export.pptx")
+        assert r.status_code == 200 and r.headers["content-type"].endswith("presentationml.presentation"), name
+        prs = Presentation(io.BytesIO(r.content))
+        assert len(prs.slides) == 1 + len(charts), name
+        n = sum(1 for s in prs.slides for sh in s.shapes if sh.has_chart)
+        assert n > 0, name
+
+
+def test_G_6(make_client, data_dir):
+    """Name: the product is called DataBoot in every page title and h1 where the page has no dataset name."""
+    client = make_client(data_dir)
+    home = client.get("/").text
+    assert re.search(r"<title>DataBoot</title>", home) and re.search(r"<h1[^>]*>\s*DataBoot\s*</h1>", home)
+    for d in client.get("/api/datasets").json():
+        html = client.get(f"/datasets/{d['id']}").text
+        assert re.search(r"<title>[^<]* - DataBoot</title>", html), d["path"]
+    assert not re.search(r"DataOS", home + client.get(f"/datasets/{d['id']}").text, re.I)
+
+
+def test_G_7(make_client, data_dir):
+    """Parquet errors: a file the reader cannot decode is listed as unreadable with its reason, and others still open."""
+    import importlib.util
+    import shutil
+    shutil.copy(ROOT / "tests/fixtures/zstd.parquet", data_dir / "zstd.parquet")
+    client = make_client(data_dir)
+    home = client.get("/").text
+    if importlib.util.find_spec("pyarrow"):  # pyarrow decodes zstd itself
+        assert ("zstd.parquet", None) in _ids(client)
+    else:
+        row = re.search(r"<tr><td[^>]*>zstd\.parquet</td>.*?</tr>", home, re.S).group(0)
+        assert "unsupported parquet encoding" in row
+        assert ("zstd.parquet", None) not in _ids(client)
+    assert client.get("/").status_code == 200 and "sales.csv" in home
+
+
+def test_G_thousands(make_client, data_dir, big_csv):
+    """Thousands separators on counts everywhere (1,234 of 56,789), including bytes and point counts."""
+    client = make_client(big_csv)
+    home = client.get("/").text
+    row = _rows_of(home, "Datasets")[0]
+    assert "60,000" in row and "60000" not in "".join(row)
+    i = _ids(client)[("big.csv", None)]
+    page = client.get(f"/datasets/{i}").text
+    shown = next(c for c in client.get(f"/api/datasets/{i}/charts").json()["charts"] if c["kind"] == "map3d")["shown"]
+    assert shown >= 1000 and f"{shown:,} of 60,000 points" in page
+    text = re.sub(r"<[^>]+>", " ", re.search(r"<main.*?</main>", page, re.S).group(0))
+    assert not re.search(r"(?<![\d.,-])\d{4,}(?![\d-])", re.sub(r"\d{4}-\d{2}-\d{2}", "", text)), "unseparated number in page text"
