@@ -1,0 +1,258 @@
+[
+ {
+  "goal": "Text readers for CSV, TSV, JSON, JSONL and GeoJSON (gate 160 file types, G-1) in app/readers.py, standard library only",
+  "layer": "backend",
+  "criteria": [
+   "readers.py exposes one function per kind returning (columns, rows) with rows as lists aligned to columns; cells are None for empty, str for csv/tsv",
+   "csv/tsv use utf-8-sig then cp1252 fallback; headers are stripped, empty header becomes column_N (1-based), duplicates get _2, _3",
+   "json accepts a top-level list of objects or {data:[...]}/{records:[...]}; jsonl skips blank lines; columns are keys in first-seen order; nested values become json.dumps strings",
+   "geojson gives one row per feature: property keys, then longitude, latitude (Point coords, else mean of first ring/line; null geometry -> None)",
+   "Failures raise a ReadError with one of the fixed notes: empty file, no header row, not a list of records, could not decode text",
+   "A row-count helper reads counts and header only without keeping rows; unit tests in tests/test_readers.py cover each kind on tiny inline files (points.tsv 4x3, records.json 3x2, events.jsonl 10x2, cities.geojson 4x3 from the data_dir fixture)"
+  ],
+  "acceptance": [
+   "AC-1",
+   "AC-12"
+  ],
+  "files": [
+   "app/readers.py",
+   "tests/test_readers.py"
+  ]
+ },
+ {
+  "goal": "Read .xlsx/.xlsm sheets with zipfile + xml.etree in app/xlsx.py (one dataset per sheet), standard library only",
+  "layer": "backend",
+  "criteria": [
+   "xlsx.py exposes sheet_names(path) and read_sheet(path, sheet) returning (columns, rows) in the same shape as readers.py",
+   "Shared strings, inline strings, numbers and booleans (as TRUE/FALSE) are read; numeric cells with date number formats (numFmtId 14-22 or custom d/m/y) become datetime from the 1899-12-30 serial; the first non-empty row is the header",
+   "Sheet XML is streamed with iterparse; a corrupt or non-zip file raises ReadError('not a valid xlsx')",
+   "Tests in tests/test_xlsx_read.py use the write_xlsx helper from conftest: Revenue sheet dates come back as datetimes, Lookup sheet reads, broken.xlsx raises not a valid xlsx"
+  ],
+  "acceptance": [
+   "AC-1",
+   "AC-12"
+  ],
+  "files": [
+   "app/xlsx.py",
+   "tests/test_xlsx_read.py"
+  ]
+ },
+ {
+  "goal": "Catalog scan and load: walk the data folder, stable ids, unreadable list and file inventory (G-2) in app/catalog.py",
+  "layer": "backend",
+  "criteria": [
+   "scan(folder) walks subfolders without following symlinks, skips names starting with '.', sorts by relative path, and returns Catalog(datasets, unreadable, others); a missing folder gives an empty catalog",
+   "Kinds by lower-case extension: csv, tsv/tab, xlsx/xlsm (one Dataset per sheet), json, jsonl/ndjson, geojson; each Dataset has id = sha1(f'{path}|{sheet or \"\"}')[:12], row count and column list; parquet is added by a later ticket through the same kind table",
+   "Any reader exception is caught per file into Unreadable(path, reason): empty.csv -> 'empty file', broken.xlsx -> 'not a valid xlsx'; other datasets still scan and load (AC-12)",
+   "Unrecognised extensions (manual.pdf, old .xls) go to others with type, size in bytes and modified date YYYY-MM-DD; they are never parsed",
+   "load(dataset, max_rows) returns the first max_rows rows and is lru_cache(4)-wrapped; scan is lru_cache(1) by folder and tests/conftest make_client clears both caches",
+   "tests/test_catalog.py on the data_dir fixture: 8 datasets with paths, Revenue and Lookup sheets, correct row and column counts, 2 unreadable, manual.pdf in others with type pdf and size 9, .hidden.csv absent"
+  ],
+  "acceptance": [
+   "AC-1",
+   "AC-12"
+  ],
+  "files": [
+   "app/catalog.py",
+   "tests/test_catalog.py"
+  ]
+ },
+ {
+  "goal": "Parquet support (Board gate 161: Parquet yes, add pyarrow as a runtime dependency) in app/parquet.py and requirements.txt",
+  "layer": "backend",
+  "criteria": [
+   "requirements.txt lists pyarrow as a runtime dependency (gate 161)",
+   "parquet.read(path) returns (columns, rows) like the other readers: it uses pyarrow when importable, otherwise a standard-library flat-schema reader (thrift compact footer, PLAIN and dictionary encodings, definition levels, UNCOMPRESSED/GZIP/SNAPPY, INT96 and DATE/TIMESTAMP to datetime/date) so tests run offline where pyarrow is not installed",
+   "ZSTD, LZ4, BROTLI or nested schemas raise ReadError('unsupported parquet encoding') and the file lands in the unreadable list (G-7)",
+   "Parquet is registered in the catalog kind table so scan lists .parquet files with row and column counts",
+   "Small fixture files (uncompressed, gzip, snappy, one dictionary-encoded, one optional column, one zstd) are committed under tests/fixtures/, generated once in /tmp and not by a runtime dependency; tests/test_parquet.py checks each reads values equal to its CSV twin and the zstd one is unsupported"
+  ],
+  "acceptance": [
+   "AC-1",
+   "AC-12"
+  ],
+  "files": [
+   "app/parquet.py",
+   "app/catalog.py",
+   "requirements.txt",
+   "tests/fixtures",
+   "tests/test_parquet.py"
+  ]
+ },
+ {
+  "goal": "Profile classification and the API routes for datasets and profile (AC-2, AC-3) in app/profile.py and app/main.py",
+  "layer": "backend",
+  "criteria": [
+   "classify(columns, rows) returns {column: type} with first-match-wins rules: geospatial (header lat, lon, lng, latitude, longitude, any case), temporal (all date/datetime values, or >= 90% of strings parse with fromisoformat or %d/%m/%Y, %m/%d/%Y, %Y/%m/%d, %d-%m-%Y, %d.%m.%Y; bare year 2020 stays numerical), numerical (int/float not bool, or numeric strings), categorical (text, <= 50 distinct and <= 50% distinct), other (everything else incl. all-empty)",
+   "GET /api/datasets returns [{id,path,sheet,kind,rows,columns}] where columns is a count",
+   "GET /api/datasets/{id}/profile returns the mapping for every column, writes the same JSON to <out>/profiles/{id}.json (creating the folder) and returns 404 for an unknown id",
+   "Unit tests in tests/test_profile.py on lists plus the fixture: Latitude/LON geospatial, date temporal, region categorical, comment other; route JSON equals the saved file"
+  ],
+  "acceptance": [
+   "AC-2",
+   "AC-3"
+  ],
+  "files": [
+   "app/profile.py",
+   "app/main.py",
+   "tests/test_profile.py"
+  ]
+ },
+ {
+  "goal": "Chart rules for map3d, line and bar with downsampling, and the chart JSON route (AC-4, AC-5, AC-6, AC-7, AC-10)",
+  "layer": "backend",
+  "criteria": [
+   "rules.charts(columns, rows, mapping, settings) returns chart dicts per the Chart contract (id chart-N, kind, title, x_label, y_label, rule caption, shown, total, data) and [] when no rule matches (AC-7)",
+   "map3d only when a lat and a lon geospatial column exist (x lon, y lat, z first numerical else 0), stride-sampled with step = ceil(n/cap) so shown <= map_cap and total is the full count (AC-10); no map otherwise (AC-6, drawn later as Plotly scatter3d, not Deck.gl per gate 161)",
+   "line: temporal + each of the first 2 numerical columns, sum per distinct timestamp sorted, sampled to chart_cap; bar: first categorical vs first 2 numerical summed per value sorted desc, or one count bar when there is no numerical column",
+   "NaN/inf become null and dates are ISO strings; GET /api/datasets/{id}/charts returns {dataset, charts}; 404 for unknown id",
+   "tests/test_rules.py: sales.csv bar sums North 16, South 23, East 7; book.xlsx Revenue gives a line; big_csv (60,000 rows) map shown <= 50,000 and total 60,000; notes.csv returns no charts"
+  ],
+  "acceptance": [
+   "AC-4",
+   "AC-5",
+   "AC-6",
+   "AC-7",
+   "AC-10"
+  ],
+  "files": [
+   "app/rules.py",
+   "app/main.py",
+   "tests/test_rules.py"
+  ]
+ },
+ {
+  "goal": "Extra chart rules: donut, histogram, scatter, correlation heatmap and country map (G-3) with the 8-chart cap",
+  "layer": "backend",
+  "criteria": [
+   "donut: first categorical column with 2 to 6 distinct values, row count per value; histogram: first numerical column, 20 equal-width bins over min..max (max in last bin, 1 bin when min = max) with edges and counts",
+   "scatter: first two numerical columns on rows with both, sampled to chart_cap; heatmap: Pearson correlation of the first 12 numerical columns on pairwise-complete rows, null when undefined, r = 1 on the diagonal",
+   "country_map: text column headed country, country_name, nation, iso3 or iso_a3; sum of first numerical per country (count if none); locationmode ISO-3 when every value is 3 upper-case letters else country names",
+   "Charts are produced in the architecture's rule order (map3d, country_map, line, bar, donut, histogram, scatter, heatmap) with at most 2 line and 2 bar charts and then cut to 8",
+   "tests/test_rules_extra.py: one hand-computed test per kind on inline rows (histogram edges/counts, r values, ISO-3 FRA/JPN versus names from records.json) and a test of the order and the cap"
+  ],
+  "acceptance": [
+   "AC-4",
+   "AC-5"
+  ],
+  "files": [
+   "app/rules.py",
+   "tests/test_rules_extra.py"
+  ]
+ },
+ {
+  "goal": "XLSX export with native editable charts (G-5, gate 160) in app/xlsx.py and the export.xlsx route",
+  "layer": "backend",
+  "criteria": [
+   "xlsx.write(dataset, rows, charts) returns bytes: sheet Data (header + loaded rows), then one sheet per chart with its data table at A1 and a drawing holding a native chart (c:lineChart, c:barChart, c:doughnutChart, c:scatterChart; histogram as column c:barChart of counts) that references that range",
+   "heatmap sheet holds the matrix with a 3-colour colorScale conditional format; map3d becomes a c:scatterChart of lon/lat and country_map a bar chart (no Office map charts because they need Bing)",
+   "GET /datasets/{id}/export.xlsx returns 200, the xlsx content type and Content-Disposition attachment with filename <stem>[-<sheet>].xlsx; 404 for unknown id",
+   "tests/test_export_xlsx.py: the zip opens, every XML part parses with xml.etree, [Content_Types].xml lists every part, and there is one chart part per chart"
+  ],
+  "acceptance": [
+   "AC-4",
+   "AC-5",
+   "AC-6"
+  ],
+  "files": [
+   "app/xlsx.py",
+   "app/export.py",
+   "app/main.py",
+   "tests/test_export_xlsx.py"
+  ]
+ },
+ {
+  "goal": "PPTX export with native editable charts (G-5, gate 160) in app/export.py and the export.pptx route",
+  "layer": "backend",
+  "criteria": [
+   "export.pptx(dataset, charts) returns bytes: slide 1 title (file name, 'N rows, M columns'), then one slide per chart with its title, a native chart part ppt/charts/chartN.xml with an embedded workbook made by the xlsx writer (Edit Data works), and a text box with the rule caption and 'N of M'",
+   "Heatmap slide uses a native a:tbl; map3d and country_map use the same scatter/bar substitutes as the xlsx export",
+   "Counts in captions use thousands separators (Board gate 161: 1,234 of 56,789)",
+   "GET /datasets/{id}/export.pptx returns 200 with the pptx content type, Content-Disposition attachment named <stem>[-<sheet>].pptx; 404 for unknown id",
+   "tests/test_export_pptx.py: zip opens, all XML parts parse, [Content_Types].xml lists every part, one ppt/charts/chartN.xml with the expected c:*Chart element and one embedded workbook per chart slide"
+  ],
+  "acceptance": [
+   "AC-4",
+   "AC-5"
+  ],
+  "files": [
+   "app/export.py",
+   "app/main.py",
+   "tests/test_export_pptx.py"
+  ]
+ },
+ {
+  "goal": "Launcher: app.launch, DataBoot.bat, Start-DataBoot.ps1 (Board gate 161 renames AC-13's Start-DataOS.ps1) and Dockerfile",
+  "layer": "backend",
+  "criteria": [
+   "python -m app.launch <folder> [--port 8765] [--no-browser] exits 2 with one stderr line when the folder is missing, sets DATABOOT_DATA, takes the first free port from 8765 (20 tries), runs uvicorn on 127.0.0.1 and calls open_browser(url) once server.started; run(folder, port, open_browser) and launch.SERVER are exposed",
+   "tests/test_launch.py: with a fake open_browser the URL http://127.0.0.1:<port>/ is received, GET / returns 200, then SERVER.should_exit stops it (AC-11)",
+   "DataBoot.bat calls Start-DataBoot.ps1 with -ExecutionPolicy Bypass; Start-DataBoot.ps1 [-Folder] [-Docker] opens a FolderBrowserDialog when no folder is given, creates .venv with py -3.11 (fallback python), installs requirements.txt (--no-index --find-links wheels when a wheels folder exists) and runs the app.launch module for Windows 11 with a folder or drive letter",
+   "With -Docker the script checks `docker info` (message and exit 1 otherwise), builds the image if missing, runs `docker run --rm -d -p 8765:8765 -v \"${Folder}:/data:ro\"` and does Start-Process http://localhost:8765/; no file named Start-DataOS.ps1 exists (gate 161)",
+   "Dockerfile: FROM python:3.11-slim, installs requirements.txt, copies app/, ENV DATABOOT_DATA=/data, CMD uvicorn app.main:app on 0.0.0.0:8765; text checks in tests/test_launcher_files.py"
+  ],
+  "acceptance": [
+   "AC-11",
+   "AC-13"
+  ],
+  "files": [
+   "app/launch.py",
+   "DataBoot.bat",
+   "Start-DataBoot.ps1",
+   "Dockerfile",
+   "tests/test_launch.py",
+   "tests/test_launcher_files.py"
+  ]
+ },
+ {
+  "goal": "Home and dashboard pages: server-rendered tables, figures, captions and thousands separators (Board gate 161), name DataBoot (G-6)",
+  "layer": "frontend",
+  "criteria": [
+   "GET / shows h1 DataBoot, the folder path and up to three tables (datasets with link to /datasets/{id}, Could not be read with reason, Other files with type, size, modified) using the DESIGN.md classes; empty tables are hidden; page title says DataBoot",
+   "GET /datasets/{id} (404 for unknown id) shows h1 with file name and sheet, a column-types table with type badges, one <figure class=\"chart\" id=\"chart-N\" data-kind> per chart with a figcaption holding title, one rule caption and 'N of M points' (rows for aggregates), the first 20 rows in a table, and links to export.pptx and export.xlsx",
+   "Every count on both pages uses thousands separators through one Jinja filter: '50,000 of 60,000' (Board gate 161); a dataset with no chart rule shows types and table only with no figure.chart and status 200 (AC-7, AC-8)",
+   "No <p> in <main> outside figcaptions and the folder path (G-4); unreadable files are listed and the other datasets still open (AC-12)",
+   "tests/test_pages.py with TestClient on data_dir and big_csv covers the home tables, manual.pdf without a link, every fixture dashboard having a types table and <= 20 rows, and the figure counts"
+  ],
+  "acceptance": [
+   "AC-1",
+   "AC-4",
+   "AC-5",
+   "AC-6",
+   "AC-7",
+   "AC-8",
+   "AC-10",
+   "AC-12"
+  ],
+  "files": [
+   "app/main.py",
+   "app/templates/home.html",
+   "app/templates/dataset.html",
+   "app/templates/base.html",
+   "tests/test_pages.py"
+  ]
+ },
+ {
+  "goal": "dashboard.js draws each chart with locally served Plotly, scatter3d for the map (Board gate 161: Plotly 3D scatter, offline outlines), with no external requests (AC-9)",
+  "layer": "frontend",
+  "criteria": [
+   "dashboard.js fetches /api/datasets/{id}/charts once on load and draws each figure's .plot with Plotly.newPlot for line, bar, donut, histogram, scatter, heatmap (printed values, diverging scale), map3d as scatter3d and country_map as choropleth",
+   "Every Plotly.newPlot passes config {topojsonURL: '/static/vendor/topojson/', displaylogo: false}; colours are read from the --c1..--c8 CSS variables with getComputedStyle; no Plotly title; light/dark follows the OS only, there is no theme toggle (gate 161)",
+   "Pages load plotly.min.js and dashboard.js from /static only; the loading shimmer shows only while the fetch is pending and a failed fetch shows the .note-error state",
+   "Parse src/href on / and every dashboard page: all relative and each returns 200 from the app (AC-9); the sane-topojson JSON and its LICENSE are served",
+   "tests/test_browser.py (Playwright, function-scope fixtures) with every non-127.0.0.1 request aborted: sales.csv shows a line and a bar svg, points.tsv a scatter3d canvas, records.json a country map with drawn paths, 0 external requests, 0 console errors; the 375px and 1280px widths show no horizontal page overflow"
+  ],
+  "acceptance": [
+   "AC-4",
+   "AC-5",
+   "AC-6",
+   "AC-9"
+  ],
+  "files": [
+   "app/static/js/dashboard.js",
+   "app/templates/dataset.html",
+   "app/static/css/databoot.css",
+   "tests/test_browser.py"
+  ]
+ }
+]
