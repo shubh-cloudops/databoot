@@ -1,0 +1,74 @@
+{
+  "header": {
+    "ticket": 387,
+    "project": "you-think-of-the-project-name",
+    "from_role": "qa",
+    "phase": "qa",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "e14d1b175e03",
+    "tokens_left": 1940474
+  },
+  "goal": "Write or extend tests/test_acceptance.py with one test per acceptance item and run them.",
+  "acceptance_criteria": [
+    {
+      "text": "One test per acceptance item, named after its id",
+      "passes": true
+    },
+    {
+      "text": "Failures are reported, not hidden",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa",
+    "passed": true,
+    "output_tail": "........................................................................ [ 55%]\n...ss....................................................                [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n127 passed, 2 skipped, 1 warning in 62.65s (0:01:02)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "AC-13 is tested against Start-DataBoot.ps1 and asserts the old Start-DataOS.ps1 name does not exist",
+      "why": "Board gate 161 renamed the script; acceptance.json text is stale",
+      "evidence": "tests/test_acceptance.py test_AC_13; docs/acceptance.json AC-13"
+    },
+    {
+      "what": "AC-4, AC-5 and AC-6 check the charts API and page markup over HTTP, plus one Playwright draw check each, with off-host requests aborted",
+      "why": "Drawn charts are only visible in a browser",
+      "evidence": "tests/test_acceptance.py live fixture, _drawn()"
+    },
+    {
+      "what": "AC-10 asserts the page shows 'N of 60,000 points' against the default cap of 50,000",
+      "why": "The AC says the page shows how many points are shown out of the total",
+      "evidence": "tests/test_acceptance.py test_AC_10"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "mcp__playwright browser tools for the sweep",
+      "why_it_failed": "Not available in this session; used Python Playwright with a temporary script in /tmp instead"
+    }
+  ],
+  "assumptions": [
+    "AC-6 text still says nothing about Deck.gl in the item itself; the test checks a 3D map (map3d chart plus a WebGL canvas), per gate 161 (Plotly 3D scatter)",
+    "AC-11 is tested through launch.run with an injected open_browser function, not by opening a real browser"
+  ],
+  "open_questions": [
+    "docs/acceptance.json AC-13 still names Start-DataOS.ps1; the PM must reword it per gate 161",
+    "docs/acceptance.json has only AC-1 to AC-13; gate 162 asked the PM to add ids for G-1 to G-7, which are not there yet, so those features (exports, extra charts, parquet, thousands separators) have no acceptance test",
+    "The sweep did not open the heatmap, a Parquet dataset, the exports in a viewer, or the real-size live snapshot"
+  ],
+  "lessons": [
+    {
+      "lesson": "If tests/test_acceptance.py does not exist, write all ids at once, reusing the data_dir, big_csv and make_client fixtures from conftest.py",
+      "when": "A QA ticket starts without an acceptance file",
+      "evidence": "tests/conftest.py; this ticket"
+    },
+    {
+      "lesson": "In the Python Playwright sweep, reuse the data_dir fixture body via conftest.data_dir.__wrapped__(tmp_path) to build the fixture folder outside pytest",
+      "when": "A browser sweep needs the same data as the tests",
+      "evidence": "/tmp/sweep.py"
+    }
+  ],
+  "problems": []
+}
