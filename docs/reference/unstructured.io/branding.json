@@ -1,0 +1,55 @@
+{
+  "url": "https://unstructured.io",
+  "logos": [
+    "https://cdn.sanity.io/images/d35hevy9/production/dacfd86b1a9012d04296b2978d2d0991c8ac24cb-358x204.png?w=256&h=146&max-h=3840&max-w=3840&q=85&auto=format",
+    "https://cdn.sanity.io/images/d35hevy9/production/3619b531ac36c5c5a18548ece639dab92712dc56-358x204.png?w=256&h=146&max-h=3840&max-w=3840&q=85&auto=format",
+    "https://cdn.sanity.io/images/d35hevy9/production/35b1c79e5ccb9bb5e39915f38bbfa63c5c589a1a-358x204.png?w=256&h=146&max-h=3840&max-w=3840&q=85&auto=format"
+  ],
+  "icons": [
+    "https://cdn.sanity.io/images/d35hevy9/production/f19dac06a6b8d3e66fe818be470470e4cb954635-1200x628.jpg?rect=2,0,1196,628&w=1200&h=630&max-h=3840&max-w=3840&q=85&auto=format",
+    "https://unstructured.io/favicon.ico?v=20260223",
+    "https://unstructured.io/favicon.svg?v=20260223",
+    "https://unstructured.io/apple-touch-icon.png?v=20260223"
+  ],
+  "logo_files": [
+    "logo-1.png",
+    "logo-2.png",
+    "logo-3.png",
+    "logo-4.jpg",
+    "logo-5.ico",
+    "logo-6.svg",
+    "logo-7.png"
+  ],
+  "styles": {
+    "body": {
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(0, 0, 0)",
+      "font": "Inter, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\""
+    },
+    "header": {
+      "color": "rgb(255, 255, 255)",
+      "background": "rgb(0, 0, 0)",
+      "font": "Inter, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\""
+    },
+    "nav": {
+      "color": "rgb(255, 255, 255)",
+      "background": "rgba(0, 0, 0, 0)",
+      "font": "Inter, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\""
+    },
+    "link": {
+      "color": "rgba(0, 0, 0, 0)",
+      "background": "rgba(0, 0, 0, 0)",
+      "font": "Inter, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\""
+    },
+    "button": {
+      "color": "rgb(255, 255, 255)",
+      "background": "rgba(0, 0, 0, 0)",
+      "font": "Inter, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\""
+    },
+    "heading": {
+      "color": "rgb(255, 255, 255)",
+      "background": "rgba(0, 0, 0, 0)",
+      "font": "Inter, ui-sans-serif, system-ui, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji\""
+    }
+  }
+}

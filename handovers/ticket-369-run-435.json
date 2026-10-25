@@ -1,0 +1,63 @@
+{
+  "header": {
+    "ticket": 369,
+    "project": "you-think-of-the-project-name",
+    "from_role": "router",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "medium",
+    "prompt_version": "775d10f51fce",
+    "tokens_left": 1977878
+  },
+  "goal": "Read docs/IDEA.md with no history and write docs/BRIEF.md: what this round asks for.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/BRIEF.md has the sections Asked, Deliverable, Done when, Unclear and Not asked",
+      "passes": true
+    },
+    {
+      "text": "It restates only what docs/IDEA.md says",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py brief",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Scoped the round to the rule-based, offline data-to-dashboard app with no AI or LLM",
+      "why": "The idea's final section says the software, not an AI, should do the explaining, with no language model, no text generation and no internet",
+      "evidence": "docs/IDEA.md line 107: \"No language models, no text generation, no internet connection required.\""
+    },
+    {
+      "what": "Listed deliverable as an offline local web app with one-click launch",
+      "why": "The idea says clients run it offline and it should start from a single click, like booting an OS",
+      "evidence": "docs/IDEA.md line 138: \"the entire environment must launch from a single click\""
+    },
+    {
+      "what": "Put the PowerPoint, Excel and Power BI exports under Unclear and Not asked, not Done when",
+      "why": "They appear only in the earlier AI-based sections, and the idea later says it wants no narration",
+      "evidence": "docs/IDEA.md lines 45-49 and 105"
+    }
+  ],
+  "tried_and_failed": [
+    "Running python3 /opt/prodagents/check.py brief was blocked by the zero-context hook, so the brief is unchecked by the script"
+  ],
+  "assumptions": [
+    "Round N is 1, taken from the ticket text",
+    "The last section of the idea (rule-based, offline) replaces the earlier AI-based sections"
+  ],
+  "open_questions": [
+    "Which file types are required this round beyond CSV, Excel and JSON?",
+    "Are the PowerPoint and Excel report exports still wanted?",
+    "Is the launcher Windows-only and Docker-based?",
+    "Does reading a pen drive mean a mounted folder or raw device access?",
+    "Is any written text allowed in the dashboard, or only visuals?",
+    "What happens to files with no recognisable column types?"
+  ],
+  "lessons": [],
+  "problems": []
+}
