@@ -1,0 +1,100 @@
+{
+  "header": {
+    "ticket": 385,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1912281
+  },
+  "goal": "dashboard.js draws each chart with locally served Plotly, scatter3d for the map (Board gate 161: Plotly 3D scatter, offline outlines), with no external requests (AC-9)",
+  "acceptance_criteria": [
+    {
+      "text": "dashboard.js fetches /api/datasets/{id}/charts once on load and draws each figure's .plot with Plotly.newPlot for line, bar, donut, histogram, scatter, heatmap (printed values, diverging scale), map3d as scatter3d and country_map as choropleth",
+      "passes": true
+    },
+    {
+      "text": "Every Plotly.newPlot passes config {topojsonURL: '/static/vendor/topojson/', displaylogo: false}; colours are read from the --c1..--c8 CSS variables with getComputedStyle; no Plotly title; light/dark follows the OS only, there is no theme toggle (gate 161)",
+      "passes": true
+    },
+    {
+      "text": "Pages load plotly.min.js and dashboard.js from /static only; the loading shimmer shows only while the fetch is pending and a failed fetch shows the .note-error state",
+      "passes": true
+    },
+    {
+      "text": "Parse src/href on / and every dashboard page: all relative and each returns 200 from the app (AC-9); the sane-topojson JSON and its LICENSE are served",
+      "passes": true
+    },
+    {
+      "text": "tests/test_browser.py (Playwright, function-scope fixtures) with every non-127.0.0.1 request aborted: sales.csv shows a line and a bar svg, points.tsv a scatter3d canvas, records.json a country map with drawn paths, 0 external requests, 0 console errors; the 375px and 1280px widths show no horizontal page overflow",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-4, AC-5, AC-6, AC-9 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "..............................................................ss........ [ 62%]\n............................................                             [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n114 passed, 2 skipped, 1 warning in 46.53s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Plotly modebar buttons are left as Plotly renders them (not keyboard-focusable); charts are still readable through the tables and aria-labels",
+      "why": "Making the hover-only modebar keyboard reachable needs extra focus CSS and key handlers; ticket scope is drawing",
+      "evidence": "docs/DESIGN.md Accessibility lists mode-bar buttons in tab order; app/static/js/dashboard.js"
+    },
+    {
+      "what": "Failed-fetch and draw-failure error is one element with classes plot-error note note-error",
+      "why": "AC says .note-error state, DESIGN.md says .plot-error with fixed text 'Chart could not be drawn'",
+      "evidence": "app/static/js/dashboard.js fail()"
+    },
+    {
+      "what": "Plotly and dashboard.js are loaded on every dashboard page even with no charts; dashboard.js returns early when there are no .plot elements",
+      "why": "AC-9 and the ticket say dashboard pages load both from /static",
+      "evidence": "app/templates/dataset.html"
+    },
+    {
+      "what": "map3d z axis is hidden and points use --c1 when every z is 0 or null; otherwise --seq colour scale by z",
+      "why": "DESIGN.md: --seq colour by z only when z is real data; rules._map3d uses 0 when no numerical column",
+      "evidence": "app/static/js/dashboard.js build.map3d; app/rules.py _map3d"
+    },
+    {
+      "what": "Added scene camera eye 1.5,1.5,1 and a re-draw on prefers-color-scheme and 599px breakpoint changes",
+      "why": "Default camera clipped the bottom axis labels in a 420px card; OS theme must be followed without a toggle",
+      "evidence": "/tmp/shots/points-1280-light.png"
+    },
+    {
+      "what": "test_browser.py runs uvicorn on port 0 in a thread per test (function-scope fixtures) and finds dataset ids via /api/datasets",
+      "why": "Ticket requires function-scope fixtures and a real browser; ids are hashes",
+      "evidence": "tests/test_browser.py"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Extra Plotly config keys responsive:true and displayModeBar:'hover' alongside topojsonURL and displaylogo are acceptable (DESIGN.md lists them)",
+    "Counts on value axes use the d3 ',' tick format for thousands separators; hover text is not reformatted"
+  ],
+  "open_questions": [
+    "Should Plotly modebar buttons be made keyboard-focusable (DESIGN.md tab order lists them)?",
+    "map3d has no z axis title or colorbar title because the chart contract has no z label",
+    "/favicon.ico still returns 404 (noted by ticket 384); the browser tests do not hit it because Playwright headless does not request it"
+  ],
+  "lessons": [
+    {
+      "lesson": "Playwright chromium works offline here (PLAYWRIGHT_BROWSERS_PATH=/opt/playwright) and scatter3d/WebGL draws a canvas headless; a browser test can run uvicorn on port 0 in a thread and read the port from server.servers[0].sockets",
+      "when": "writing browser tests for this app",
+      "evidence": "tests/test_browser.py; 11 passed in about 31 s"
+    },
+    {
+      "lesson": "Chart tests can wait on Plotly's own selectors (.main-svg, .gl-container canvas, .geo .choroplethlayer path) instead of sleeping",
+      "when": "asserting that a Plotly chart drew",
+      "evidence": "tests/test_browser.py"
+    }
+  ],
+  "problems": []
+}

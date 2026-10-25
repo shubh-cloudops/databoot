@@ -140,5 +140,6 @@ section.block { margin-top: var(--s6); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
   .btn:active { transform: none; }
+  .plot.is-loading { background: var(--line); }
 }
 @media print { .site-header, .actions, .skip { display: none; } }
