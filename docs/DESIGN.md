@@ -51,7 +51,7 @@ System stack `--font`: `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica
 | `--t-sm` | 0.875rem | tables, captions, notes |
 | `--t-xs` | 0.8125rem | table headings (upper case, 0.04em), badges |
 Numbers in tables and counts use `font-variant-numeric: tabular-nums` and right-align (`.num`). Thousands
-separators are not required by the spec; use them if the engineer adds them (open question in ARCHITECTURE.md).
+separators are used everywhere (Board gate 161), through the `num` filter.
 
 ## Spacing, shape, layout
 4px grid: `--s1..--s7` = 4, 8, 12, 16, 24, 32, 48. Radius 6px. Max content width 1200px, centred. Page padding
@@ -149,7 +149,15 @@ the page width.
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
-New: `app/static/css/databoot.css`; `app/templates/base.html` now links it and adds the skip link, header and
-`main#main`. Not done here (front-end ticket): `home.html`, `dataset.html`, `dashboard.js` markup using these
-classes. Stylesheet cannot be checked in a browser until those pages exist; the design review in the build
-phase does that.
+New: `app/static/css/databoot.css`; `app/templates/base.html` links it and adds the skip link, header and
+`main#main`. Home, dashboard and `dashboard.js` now use these classes.
+
+Design review (ticket 386), checked in a real browser at 1280, 800 and 375 px, light and dark, reduced motion:
+no sideways page scroll at any width, no console errors, every `.plot` has an aria-label, focus ring is 3px
+`--accent`. Fixed: table links and the crumb link were 29px and 16px high, now 44px (`td a`, `.crumb a`);
+table cells centre vertically so numbers line up with the link row; Modified dates no longer wrap (`td.nowrap`);
+a blank `/static/blank.svg` icon (not a logo) stops the `/favicon.ico` 404 console error (no logo, no new route); 3D map
+camera is pulled back at <= 599px so the lat/lon axis titles are not clipped; Plotly mode-bar buttons get the
+same focus ring. Table names are `<caption>`s (styled like h2) rather than h2 elements. The mode bar uses
+`displayModeBar: "hover"`, so its buttons are not in the tab order until shown; the same data is in the tables.
+No token change.

@@ -53,6 +53,9 @@ code, .mono { font-family: var(--mono); font-size: 0.9em; overflow-wrap: anywher
   padding: var(--s2) var(--s4); border: 2px solid var(--accent); border-radius: var(--radius); }
 .skip:focus { top: var(--s2); }
 
+/* Plotly mode-bar buttons: same ring as every control */
+.modebar-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 0; }
+
 /* layout */
 .site-header { background: var(--surface); border-bottom: 1px solid var(--line); }
 .site-header .inner { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--s4); min-height: 56px;
@@ -65,6 +68,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: var(--s5) var(--s4) var(
   margin-bottom: var(--s4); }
 .page-head h1 { margin: 0; }
 .crumb { font-size: var(--t-sm); color: var(--muted); margin: 0 0 var(--s2); }
+.crumb a { display: inline-flex; align-items: center; min-height: var(--tap); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
 
 /* buttons and links that download */
@@ -81,12 +85,14 @@ main { max-width: var(--maxw); margin: 0 auto; padding: var(--s5) var(--s4) var(
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
 caption { text-align: left; padding: var(--s3) var(--s4) var(--s2); font-weight: 650; font-size: var(--t-md); }
-th, td { text-align: left; padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); vertical-align: top; }
+th, td { text-align: left; padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); }
 th { font-weight: 650; color: var(--muted); font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.04em;
   white-space: nowrap; background: var(--bg); }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--accent-soft); }
-td a { display: inline-block; padding: var(--s1) 0; }
+td { vertical-align: middle; }
+td a { display: inline-flex; align-items: center; min-height: var(--tap); }
+td.nowrap { white-space: nowrap; }
 td.path { overflow-wrap: anywhere; min-width: 12ch; }
 .data-table td { white-space: nowrap; max-width: 28ch; overflow: hidden; text-overflow: ellipsis; }
 

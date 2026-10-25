@@ -23,7 +23,7 @@
   <caption>Other files</caption>
   <thead><tr><th scope="col">File</th><th scope="col">Type</th><th scope="col" class="num">Size (bytes)</th><th scope="col">Modified</th></tr></thead>
   <tbody>{% for o in cat.others %}
-    <tr><td class="path">{{ o.path }}</td><td>{{ o.type }}</td><td class="num">{{ o.size|num }}</td><td>{{ o.modified }}</td></tr>{% endfor %}
+    <tr><td class="path">{{ o.path }}</td><td>{{ o.type }}</td><td class="num">{{ o.size|num }}</td><td class="nowrap">{{ o.modified }}</td></tr>{% endfor %}
   </tbody></table></div></section>
 {% endif %}
 {% endblock %}
