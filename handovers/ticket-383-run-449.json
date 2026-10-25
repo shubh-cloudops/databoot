@@ -1,0 +1,91 @@
+{
+  "header": {
+    "ticket": 383,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1953628
+  },
+  "goal": "Launcher: app.launch, DataBoot.bat, Start-DataBoot.ps1 (Board gate 161 renames AC-13's Start-DataOS.ps1) and Dockerfile",
+  "acceptance_criteria": [
+    {
+      "text": "python -m app.launch <folder> [--port 8765] [--no-browser] exits 2 with one stderr line when the folder is missing, sets DATABOOT_DATA, takes the first free port from 8765 (20 tries), runs uvicorn on 127.0.0.1 and calls open_browser(url) once server.started; run(folder, port, open_browser) and launch.SERVER are exposed",
+      "passes": true
+    },
+    {
+      "text": "tests/test_launch.py: with a fake open_browser the URL http://127.0.0.1:<port>/ is received, GET / returns 200, then SERVER.should_exit stops it (AC-11)",
+      "passes": true
+    },
+    {
+      "text": "DataBoot.bat calls Start-DataBoot.ps1 with -ExecutionPolicy Bypass; Start-DataBoot.ps1 [-Folder] [-Docker] opens a FolderBrowserDialog when no folder is given, creates .venv with py -3.11 (fallback python), installs requirements.txt (--no-index --find-links wheels when a wheels folder exists) and runs the app.launch module for Windows 11 with a folder or drive letter",
+      "passes": true
+    },
+    {
+      "text": "With -Docker the script checks `docker info` (message and exit 1 otherwise), builds the image if missing, runs `docker run --rm -d -p 8765:8765 -v \"${Folder}:/data:ro\"` and does Start-Process http://localhost:8765/; no file named Start-DataOS.ps1 exists (gate 161)",
+      "passes": true
+    },
+    {
+      "text": "Dockerfile: FROM python:3.11-slim, installs requirements.txt, copies app/, ENV DATABOOT_DATA=/data, CMD uvicorn app.main:app on 0.0.0.0:8765; text checks in tests/test_launcher_files.py",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-11, AC-13 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": ".............................................ss......................... [ 72%]\n...........................                                              [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n97 passed, 2 skipped, 1 warning in 10.20s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "run() imports app.main after setting DATABOOT_DATA and starts a daemon thread that waits for server.started before calling open_browser; main passes None for --no-browser",
+      "why": "Single open_browser call only after the server is up; works when run() is in a non-main thread (uvicorn skips signal handlers there)",
+      "evidence": "app/launch.py run; tests/test_launch.py::test_run_opens_url_and_serves_home"
+    },
+    {
+      "what": "Dockerfile uses WORKDIR /srv and copies app/ to /srv/app",
+      "why": "Ticket asks only for requirements install, app/ copy, ENV and CMD; uvicorn app.main:app needs the package importable from the working directory",
+      "evidence": "Dockerfile"
+    },
+    {
+      "what": "Test sets DATABOOT_DATA via monkeypatch.setenv before run()",
+      "why": "run() writes os.environ; monkeypatch restores it so later tests are not affected",
+      "evidence": "tests/test_launch.py"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First attempt to write all files in one Bash heredoc command",
+      "why_it_failed": "The ProdAgents pretool deny list blocked the command; used the Write tool instead"
+    }
+  ],
+  "assumptions": [
+    "The test port search starting at 8765 is fine even if another process holds 8765, since run() takes the next free port",
+    "Start-DataBoot.ps1 exits 1 when the folder does not exist or the dialog is cancelled (not specified in the ticket)",
+    "The Docker image name is databoot, per ARCHITECTURE.md"
+  ],
+  "open_questions": [
+    "docs/acceptance.json AC-13 still names Start-DataOS.ps1; the PM must reword it per gate 161",
+    "The PowerShell script and Dockerfile were not run (no Windows or Docker here); only text-checked",
+    "-Docker with a drive letter such as E:\\ assumes Docker Desktop can mount it; not verified"
+  ],
+  "lessons": [
+    {
+      "lesson": "When a Bash heredoc batch is blocked by the pretool deny list, write the files with the Write tool instead of retrying",
+      "when": "Creating several files containing script text such as PowerShell or Dockerfile content",
+      "evidence": "ticket 383: heredoc command blocked, Write calls succeeded"
+    },
+    {
+      "lesson": "A test that calls a function which writes os.environ must call monkeypatch.setenv first (not delenv raising=False) so the value is restored",
+      "when": "Testing launchers or config that set environment variables",
+      "evidence": "tests/test_launch.py"
+    }
+  ],
+  "problems": []
+}
