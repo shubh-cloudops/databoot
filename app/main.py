@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import catalog, config, profile, rules, xlsx
+from app import catalog, config, export, profile, rules, xlsx
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -61,12 +61,21 @@ def dataset_charts(id: str):
     return {"dataset": d.id, "charts": _charts(d)[1]}
 
 
+def _download(d, ext, body, media_type):
+    name = Path(d.path).stem + (f"-{d.sheet}" if d.sheet else "") + "." + ext
+    disposition = f'attachment; filename="{name}"'
+    if not name.isascii() or '"' in name or "\\" in name:  # header values are latin-1: add the RFC 5987 form
+        disposition = f"attachment; filename=\"export.{ext}\"; filename*=UTF-8''{quote(name)}"
+    return Response(body, headers={"Content-Disposition": disposition}, media_type=media_type)
+
+
 @app.get("/datasets/{id}/export.xlsx")
 def export_xlsx(id: str):
     d = _dataset(id)
-    name = Path(d.path).stem + (f"-{d.sheet}" if d.sheet else "") + ".xlsx"
-    disposition = f'attachment; filename="{name}"'
-    if not name.isascii() or '"' in name or "\\" in name:  # header values are latin-1: add the RFC 5987 form
-        disposition = f"attachment; filename=\"export.xlsx\"; filename*=UTF-8''{quote(name)}"
-    return Response(xlsx.write(d, *_charts(d)), headers={"Content-Disposition": disposition},
-                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return _download(d, "xlsx", xlsx.write(d, *_charts(d)), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@app.get("/datasets/{id}/export.pptx")
+def export_pptx(id: str):
+    d = _dataset(id)
+    return _download(d, "pptx", export.pptx(d, _charts(d)[1]), "application/vnd.openxmlformats-officedocument.presentationml.presentation")

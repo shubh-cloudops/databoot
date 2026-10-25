@@ -1,0 +1,90 @@
+{
+  "header": {
+    "ticket": 382,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1928897
+  },
+  "goal": "PPTX export with native editable charts (G-5, gate 160) in app/export.py and the export.pptx route",
+  "acceptance_criteria": [
+    {
+      "text": "export.pptx(dataset, charts) returns bytes: slide 1 title (file name, 'N rows, M columns'), then one slide per chart with its title, a native chart part ppt/charts/chartN.xml with an embedded workbook made by the xlsx writer (Edit Data works), and a text box with the rule caption and 'N of M'",
+      "passes": true
+    },
+    {
+      "text": "Heatmap slide uses a native a:tbl; map3d and country_map use the same scatter/bar substitutes as the xlsx export",
+      "passes": true
+    },
+    {
+      "text": "Counts in captions use thousands separators (Board gate 161: 1,234 of 56,789)",
+      "passes": true
+    },
+    {
+      "text": "GET /datasets/{id}/export.pptx returns 200 with the pptx content type, Content-Disposition attachment named <stem>[-<sheet>].pptx; 404 for unknown id",
+      "passes": true
+    },
+    {
+      "text": "tests/test_export_pptx.py: zip opens, all XML parts parse, [Content_Types].xml lists every part, one ppt/charts/chartN.xml with the expected c:*Chart element and one embedded workbook per chart slide",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-4, AC-5 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "......................................ss................................ [ 78%]\n....................                                                     [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n90 passed, 2 skipped, 1 warning in 9.48s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Embedded workbook per chart is xlsx.write(SimpleNamespace(columns=head), table rows, [chart]), so its Data sheet and 'chart-1 <kind>' sheet both hold the chart table",
+      "why": "Reuses the xlsx writer as the ticket asks; the first sheet PowerPoint shows is then not empty, and the chart series point at 'chart-1 <kind>'",
+      "evidence": "app/export.py pptx(); tests/test_export_pptx.py::test_sales_download"
+    },
+    {
+      "what": "export.py imports private helpers (_chart, _table, _rels, _esc and the namespace constants) from app/xlsx.py",
+      "why": "Same chart XML and relationship writer for both formats, no duplicated code",
+      "evidence": "app/export.py:7"
+    },
+    {
+      "what": "Caption is two paragraphs in one text box: the rule, then 'N of M points' (map3d, line, scatter) or 'N of M rows'",
+      "why": "Matches the page caption wording in ARCHITECTURE.md Pages",
+      "evidence": "app/export.py _caption"
+    },
+    {
+      "what": "Every part, including the embedded .xlsx files, is listed as an Override in [Content_Types].xml",
+      "why": "The test and strict readers can then check that every non-rels part is listed",
+      "evidence": "app/export.py pptx(); tests/test_export_pptx.py check_package"
+    },
+    {
+      "what": "Extracted _download(d, ext, body, media_type) in main.py for the Content-Disposition logic, used by both export routes",
+      "why": "One filename and header rule for both formats",
+      "evidence": "app/main.py _download"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Title slide shows 'name - sheet' when the dataset has a sheet",
+    "Slide size is 16:9 (12192000 x 6858000 EMU); a blank layout and a minimal master and theme (Arial) are enough for PowerPoint to open the file",
+    "Heatmap values are shown with two decimals and coloured on the same blue-white-red scale as the xlsx matrix"
+  ],
+  "open_questions": [
+    "The generated pptx was not opened in PowerPoint or LibreOffice (neither is installed here); the master, theme and chart-frame XML follow the OOXML schema from memory",
+    "ARCHITECTURE.md lists export.xlsx(dataset, rows, charts) in app/export.py, but the xlsx writer lives in app/xlsx.py; should the Modules section be updated?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When a sibling export already built chart XML and a package writer, import its helpers and add only the new package layout (master, layout, theme, slides)",
+      "when": "Adding a second Office export format",
+      "evidence": "app/export.py reuses app/xlsx.py _chart/_table/_rels"
+    }
+  ],
+  "problems": []
+}
