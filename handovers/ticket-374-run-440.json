@@ -1,0 +1,83 @@
+{
+  "header": {
+    "ticket": 374,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1944764
+  },
+  "goal": "Text readers for CSV, TSV, JSON, JSONL and GeoJSON (gate 160 file types, G-1) in app/readers.py, standard library only",
+  "acceptance_criteria": [
+    {
+      "text": "readers.py exposes one function per kind returning (columns, rows) with rows as lists aligned to columns; cells are None for empty, str for csv/tsv",
+      "passes": true
+    },
+    {
+      "text": "csv/tsv use utf-8-sig then cp1252 fallback; headers are stripped, empty header becomes column_N (1-based), duplicates get _2, _3",
+      "passes": true
+    },
+    {
+      "text": "json accepts a top-level list of objects or {data:[...]}/{records:[...]}; jsonl skips blank lines; columns are keys in first-seen order; nested values become json.dumps strings",
+      "passes": true
+    },
+    {
+      "text": "geojson gives one row per feature: property keys, then longitude, latitude (Point coords, else mean of first ring/line; null geometry -> None)",
+      "passes": true
+    },
+    {
+      "text": "Failures raise a ReadError with one of the fixed notes: empty file, no header row, not a list of records, could not decode text",
+      "passes": true
+    },
+    {
+      "text": "A row-count helper reads counts and header only without keeping rows; unit tests in tests/test_readers.py cover each kind on tiny inline files (points.tsv 4x3, records.json 3x2, events.jsonl 10x2, cities.geojson 4x3 from the data_dir fixture)",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-1, AC-12 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "...................                                                      [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n19 passed, 1 warning in 4.89s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "ReadError(ValueError) defined in readers.py; one read_<kind>(path) per kind plus count_rows(path, kind); shared _load(path, kind, keep) so count and read cannot disagree",
+      "why": "Ticket asks for per-kind functions and a count helper; xlsx/parquet tickets import ReadError from here",
+      "evidence": "app/readers.py"
+    },
+    {
+      "what": "Encoding is checked by a full read pass (utf-8-sig, then cp1252) before the real read, so streaming cannot fail midway",
+      "why": "A late UnicodeDecodeError during a count or read would escape as a non-ReadError",
+      "evidence": "app/readers.py _open; tests/test_readers.py::test_csv_encodings"
+    },
+    {
+      "what": "Zero-record json/jsonl, header-less csv -> 'no header row'; malformed JSON or wrong shape -> 'not a list of records'",
+      "why": "Only four fixed notes are allowed and none fits these cases better",
+      "evidence": "tests/test_readers.py::test_failures"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Whitespace-only CSV header cells become column_N; a blank CSV line is skipped; an all-empty-cell row such as ',,' is kept as data",
+    "GeoJSON GeometryCollection or malformed coordinates give None longitude/latitude",
+    "A property literally named longitude/latitude is overwritten by the geometry values"
+  ],
+  "open_questions": [
+    "Should the catalog show 'not a list of records' for broken JSON syntax, or is a separate note wanted?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When a module stub docstring and the ticket disagree on the function shape, follow the ticket and rewrite the docstring in the same change",
+      "when": "Implementing a stubbed module whose docstring predates the ticket",
+      "evidence": "app/readers.py old docstring said read(path, max_rows) -> 3-tuple; ticket 374 says (columns, rows)"
+    }
+  ],
+  "problems": []
+}
