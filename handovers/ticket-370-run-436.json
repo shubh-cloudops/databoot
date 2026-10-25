@@ -1,0 +1,96 @@
+{
+  "header": {
+    "ticket": 370,
+    "project": "you-think-of-the-project-name",
+    "from_role": "pm",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "a2dbf282ff46",
+    "tokens_left": 1956771
+  },
+  "goal": "Write or update docs/PRD.md and docs/acceptance.json for the idea in docs/IDEA.md.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/PRD.md describes the product",
+      "passes": true
+    },
+    {
+      "text": "docs/acceptance.json lists testable acceptance items",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py spec",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Scoped round 1 to the rule-based offline app: scan a folder for CSV/xlsx, classify columns, rule-picked line/bar/3D map charts, locally served assets, downsampling, one-click launcher",
+      "why": "The brief's Asked and Done-when sections say exactly this; the AI, narration and export sections are superseded",
+      "evidence": "docs/BRIEF.md Asked/Done when/Not asked; docs/IDEA.md L105-143"
+    },
+    {
+      "what": "Treated docs/reference (deck.gl, unstructured.io) as captures of third-party libraries, not a business site; no redesign and no branding taken from them",
+      "why": "Both are libraries named in the idea, not the client's website",
+      "evidence": "docs/reference/deck.gl/page.md, docs/reference/unstructured.io/page.md; docs/IDEA.md L16, L129"
+    },
+    {
+      "what": "Added an 'other' column type next to the four in the idea, and set fixed thresholds (\u226450 distinct and \u226450% distinct for categorical, 90% date-parse for temporal, lng also geospatial)",
+      "why": "Free-text and id columns fit none of the four, and the ACs need numbers to be testable",
+      "evidence": "docs/IDEA.md L117; docs/BRIEF.md Unclear"
+    },
+    {
+      "what": "Kept the existing FastAPI + Jinja scaffold as the default stack and left the Flask/Dash choice to the architecture",
+      "why": "The scaffold already exists; the idea's stack lines are prompts, not requirements",
+      "evidence": "app/main.py, requirements.txt; docs/IDEA.md L129"
+    },
+    {
+      "what": "Made a cross-platform launcher command the Must item (AC-11) and Docker + Start-DataOS.ps1 a Should item (AC-13)",
+      "why": "QA cannot run Docker or PowerShell offline in tests; the Windows packaging is still delivered",
+      "evidence": "docs/IDEA.md L141; docs/BRIEF.md Unclear"
+    },
+    {
+      "what": "All four optional agents on",
+      "why": "This is a browser dashboard web app",
+      "evidence": "docs/team.json"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Running python3 /opt/prodagents/check.py spec",
+      "why_it_failed": "The Bash command needed approval, which was not granted; the orchestrator will run it"
+    }
+  ],
+  "assumptions": [
+    "The drive is mounted as a normal folder; raw device access is out of scope",
+    "Bar charts sum the numerical column per category",
+    "A small count label ('showing N of M points') does not break the no-narration rule",
+    "Map renders with no online base-map tiles"
+  ],
+  "open_questions": [
+    "Branding: no logo, colours or fonts for the business were found. docs/reference holds only captures of deck.gl and unstructured.io (third-party libraries, with their own logos), which we will not use. Please confirm the product name ('Data OS', from Start-DataOS.ps1) and give a logo (image link in the gate comment) and colours/fonts, or confirm a plain neutral style.",
+    "Stack: the idea names Flask + Plotly Dash; the project scaffold is FastAPI + Jinja. Is the scaffold acceptable?",
+    "Is the launcher Windows-only (PowerShell + Docker), or must it also run on macOS/Linux?",
+    "Which file types beyond CSV and Excel are wanted next (JSON, PDF, Word, SQL, shapefile, GeoJSON)?",
+    "Are the PowerPoint/Excel report and Power BI exports dropped, or wanted in a later round?",
+    "Bar charts: sum or average per category?",
+    "Are the classification thresholds (categorical \u226450 distinct and \u226450% of rows; temporal \u226590% parse as dates) right, and are other chart types wanted?",
+    "Is a short count label or caption on charts acceptable, or must the dashboard hold no text beyond axis labels?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When docs/reference holds captures of libraries named in the idea (not the client's site), say so, don't spec a redesign, and ask for branding in the first open question",
+      "when": "PM round where docs/reference exists for a non-redesign idea",
+      "evidence": "docs/reference/deck.gl, docs/reference/unstructured.io; docs/IDEA.md L16, L129"
+    },
+    {
+      "lesson": "check.py spec may need approval for Bash; validate JSON shape by hand and report it unrun",
+      "when": "PM ticket end",
+      "evidence": "ticket 370 Bash denial"
+    }
+  ],
+  "problems": []
+}

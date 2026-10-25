@@ -1,0 +1,15 @@
+[
+  {"id": "AC-1", "text": "Started on a folder that holds CSV and .xlsx files (also in subfolders), the home page lists every dataset found with its file name, sheet name for Excel, row count and column count."},
+  {"id": "AC-2", "text": "GET /api/datasets/<id>/profile returns a JSON object mapping every column name to one of geospatial, temporal, categorical, numerical or other, and the same mapping is saved as a JSON file in the app's output folder."},
+  {"id": "AC-3", "text": "Columns named lat, lon, lng, latitude or longitude (any case) are geospatial; date columns are temporal; integer and float columns are numerical; text columns with at most 50 distinct values and at most 50% distinct are categorical; other text columns are other."},
+  {"id": "AC-4", "text": "A dataset with a temporal and a numerical column shows a time-series line chart of that numerical column over the temporal column on its dashboard page."},
+  {"id": "AC-5", "text": "A dataset with a categorical and a numerical column shows a bar chart of the numerical column summed per category on its dashboard page."},
+  {"id": "AC-6", "text": "A dataset with latitude and longitude columns shows a 3D map of its points on its dashboard page; a dataset without them shows no map."},
+  {"id": "AC-7", "text": "A dataset with no matching rule shows its column types and a table of its first rows and no charts, and the page loads without error."},
+  {"id": "AC-8", "text": "Every dashboard page shows the dataset's column types and a table of its first 20 rows."},
+  {"id": "AC-9", "text": "No page served by the app references a script, stylesheet, font or image on another host; every asset URL in the home and dashboard pages returns 200 from the app itself."},
+  {"id": "AC-10", "text": "For a dataset with more rows than the map cap (default 50,000), the map data sent to the browser holds at most the cap and the page shows how many points are shown out of the total."},
+  {"id": "AC-11", "text": "One launcher command, given a folder, starts the app on localhost and opens the dashboard home page in the default browser."},
+  {"id": "AC-12", "text": "An empty or unreadable file in the folder is listed on the home page as could not be read, and the other datasets still list and open."},
+  {"id": "AC-13", "text": "A Dockerfile and a Start-DataOS.ps1 script are provided; the script checks Docker is running, mounts the chosen folder read-only, starts the container and opens the browser."}
+]
