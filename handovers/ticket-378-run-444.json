@@ -1,0 +1,68 @@
+{
+  "header": {
+    "ticket": 378,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1953343
+  },
+  "goal": "Profile classification and the API routes for datasets and profile (AC-2, AC-3) in app/profile.py and app/main.py",
+  "acceptance_criteria": [
+    {
+      "text": "classify(columns, rows) returns {column: type} with first-match-wins rules: geospatial (header lat, lon, lng, latitude, longitude, any case), temporal (all date/datetime values, or >= 90% of strings parse with fromisoformat or %d/%m/%Y, %m/%d/%Y, %Y/%m/%d, %d-%m-%Y, %d.%m.%Y; bare year 2020 stays numerical), numerical (int/float not bool, or numeric strings), categorical (text, <= 50 distinct and <= 50% distinct), other (everything else incl. all-empty)",
+      "passes": true
+    },
+    {
+      "text": "GET /api/datasets returns [{id,path,sheet,kind,rows,columns}] where columns is a count",
+      "passes": true
+    },
+    {
+      "text": "GET /api/datasets/{id}/profile returns the mapping for every column, writes the same JSON to <out>/profiles/{id}.json (creating the folder) and returns 404 for an unknown id",
+      "passes": true
+    },
+    {
+      "text": "Unit tests in tests/test_profile.py on lists plus the fixture: Latitude/LON geospatial, date temporal, region categorical, comment other; route JSON equals the saved file",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-2, AC-3 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "...........................ss..................................          [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n61 passed, 2 skipped, 1 warning in 6.74s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Bool values count as categorical candidates (str or bool only); a column mixing numbers and text, or holding dicts, is other",
+      "why": "The ticket says numerical excludes bool and categorical means text, with other for everything else; bool is the closest fit to categorical, same as the strings 'True'/'False' from CSV",
+      "evidence": "app/profile.py _kind; tests/test_profile.py::test_numerical_and_bool"
+    },
+    {
+      "what": "The 50% distinct limit uses the loaded row count including empty cells; distinct counts use str(value)",
+      "why": "ARCHITECTURE.md says '\u2264 50% of loaded rows'",
+      "evidence": "docs/ARCHITECTURE.md L101; app/profile.py _kind"
+    },
+    {
+      "what": "The profile route looks the dataset up through catalog.scan(config.get().data) and loads rows with catalog.load(d, max_rows)",
+      "why": "Reuses the cached scan and load, so the route needs no second reader",
+      "evidence": "app/main.py _dataset, dataset_profile"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Numeric strings such as '20240101' parse with fromisoformat and so count as temporal, as the rule order says",
+    "The modified flat.csv and optional.csv fixtures in git status are not from this ticket and were left alone"
+  ],
+  "open_questions": [
+    "Should boolean columns be categorical or other? The ticket does not say."
+  ],
+  "lessons": [],
+  "problems": []
+}
