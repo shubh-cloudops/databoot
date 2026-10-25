@@ -1,0 +1,95 @@
+{
+  "header": {
+    "ticket": 377,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1938650
+  },
+  "goal": "Parquet support (Board gate 161: Parquet yes, add pyarrow as a runtime dependency) in app/parquet.py and requirements.txt",
+  "acceptance_criteria": [
+    {
+      "text": "requirements.txt lists pyarrow as a runtime dependency (gate 161)",
+      "passes": true
+    },
+    {
+      "text": "parquet.read(path) returns (columns, rows) like the other readers: it uses pyarrow when importable, otherwise a standard-library flat-schema reader (thrift compact footer, PLAIN and dictionary encodings, definition levels, UNCOMPRESSED/GZIP/SNAPPY, INT96 and DATE/TIMESTAMP to datetime/date) so tests run offline where pyarrow is not installed",
+      "passes": true
+    },
+    {
+      "text": "ZSTD, LZ4, BROTLI or nested schemas raise ReadError('unsupported parquet encoding') and the file lands in the unreadable list (G-7)",
+      "passes": true
+    },
+    {
+      "text": "Parquet is registered in the catalog kind table so scan lists .parquet files with row and column counts",
+      "passes": true
+    },
+    {
+      "text": "Small fixture files (uncompressed, gzip, snappy, one dictionary-encoded, one optional column, one zstd) are committed under tests/fixtures/, generated once in /tmp and not by a runtime dependency; tests/test_parquet.py checks each reads values equal to its CSV twin and the zstd one is unsupported",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-1, AC-12 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "...........................ss.........................                   [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n52 passed, 2 skipped, 1 warning in 6.22s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "ZSTD/LZ4/BROTLI/LZO and nested schemas are rejected on the pyarrow path too, by checking footer codecs and child fields",
+      "why": "Gate and G-7 say such files are unsupported; one rule on both paths means the same listing whether or not pyarrow is installed",
+      "evidence": "app/parquet.py _read_arrow; tests/test_parquet.py::test_unsupported_codec"
+    },
+    {
+      "what": "Fallback reads data page v1 only; v2 pages, DECIMAL, FIXED_LEN_BYTE_ARRAY and unknown encodings raise unsupported parquet encoding",
+      "why": "Architecture lists PLAIN and dictionary encodings only; a wrong silent value is worse than a note",
+      "evidence": "app/parquet.py _pages, _converter"
+    },
+    {
+      "what": "Fixtures generated once with pyarrow 26.0.0 pip-installed into /tmp/pa (outside /work); CSV twins committed beside them",
+      "why": "Ticket requires committed fixtures not produced by a runtime dependency",
+      "evidence": "/tmp/gen/gen.py; tests/fixtures/"
+    },
+    {
+      "what": "Tests run each check twice, the second time with pyarrow hidden through sys.modules",
+      "why": "Covers the stdlib fallback even where pyarrow is installed",
+      "evidence": "tests/test_parquet.py reader fixture"
+    },
+    {
+      "what": "Pinned pyarrow==26.0.0 in requirements.txt",
+      "why": "Other entries are pinned; this is the version that wrote the fixtures",
+      "evidence": "requirements.txt:6"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "pyarrow path on a non-parquet file",
+      "why_it_failed": "pyarrow raised ArrowInvalid, not ReadError; fixed by mapping non-ReadError exceptions to unsupported parquet encoding"
+    }
+  ],
+  "assumptions": [
+    "A corrupt or non-parquet file uses the note 'unsupported parquet encoding' because it is the only fixed parquet note",
+    "Byte-array columns are decoded as UTF-8 with replacement characters",
+    "pyarrow 26.0.0 exists as a pip version, since it installed offline here from the index"
+  ],
+  "open_questions": [
+    "Should a corrupt (non-Parquet) file get its own note instead of 'unsupported parquet encoding'?",
+    "Should the shared data_dir fixture get a parquet file in a later ticket (it would change home-page counts)?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When a dependency is missing for fixture generation, pip install --target /tmp/<dir> and run the generator with sys.path pointing there; run the tests once with PYTHONPATH set to it to check the real-library path",
+      "when": "A ticket needs binary fixtures from a library not installed in the project",
+      "evidence": "pip install --target /tmp/pa pyarrow worked; PYTHONPATH=/tmp/pa python3 -m pytest tests/test_parquet.py"
+    }
+  ],
+  "problems": []
+}

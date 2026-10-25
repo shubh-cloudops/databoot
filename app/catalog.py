@@ -6,14 +6,16 @@ from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
-from app import config, readers, xlsx
+from app import config, parquet, readers, xlsx
 from app.readers import ReadError
 
-# Extension -> kind. A later ticket adds ".parquet" here and its reader below.
+# Extension -> kind, and the reader of each kind (xlsx is read per sheet in _read).
 KINDS = {".csv": "csv", ".tsv": "tsv", ".tab": "tsv", ".xlsx": "xlsx", ".xlsm": "xlsx", ".json": "json",
-         ".jsonl": "jsonl", ".ndjson": "jsonl", ".geojson": "geojson"}
+         ".jsonl": "jsonl", ".ndjson": "jsonl", ".geojson": "geojson",
+         ".parquet": "parquet"}
 READERS = {"csv": readers.read_csv, "tsv": readers.read_tsv, "json": readers.read_json,
-           "jsonl": readers.read_jsonl, "geojson": readers.read_geojson}
+           "jsonl": readers.read_jsonl, "geojson": readers.read_geojson,
+           "parquet": parquet.read}
 FAILED = "could not read file"
 
 
