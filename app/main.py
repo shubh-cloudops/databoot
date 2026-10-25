@@ -13,11 +13,13 @@ from app import catalog, config, export, profile, rules, xlsx
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+templates.env.filters["num"] = "{:,}".format  # the one thousands-separator filter for every count (gate 161)
 
 
 @app.get("/")
 def home(request: Request):
-    return templates.TemplateResponse(request, "home.html", {"title": "DataBoot"})
+    cat = catalog.scan(config.get().data)
+    return templates.TemplateResponse(request, "home.html", {"title": "DataBoot", "folder": config.get().data, "cat": cat})
 
 
 @app.get("/health")
@@ -36,6 +38,16 @@ def _dataset(id):
 def datasets():
     return [{"id": d.id, "path": d.path, "sheet": d.sheet, "kind": d.kind, "rows": d.rows, "columns": len(d.columns)}
             for d in catalog.scan(config.get().data).datasets]
+
+
+@app.get("/datasets/{id}")
+def dashboard(request: Request, id: str):
+    d = _dataset(id)
+    rows, charts = _charts(d)
+    types = profile.classify(d.columns, rows)
+    return templates.TemplateResponse(request, "dataset.html", {
+        "title": f"{d.path} - DataBoot", "d": d, "types": types, "charts": charts, "rows": rows[:20],
+        "points": {"map3d", "line", "scatter"}})
 
 
 @app.get("/api/datasets/{id}/profile")

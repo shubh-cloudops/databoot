@@ -1,0 +1,96 @@
+{
+  "header": {
+    "ticket": 384,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1917088
+  },
+  "goal": "Home and dashboard pages: server-rendered tables, figures, captions and thousands separators (Board gate 161), name DataBoot (G-6)",
+  "acceptance_criteria": [
+    {
+      "text": "GET / shows h1 DataBoot, the folder path and up to three tables (datasets with link to /datasets/{id}, Could not be read with reason, Other files with type, size, modified) using the DESIGN.md classes; empty tables are hidden; page title says DataBoot",
+      "passes": true
+    },
+    {
+      "text": "GET /datasets/{id} (404 for unknown id) shows h1 with file name and sheet, a column-types table with type badges, one <figure class=\"chart\" id=\"chart-N\" data-kind> per chart with a figcaption holding title, one rule caption and 'N of M points' (rows for aggregates), the first 20 rows in a table, and links to export.pptx and export.xlsx",
+      "passes": true
+    },
+    {
+      "text": "Every count on both pages uses thousands separators through one Jinja filter: '50,000 of 60,000' (Board gate 161); a dataset with no chart rule shows types and table only with no figure.chart and status 200 (AC-7, AC-8)",
+      "passes": true
+    },
+    {
+      "text": "No <p> in <main> outside figcaptions and the folder path (G-4); unreadable files are listed and the other datasets still open (AC-12)",
+      "passes": true
+    },
+    {
+      "text": "tests/test_pages.py with TestClient on data_dir and big_csv covers the home tables, manual.pdf without a link, every fixture dashboard having a types table and <= 20 rows, and the figure counts",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-1, AC-4, AC-5, AC-6, AC-7, AC-8, AC-10, AC-12 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "...................................................ss................... [ 68%]\n.................................                                        [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n103 passed, 2 skipped, 1 warning in 15.58s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Added a `num` Jinja filter ('{:,}'.format) on templates.env and used it for rows, columns, bytes, shown and total",
+      "why": "Board gate 161 wants thousands separators everywhere, through one filter",
+      "evidence": "app/main.py:16; app/templates/home.html; app/templates/dataset.html"
+    },
+    {
+      "what": "Plot div has no is-loading class and no Plotly code was added",
+      "why": "dashboard.js is an empty stub and is not in this ticket; a shimmer with no pending fetch would break the honesty rules",
+      "evidence": "docs/DESIGN.md States; app/static/js/dashboard.js"
+    },
+    {
+      "what": "Reason cell is a span.note.note-error; the breadcrumb is a nav, not a p",
+      "why": "No <p> in main except the folder path (G-4)",
+      "evidence": "app/templates/home.html; app/templates/dataset.html; tests/test_pages.py::test_home_tables"
+    },
+    {
+      "what": "Unit word is 'points' for map3d, line and scatter, 'rows' for the other kinds",
+      "why": "Same rule as the pptx caption and ARCHITECTURE.md Chart contract",
+      "evidence": "app/main.py dashboard(); app/export.py _POINTS"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Asserted '50,000 of 60,000 points' for big_csv",
+      "why_it_failed": "rules._sample uses stride ceil(60000/50000)=2, so shown is 30,000; the test now compares against the API's shown value"
+    }
+  ],
+  "assumptions": [
+    "The dashboard title is '<path> - DataBoot'",
+    "The Columns table keys types by column name, so duplicate column names would show the same type twice",
+    "The Size column header reads 'Size (bytes)' because DESIGN.md says size is in bytes"
+  ],
+  "open_questions": [
+    "Should _sample fill up to the map cap (60,000 rows give 30,000 shown) rather than stride sample? AC-10 only says at most the cap",
+    "A later ticket must fill the .plot divs from dashboard.js and set is-loading there",
+    "/favicon.ico returns 404 and logs a console error on every page; add a favicon or accept it?"
+  ],
+  "lessons": [
+    {
+      "lesson": "Ask the charts API for shown/total in page tests instead of hard-coding the ticket's example numbers",
+      "when": "A ticket quotes a count such as '50,000 of 60,000' that depends on the sampler",
+      "evidence": "tests/test_pages.py::test_big_csv_counts_have_separators"
+    },
+    {
+      "lesson": "Start a temp uvicorn from a python3 subprocess with start_new_session and kill it by PID afterwards",
+      "when": "Browser-checking pages without pkill",
+      "evidence": "port 8791 run this ticket"
+    }
+  ],
+  "problems": []
+}

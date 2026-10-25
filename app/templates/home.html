@@ -1,2 +1,29 @@
 {% extends "base.html" %}
-{% block content %}<h1>{{ title }}</h1><p class="muted">Replace this page.</p>{% endblock %}
+{% block content %}
+<h1>DataBoot</h1>
+<p class="muted mono">{{ folder }}</p>
+{% if cat.datasets %}
+<section class="block"><div class="table-wrap"><table>
+  <caption>Datasets</caption>
+  <thead><tr><th scope="col">File</th><th scope="col">Sheet</th><th scope="col" class="num">Rows</th><th scope="col" class="num">Columns</th></tr></thead>
+  <tbody>{% for d in cat.datasets %}
+    <tr><td class="path"><a href="/datasets/{{ d.id }}">{{ d.path }}</a></td><td>{{ d.sheet or "" }}</td><td class="num">{{ d.rows|num }}</td><td class="num">{{ d.columns|length|num }}</td></tr>{% endfor %}
+  </tbody></table></div></section>
+{% endif %}
+{% if cat.unreadable %}
+<section class="block"><div class="table-wrap"><table>
+  <caption>Could not be read</caption>
+  <thead><tr><th scope="col">File</th><th scope="col">Reason</th></tr></thead>
+  <tbody>{% for u in cat.unreadable %}
+    <tr><td class="path">{{ u.path }}</td><td><span class="note note-error">{{ u.reason }}</span></td></tr>{% endfor %}
+  </tbody></table></div></section>
+{% endif %}
+{% if cat.others %}
+<section class="block"><div class="table-wrap"><table>
+  <caption>Other files</caption>
+  <thead><tr><th scope="col">File</th><th scope="col">Type</th><th scope="col" class="num">Size (bytes)</th><th scope="col">Modified</th></tr></thead>
+  <tbody>{% for o in cat.others %}
+    <tr><td class="path">{{ o.path }}</td><td>{{ o.type }}</td><td class="num">{{ o.size|num }}</td><td>{{ o.modified }}</td></tr>{% endfor %}
+  </tbody></table></div></section>
+{% endif %}
+{% endblock %}

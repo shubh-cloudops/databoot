@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<nav class="crumb"><a href="/">DataBoot</a> / {{ d.path }}</nav>
+<div class="page-head">
+  <h1>{{ d.path }}{% if d.sheet %} <span class="muted">{{ d.sheet }}</span>{% endif %}</h1>
+  <div class="actions">
+    <a class="btn btn-primary" href="/datasets/{{ d.id }}/export.pptx">Export PPTX</a>
+    <a class="btn" href="/datasets/{{ d.id }}/export.xlsx">Export XLSX</a>
+  </div>
+</div>
+{% if charts %}
+<div class="charts">{% for c in charts %}
+  <figure class="chart" id="{{ c.id }}" data-kind="{{ c.kind }}" aria-label="{{ c.title }}">
+    <figcaption><span class="chart-title">{{ c.title }}</span> <span class="chart-rule">{{ c.rule }}</span> <span class="chart-count">{{ c.shown|num }} of {{ c.total|num }} {{ "points" if c.kind in points else "rows" }}</span></figcaption>
+    <div class="plot" role="img" aria-label="{{ c.title }}: {{ c.rule }}"></div>
+  </figure>{% endfor %}
+</div>
+{% else %}
+<div class="empty">No charts for this dataset</div>
+{% endif %}
+<section class="block"><div class="table-wrap"><table>
+  <caption>Columns</caption>
+  <thead><tr><th scope="col">Column</th><th scope="col">Type</th></tr></thead>
+  <tbody>{% for col in d.columns %}
+    <tr><td class="path">{{ col }}</td><td><span class="badge">{{ types[col] }}</span></td></tr>{% endfor %}
+  </tbody></table></div></section>
+<section class="block"><div class="table-wrap"><table class="data-table">
+  <caption>First {{ rows|length|num }} rows</caption>
+  <thead><tr>{% for col in d.columns %}<th scope="col">{{ col }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for r in rows %}
+    <tr>{% for v in r %}<td>{{ "" if v is none else v }}</td>{% endfor %}</tr>{% endfor %}
+  </tbody></table></div></section>
+{% endblock %}
+{% block scripts %}<script src="/static/js/dashboard.js" defer></script>{% endblock %}
