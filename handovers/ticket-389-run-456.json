@@ -1,0 +1,69 @@
+{
+  "header": {
+    "ticket": 389,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "qa",
+    "attempt": 2,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1929837
+  },
+  "goal": "Fix the application so every test in tests/test_acceptance.py passes. Do not edit that file; read the QA handover notes for the failing behaviour.",
+  "acceptance_criteria": [
+    {
+      "text": "All acceptance tests pass",
+      "passes": false
+    },
+    {
+      "text": "tests/test_acceptance.py is unchanged",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa && echo '586b5275de674bf205977b285d15f08f02cae5323a4399e70e9e964eb0db7df0  tests/test_acceptance.py' | sha256sum -c --quiet",
+    "passed": false,
+    "output_tail": ".................F...................................................... [ 52%]\n...........ss....................................................        [100%]\n=================================== FAILURES ===================================\n___________________________________ test_G_5 ___________________________________\n\nmake_client = <function make_client.<locals>.make at 0x75d104b2f100>\ndata_dir = PosixPath('/tmp/pytest-of-node/pytest-0/test_G_50/data')\n\n    def test_G_5(make_client, data_dir):\n        \"\"\"Exports: XLSX reopens in openpyxl and PPTX in python-pptx, each with native charts (count > 0).\"\"\"\n>       from openpyxl import load_workbook\nE       ModuleNotFoundError: No module named 'openpyxl'\n\ntests/test_acceptance.py:404: ModuleNotFoundError\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED tests/test_acceptance.py::test_G_5 - ModuleNotFoundError: No module na...\n1 failed, 134 passed, 2 skipped, 1 warning in 64.37s (0:01:04)\ntests failed\n"
+  },
+  "decisions": [
+    {
+      "what": "Made no application code change; added openpyxl==3.1.5 and python-pptx==1.0.2 to requirements.txt",
+      "why": "The only failing acceptance test (test_G_5) fails on ModuleNotFoundError for openpyxl; with both libraries on PYTHONPATH the existing exports pass and the full suite is green (135 passed, 2 skipped). Board gates 162 and 163 ask for these libraries.",
+      "evidence": "python3 -m pytest -q tests/test_acceptance.py -k G_5 (fails), PYTHONPATH=/tmp/extlibs python3 -m pytest -q (135 passed); requirements.txt"
+    },
+    {
+      "what": "Did not pip install into system Python with --break-system-packages",
+      "why": "It would alter the shared interpreter; I installed into /tmp/extlibs only to check the behaviour",
+      "evidence": "pip install error: externally-managed-environment (PEP 668)"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "pip install openpyxl python-pptx into the system Python",
+      "why_it_failed": "PEP 668 externally-managed-environment refusal"
+    }
+  ],
+  "assumptions": [
+    "The verify environment can install requirements.txt, or the Board/orchestrator accepts installing openpyxl and python-pptx there",
+    "Gate 162's xlsxwriter/python-pptx rewrite of the exports is a separate ticket, since the hand-written OOXML already passes the reopen tests"
+  ],
+  "open_questions": [
+    "Will the orchestrator's environment have openpyxl and python-pptx installed? Without them python3 /opt/prodagents/check.py qa fails at test_G_5 regardless of code.",
+    "Should the exports be rewritten onto xlsxwriter and python-pptx as gate 162 says? app/xlsx.py and app/export.py still hand-write OOXML.",
+    "openpyxl warns 'Workbook contains no default style' for the hand-written XLSX; fix it in a later ticket?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When an acceptance test fails with ModuleNotFoundError, check whether the library is installed and whether a Board gate asks for it before changing code; test it with pip install --target /tmp/x plus PYTHONPATH, which does not touch the system Python.",
+      "when": "A verify failure is an ImportError for a test-only library",
+      "evidence": "ticket 389: openpyxl and python-pptx missing, test_G_5 passes with PYTHONPATH=/tmp/extlibs"
+    },
+    {
+      "lesson": "pip download and pip install run from /work drop wheel files in the repo; run pip from /tmp.",
+      "when": "Probing network or package availability",
+      "evidence": "ticket 389: openpyxl and et_xmlfile wheels appeared in /work and were deleted"
+    }
+  ],
+  "problems": []
+}
