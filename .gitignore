@@ -1,3 +1,6 @@
 graphify-out/
 __pycache__/
 .pytest_cache/
+output/
+.venv/
+wheels/

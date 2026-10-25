@@ -1,0 +1,109 @@
+{
+  "header": {
+    "ticket": 371,
+    "project": "you-think-of-the-project-name",
+    "from_role": "architect",
+    "phase": "architecture",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "4acf784af3ed",
+    "tokens_left": 1892748
+  },
+  "goal": "Write or update docs/ARCHITECTURE.md and adapt the scaffold for the approved spec.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/ARCHITECTURE.md explains how every acceptance item will be met",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py architecture",
+    "passed": true,
+    "output_tail": "..                                                                       [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n2 passed, 1 warning in 4.75s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Gate 160 overrides are written beside each AC row, and the new scope is added as work items G-1..G-7 with explicit checks",
+      "why": "The PRD and acceptance.json come before gate 160, and the later gate wins; check.py plan only covers AC ids",
+      "evidence": "graphify-out/memory.md L4-17; docs/ARCHITECTURE.md 'How each acceptance item is met' and 'Work items without AC ids'"
+    },
+    {
+      "what": "Standard library only for xlsx/parquet reading and for writing pptx/xlsx with native charts",
+      "why": "pandas, openpyxl, pyarrow, plotly and python-pptx are not installed, and the ticket allows only installed libraries",
+      "evidence": "python3 -c 'import pandas' etc. -> ModuleNotFoundError; Python 3.11.2 (no compression.zstd)"
+    },
+    {
+      "what": "Vendored plotly.js-dist-min 4.1.2 and sane-topojson 4.0.0 world_110m/50m into app/static/vendor, and made topojsonURL config mandatory",
+      "why": "Gate 160 says to serve Plotly locally with sane-topojson outlines; Plotly's default topojsonURL is https://cdn.plot.ly/un/",
+      "evidence": "grep topojsonURL in plotly.min.js; /tmp/probe/run.py: 3 choropleth paths, a scatter3d canvas, 0 external requests, 0 console errors"
+    },
+    {
+      "what": "Charts are computed on the server once and shared by the page figures, /api/datasets/{id}/charts and the exports; dashboard.js only draws them",
+      "why": "All three then show the same numbers, and most ACs can be tested with TestClient alone",
+      "evidence": "docs/ARCHITECTURE.md 'Chart contract', 'Pages'"
+    },
+    {
+      "what": "Rows are loaded on demand with lru_cache(4) and a 200,000 row cap; scan reads only counts and headers",
+      "why": "Keeps a large drive inside 16 GB RAM while the home page still shows row counts",
+      "evidence": "docs/PRD.md Constraints"
+    },
+    {
+      "what": "Launcher: app.launch is cross-platform; DataBoot.bat and Start-DataBoot.ps1 use a venv by default, with a -Docker switch for AC-13",
+      "why": "Gate 160 asks for a Windows .bat + PowerShell + venv launcher with Docker optional, while AC-13 still describes Docker steps",
+      "evidence": "memory.md L12; acceptance.json AC-13"
+    },
+    {
+      "what": "Line and bar charts are capped at 2 each; the country map is chosen by header name; line charts sum per timestamp",
+      "why": "So the extra chart kinds still fit under the 8-chart cap, and every rule stays fixed and testable",
+      "evidence": "docs/ARCHITECTURE.md 'Routing rules'"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "tarfile.extractall(filter='data')",
+      "why_it_failed": "Python 3.11.2 has no filter argument; I checked member paths by hand instead"
+    }
+  ],
+  "assumptions": [
+    "The country map rule uses the header names country, country_name, nation, iso3 or iso_a3",
+    "Old binary .xls files go in the file inventory and are not parsed",
+    "Export charts for 3D maps and country maps become an XY scatter and a bar chart, because Office map charts need Bing online",
+    "Feature C2 (pick a different folder from the home page) is skipped this round"
+  ],
+  "open_questions": [
+    "AC-13 names Start-DataOS.ps1, but gate 160 names the product DataBoot; the architecture uses Start-DataBoot.ps1. Should the PM reword AC-13 (and AC-6 'Deck.gl' wording in the PRD)?",
+    "Gate 160 says 'see databoot-partial' for the sane-topojson outlines; nothing with that name exists in /work, /live/projects or on disk (the only match is the gate comment). What is it?",
+    "Should the gate's new scope (file types, extra charts, exports, file inventory, rule caption) get AC ids from the PM?",
+    "Should old .xls files be read, or listed as unsupported?",
+    "Parquet fixtures need a writer that is not installed; may the engineer generate them once in /tmp with a temporarily pip-installed pyarrow and commit the small binaries?",
+    "Should 'N of M' numbers be shown with thousands separators?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When a Board gate approves the spec with answers that change scope, the PRD and acceptance.json may not be updated; write the overrides beside each AC row and add non-AC work items with explicit checks",
+      "when": "An architecture ticket right after a spec gate whose comment changes scope",
+      "evidence": "graphify-out/memory.md L4-17 vs docs/acceptance.json"
+    },
+    {
+      "lesson": "Plotly geo traces load topojson from cdn.plot.ly by default; vendor sane-topojson and set config topojsonURL to the local folder. Object keys match ('countries')",
+      "when": "Any offline Plotly choropleth or geo map",
+      "evidence": "plotly.min.js getTopojsonPath/Hor map; /tmp/probe/run.py"
+    },
+    {
+      "lesson": "Python here is 3.11: tarfile.extractall has no filter= argument and there is no compression.zstd; check member paths by hand",
+      "when": "Downloading npm tarballs to vendor assets",
+      "evidence": "TypeError in this session"
+    },
+    {
+      "lesson": "Check a hand-built OOXML fixture by pip-installing openpyxl with --target /tmp/opx and loading the file, never into the app environment",
+      "when": "Writing xlsx/pptx without openpyxl or python-pptx",
+      "evidence": "/tmp/chk_xlsx.py output"
+    }
+  ],
+  "problems": []
+}
