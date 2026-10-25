@@ -1,0 +1,85 @@
+{
+  "header": {
+    "ticket": 379,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1944179
+  },
+  "goal": "Chart rules for map3d, line and bar with downsampling, and the chart JSON route (AC-4, AC-5, AC-6, AC-7, AC-10)",
+  "acceptance_criteria": [
+    {
+      "text": "rules.charts(columns, rows, mapping, settings) returns chart dicts per the Chart contract (id chart-N, kind, title, x_label, y_label, rule caption, shown, total, data) and [] when no rule matches (AC-7)",
+      "passes": true
+    },
+    {
+      "text": "map3d only when a lat and a lon geospatial column exist (x lon, y lat, z first numerical else 0), stride-sampled with step = ceil(n/cap) so shown <= map_cap and total is the full count (AC-10); no map otherwise (AC-6, drawn later as Plotly scatter3d, not Deck.gl per gate 161)",
+      "passes": true
+    },
+    {
+      "text": "line: temporal + each of the first 2 numerical columns, sum per distinct timestamp sorted, sampled to chart_cap; bar: first categorical vs first 2 numerical summed per value sorted desc, or one count bar when there is no numerical column",
+      "passes": true
+    },
+    {
+      "text": "NaN/inf become null and dates are ISO strings; GET /api/datasets/{id}/charts returns {dataset, charts}; 404 for unknown id",
+      "passes": true
+    },
+    {
+      "text": "tests/test_rules.py: sales.csv bar sums North 16, South 23, East 7; book.xlsx Revenue gives a line; big_csv (60,000 rows) map shown <= 50,000 and total 60,000; notes.csv returns no charts",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-4, AC-5, AC-6, AC-7, AC-10 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "...........................ss........................................... [ 97%]\n..                                                                       [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n72 passed, 2 skipped, 1 warning in 8.80s\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Only map3d, line and bar rules are implemented; donut, histogram, scatter, heatmap and country_map are not",
+      "why": "Ticket scope names only map3d, line and bar",
+      "evidence": "app/rules.py charts(): rule tuple (_map3d, _lines, _bars)"
+    },
+    {
+      "what": "Bar and line shown/total: bar counts rows used (non-empty category and numeric value), line counts points (distinct timestamps)",
+      "why": "ARCHITECTURE.md 'Chart contract' says shown/total count points for line and rows used for bar",
+      "evidence": "docs/ARCHITECTURE.md L135-136"
+    },
+    {
+      "what": "Numeric strings from CSV are parsed with profile.NUMBER, and date strings with profile.DATE_FORMATS, so rules and classification agree",
+      "why": "CSV cells are all str; reuse avoids a second definition of number/date",
+      "evidence": "app/rules.py _num, _time"
+    },
+    {
+      "what": "NaN/inf cells are skipped in sums; a sum that overflows to inf becomes null",
+      "why": "Starlette JSON rejects NaN/inf; spec says they become null",
+      "evidence": "tests/test_rules.py::test_nan_inf_become_null_and_json_is_valid"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "mapping is the {column: type} dict from profile.classify and settings is config.Settings",
+    "Map points with a non-numeric lat or lon are dropped before counting total",
+    "Bar categories are str(value), so bool categories show as 'True'/'False'",
+    "Map z is null for a row whose numerical z cell is empty"
+  ],
+  "open_questions": [
+    "Should the map total include rows whose lat/lon are empty or non-numeric? I excluded them."
+  ],
+  "lessons": [
+    {
+      "lesson": "Reuse profile.NUMBER and profile.DATE_FORMATS in rules, because CSV cells arrive as strings and must be parsed the same way as in classify",
+      "when": "Building chart rules on top of profile.classify output",
+      "evidence": "app/rules.py imports from app.profile"
+    }
+  ],
+  "problems": []
+}

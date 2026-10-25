@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import catalog, config, profile
+from app import catalog, config, profile, rules
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -44,3 +44,11 @@ def dataset_profile(id: str):
     folder.mkdir(parents=True, exist_ok=True)
     (folder / f"{d.id}.json").write_text(json.dumps(types))
     return types
+
+
+@app.get("/api/datasets/{id}/charts")
+def dataset_charts(id: str):
+    d = _dataset(id)
+    settings = config.get()
+    rows = catalog.load(d, settings.max_rows)
+    return {"dataset": d.id, "charts": rules.charts(d.columns, rows, profile.classify(d.columns, rows), settings)}
