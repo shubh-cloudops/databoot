@@ -1,6 +1,6 @@
 {
-  "trends": {"run": true, "why": "Browser dashboard product; research on dashboard and data-viz layouts helps (unsure, so left on)"},
-  "designer": {"run": true, "why": "The home list and dashboard pages need a layout, colours and chart styling"},
-  "frontend": {"run": true, "why": "Dashboard pages with Plotly charts and a Deck.gl 3D map are front-end work"},
-  "design_review": {"run": true, "why": "Screenshots of the home and dashboard pages must be checked"}
+  "trends": {"run": false, "why": "Board gate 160 switched trends off; round 2 is library and accessibility fixes, no new design research needed"},
+  "designer": {"run": true, "why": "DESIGN.md must change (modebar always visible, h2 captions, header case) and the build needs a design review"},
+  "frontend": {"run": true, "why": "Template captions to h2, CSS uppercase removal and the Plotly modebar setting are front-end tickets"},
+  "design_review": {"run": true, "why": "Visible changes to tables and charts on the home and dashboard pages need a screenshot check"}
 }

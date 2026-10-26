@@ -1,0 +1,80 @@
+{
+  "header": {
+    "ticket": 392,
+    "project": "you-think-of-the-project-name",
+    "from_role": "pm",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "a2dbf282ff46",
+    "tokens_left": 1940447
+  },
+  "goal": "Write or update docs/PRD.md and docs/acceptance.json for the idea in docs/IDEA.md.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/PRD.md describes the product",
+      "passes": true
+    },
+    {
+      "text": "docs/acceptance.json lists testable acceptance items",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py spec",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "G-1..G-7 became AC-14..AC-20 in the order of the existing test_G_1..test_G_7 docstrings, and test_G_thousands became AC-21",
+      "why": "Gates 162-164 ask for AC ids; the round 1 tests already define each G item, so QA's rename is one for one",
+      "evidence": "tests/test_acceptance.py:312-466; graphify-out/memory.md gate 163"
+    },
+    {
+      "what": "Reworded AC-6 (Plotly 3D scatter) and AC-13 (Start-DataBoot.ps1) in place and kept every other existing text",
+      "why": "IDEA.md and gate 161 asked for these two rewordings only",
+      "evidence": "docs/IDEA.md L9; graphify-out/memory.md gate 161"
+    },
+    {
+      "what": "Added AC-22 (h2 captions and real-case headers), AC-23 (pinned requirements, nothing vendored, no style warning) and AC-24 (modebar visible and keyboard reachable)",
+      "why": "Each change this round asks for needs a testable item, so QA does not stall on items with no id",
+      "evidence": "docs/BRIEF.md Done when; LESSONS: scope change -> AC ids in same round; app/static/css/databoot.css:89; app/static/js/dashboard.js:9"
+    },
+    {
+      "what": "Rewrote the PRD as round 2 with a 'Product today' section",
+      "why": "The round 1 PRD still described Deck.gl, Data OS and CSV/xlsx only, which the Board overrode in gates 160-162",
+      "evidence": "docs/PRD.md (old L33, L54, L67); graphify-out/memory.md gates 160-162"
+    },
+    {
+      "what": "team.json: trends off, the other three on",
+      "why": "Gate 160 said -trends; tables and charts change visibly and DESIGN.md must be updated",
+      "evidence": "graphify-out/memory.md gate 160; docs/BRIEF.md"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Running python3 /opt/prodagents/check.py spec and a python json.load check",
+      "why_it_failed": "The Bash commands needed approval in this session; the JSON was not checked by a parser"
+    }
+  ],
+  "assumptions": [
+    "The h2 goes inside the existing <caption> element (<caption><h2>...</h2></caption>), which keeps the table's accessible name; QA's _rows_of regex must then allow the h2",
+    "Gate 164 says to revert the fixture line endings to their committed bytes (git checkout), and .gitattributes is not meant to renormalize the other files in this round",
+    "AC-20 is written so it holds now that pyarrow is installed (a corrupt .parquet rather than zstd), since pyarrow decodes zstd"
+  ],
+  "open_questions": [
+    "Branding: no business website capture and no docs/brand/ were found. docs/reference/ holds only deck.gl and unstructured.io captures (including deck.gl logo-1.png and logo-2.png), which are third-party libraries and not used. Please confirm the gate 160 branding stays: name DataBoot, plain neutral style, system sans font, no logo, blank SVG favicon. If you want a logo, give an image link in the gate comment.",
+    "IDEA.md says the libraries are now installed in the agent image, but a ticket 389 handover said check.py never installs requirements.txt; can the orchestrator confirm verify now imports openpyxl, python-pptx and xlsxwriter?",
+    "Should test_G_* be renamed test_AC_14..test_AC_21 (assumed), with test_G_7 rewritten to use a corrupt .parquet now that pyarrow reads zstd?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When the Board asks for ids for G-n work items it never defined, take the definitions from the QA test docstrings (test_G_n) and map them in order to the next free AC ids",
+      "when": "A PM round where gates refer to work items with no text",
+      "evidence": "tests/test_acceptance.py:296-466"
+    }
+  ],
+  "problems": []
+}
