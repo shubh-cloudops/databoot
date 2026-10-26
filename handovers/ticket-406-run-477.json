@@ -1,0 +1,62 @@
+{
+  "header": {
+    "ticket": 406,
+    "project": "you-think-of-the-project-name",
+    "from_role": "techlead",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "38d349eb1f24",
+    "tokens_left": 1952620
+  },
+  "goal": "Revise your earlier work for the build phase. The Board rejected it with this comment: Ticket 403: allowed to change the 5 caption literals in tests/test_acceptance.py (L186, 198, 274, 308, 349) to <caption><h2>X</h2></caption>. No other edits to that file. Suite must be fully green after.\r\n3D map: fix the clipped 'lat' label at 1280px (increase scene/bottom margin).\r\nCaption h2 size = --t-md; designer updates DESIGN.md L57/L76 to match.\r\nArchitect: add 'invalid JSON' row to ARCHITECTURE.md notes table; histogram labels documented as 'a to b' (code wins).\r\nQA: confirm requirements.txt pins xlsxwriter, python-pptx, openpyxl, pyarrow (AC-23).\r\nAll assumptions OK (GeoJSON broken syntax also says 'invalid JSON').",
+  "acceptance_criteria": [
+    {
+      "text": "Every acceptance item is covered by a ticket",
+      "passes": true
+    },
+    {
+      "text": "Each ticket is small, testable and has a layer",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py plan",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Appended 3 tickets (lat label, caption h2 size + DESIGN.md, ARCHITECTURE.md notes) and kept entries 0-8 unchanged",
+      "why": "Board rejection: append only; orchestrator skips built entries",
+      "evidence": "plan/tickets.json; python3 /opt/prodagents/check.py plan passed"
+    },
+    {
+      "what": "Did not list tests/test_acceptance.py in any files list; the 5 caption literals are already h2 form and a criterion in ticket 11 says no further edits",
+      "why": "QA-owned file; Board allows only those 5 literal edits and they were made by ticket 404",
+      "evidence": "tests/test_acceptance.py L186,198,274,308,349"
+    },
+    {
+      "what": "Put the ARCHITECTURE.md and requirements.txt confirmation in a backend ticket covering AC-18, AC-23, AC-26",
+      "why": "Docs-only work with no UI; groups the architect/QA answers from gate 167",
+      "evidence": "docs/ARCHITECTURE.md L91, L211; requirements.txt"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The 'invalid JSON' row already exists at ARCHITECTURE.md L91 with a '**new**' marker, so that ticket only cleans the marker and verifies it",
+    "The lat clip is fixed by the map3d layout bottom margin (dashboard.js L121/L127), as the Board suggested"
+  ],
+  "open_questions": [
+    "No test of the AC-23 pins exists yet; test_acceptance.py still has only test_G_* tests with no test_AC_14..27, so QA must add them"
+  ],
+  "lessons": [
+    {
+      "lesson": "On a Board rejection, copy plan/tickets.json aside, append, and assert the old entries are equal before dumping; the printout of the file is garbled by a hook, so read it with a script",
+      "when": "Revising tickets after a Board rejection",
+      "evidence": "/tmp/add.py assert t==old; check.py plan passed"
+    }
+  ],
+  "problems": []
+}

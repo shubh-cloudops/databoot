@@ -137,7 +137,7 @@
   ]
  },
  {
-  "goal": "Table captions as <caption><h2>…</h2></caption> and real-case column headers (R5, gate 165); AC-15, AC-17, AC-19 and AC-21 must keep holding",
+  "goal": "Table captions as <caption><h2>\u2026</h2></caption> and real-case column headers (R5, gate 165); AC-15, AC-17, AC-19 and AC-21 must keep holding",
   "layer": "frontend",
   "criteria": [
    "home.html: 'Datasets', 'Could not be read' and 'Other files', and dataset.html: 'Columns' and 'First N rows', each render as `<caption><h2>NAME</h2></caption>`",
@@ -179,6 +179,59 @@
    "app/static/js/dashboard.js",
    "app/static/css/databoot.css",
    "tests/test_browser.py"
+  ]
+ },
+ {
+  "goal": "3D map: fix the clipped 'lat' axis label at 1280px (Board gate 167) by increasing the map3d layout bottom margin",
+  "layer": "frontend",
+  "criteria": [
+   "dashboard.js map3d layout: the bottom margin (l.margin b, now 0) is raised until the 'lat' axis title is fully inside the chart box; top/left/right stay as they are so the always-visible modebar and z title still fit",
+   "tests/test_browser.py: on points.tsv at 1280px wide, the bounding box of the lat axis title text lies inside the .js-plotly-plot box (bottom edge <= plot bottom); the same check at 375px does not regress",
+   "Checked at 1280px and 375px in light and dark: no other label or the modebar is clipped; no external requests (AC-9)"
+  ],
+  "acceptance": [
+   "AC-6"
+  ],
+  "files": [
+   "app/static/js/dashboard.js",
+   "tests/test_browser.py"
+  ]
+ },
+ {
+  "goal": "Table caption h2 size is --t-md (Board gate 167); designer updates DESIGN.md L57 and L76 to match",
+  "layer": "frontend",
+  "criteria": [
+   "app/static/css/databoot.css: `caption h2` uses font-size var(--t-md) (weight 650, margin 0, line-height kept); the global h2 and .brand stay --t-lg",
+   "docs/DESIGN.md Type scale (L57): `--t-lg` row no longer lists table titles; `--t-md` row lists body, chart title and table titles (`caption h2`)",
+   "docs/DESIGN.md Components (L76): the `.table-wrap > table` row says `caption h2` has margin 0 and `--t-md`",
+   "tests/test_acceptance.py: the 5 caption literals (L186, 198, 274, 308, 349) are already `<caption><h2>X</h2></caption>`; this ticket makes no other edit to that file and does not list it in files; AC-22 holds and the full suite is green",
+   "Page checked at 1280px and 375px in light and dark: captions read as table titles, no layout shift"
+  ],
+  "acceptance": [
+   "AC-22"
+  ],
+  "files": [
+   "app/static/css/databoot.css",
+   "docs/DESIGN.md"
+  ]
+ },
+ {
+  "goal": "ARCHITECTURE.md notes (Board gate 167): 'invalid JSON' row in the notes table (also for GeoJSON broken syntax) and histogram labels documented as 'a to b' (code wins); confirm requirements.txt pins for AC-23",
+  "layer": "backend",
+  "criteria": [
+   "docs/ARCHITECTURE.md notes table (L91) has a row `invalid JSON` for json.JSONDecodeError in .json, .jsonl (any line) and .geojson; the '**new**' marker is dropped; no other row changes",
+   "docs/ARCHITECTURE.md Exports table (L211) documents histogram bin labels as `\"a to b\"` (6 significant digits), matching app/xlsx.py and app/export.py; no code changes",
+   "requirements.txt is unchanged and still pins xlsxwriter==3.3.0, python-pptx==1.0.2, openpyxl==3.1.5 and pyarrow==26.0.0 (AC-23); checked by grep, no library is vendored in the repo",
+   "No test file is edited; AC-26 and AC-18 behaviour is unchanged and their existing tests pass"
+  ],
+  "acceptance": [
+   "AC-18",
+   "AC-23",
+   "AC-26"
+  ],
+  "files": [
+   "docs/ARCHITECTURE.md",
+   "requirements.txt"
   ]
  }
 ]
