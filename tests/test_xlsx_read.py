@@ -50,12 +50,11 @@ def test_shared_booleans_formats_and_gaps(tmp_path):
     styles = (f'<styleSheet {ns}><numFmts count="2"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/>'
               '<numFmt numFmtId="165" formatCode="0.00&quot;d&quot;"/></numFmts>'
               '<cellXfs count="4"><xf numFmtId="0"/><xf numFmtId="164"/><xf numFmtId="165"/><xf numFmtId="22"/></cellXfs></styleSheet>')
-    shared = f'<sst {ns}><si><t>name</t></si><si><r><t>rich </t></r><r><t>text</t></r><rPh><t>x</t></rPh></si></sst>'
-    sheet = (f'<worksheet {ns}><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="C1" t="inlineStr"><is><t>when</t></is></c></row>'
-             '<row r="2"><c r="A2" t="s"><v>1</v></c><c r="B2" t="b"><v>1</v></c><c r="C2" s="1"><v>45292.5</v></c></row>'
+    sheet = (f'<worksheet {ns}><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>name</t></is></c><c r="C1" t="inlineStr"><is><t>when</t></is></c></row>'
+             '<row r="2"><c r="A2" t="inlineStr"><is><r><t>rich </t></r><r><t>text</t></r></is></c><c r="B2" t="b"><v>1</v></c><c r="C2" s="1"><v>45292.5</v></c></row>'
              '<row r="3"><c r="A3"><v>2.5</v></c><c r="B3" t="b"><v>0</v></c><c r="C3" s="2"><v>45292</v></c></row>'
              '<row r="4"/><row r="5"><c r="C5" s="3"><v>45292</v></c></row></sheetData></worksheet>')
-    _rewrite(src, dst, {"xl/styles.xml": styles, "xl/sharedStrings.xml": shared, "xl/worksheets/sheet1.xml": sheet})
+    _rewrite(src, dst, {"xl/styles.xml": styles, "xl/worksheets/sheet1.xml": sheet})
     cols, rows = xlsx.read_sheet(dst, "S")
     assert cols == ["name", "column_2", "when"]
     assert rows == [["rich text", "TRUE", datetime(2024, 1, 1, 12)],

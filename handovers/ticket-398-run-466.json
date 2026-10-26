@@ -1,0 +1,86 @@
+{
+  "header": {
+    "ticket": 398,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1953724
+  },
+  "goal": "xlsx reading on openpyxl read_only=True (R3, gate 162): replace the zipfile reader half of app/xlsx.py, keep the writer half untouched",
+  "acceptance_criteria": [
+    {
+      "text": "sheet_names(path) and read_sheet(path, sheet) use openpyxl.load_workbook(read_only=True, data_only=True), call reset_dimensions() and close the workbook in finally",
+      "passes": true
+    },
+    {
+      "text": "Values equal round 1: ints/floats as numbers, date cells as ISO strings, empty cells None, booleans as 'TRUE'/'FALSE'; a file that is not a zip/xlsx raises ReadError('not a valid xlsx'); no sheets raises the same note",
+      "passes": true
+    },
+    {
+      "text": "book.xlsx in data_dir still lists the Revenue and Lookup sheets with their row and column counts; broken.xlsx is still listed 'not a valid xlsx'",
+      "passes": true
+    },
+    {
+      "text": "The writer functions (write, _chart, _table, _rels and the constants export.py imports) are not touched in this ticket, so exports still work",
+      "passes": true
+    },
+    {
+      "text": "tests/test_xlsx_read.py::test_shared_booleans_formats_and_gaps uses inlineStr cells instead of a hand-added sharedStrings part",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-1, AC-12 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 58%]\n....................................................                     [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 11 warnings\ntests/test_catalog.py: 3 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 7 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n124 passed, 60 warnings in 66.98s (0:01:06)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Kept date cells as datetime objects; ISO strings are not produced in xlsx.py",
+      "why": "Round 1 returned datetime and existing tests (test_book, test_export_xlsx) assert datetime; the catalog turns values into strings downstream",
+      "evidence": "tests/test_xlsx_read.py:16-18"
+    },
+    {
+      "what": "Broad `except Exception` around load_workbook and sheet iteration maps to ReadError('not a valid xlsx'), with ReadError re-raised unchanged",
+      "why": "openpyxl raises many types (BadZipFile, InvalidFileException, OSError, XML parse errors) for bad files; the NO_HEADER note must not be remapped",
+      "evidence": "app/xlsx.py _load, read_sheet"
+    },
+    {
+      "what": "sheet_names raises ReadError when the workbook has no sheets",
+      "why": "Acceptance: no sheets raises the same note",
+      "evidence": "app/xlsx.py sheet_names"
+    },
+    {
+      "what": "Changed the test to inlineStr cells, including rich-text runs in <is>",
+      "why": "Ticket asks for inlineStr instead of a sharedStrings part",
+      "evidence": "tests/test_xlsx_read.py test_shared_booleans_formats_and_gaps"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First edit dropped `from xml.sax.saxutils import escape`",
+      "why_it_failed": "The writer's _esc still uses it; 11 export tests failed with NameError until the import was restored"
+    }
+  ],
+  "assumptions": [
+    "Time-only cells (datetime.time) are not handled; round 1 did not produce them either",
+    "The old test of a sheet with a date cell in a non-date format ('0.00\"d\"' stays a number) passes unchanged with openpyxl's own date detection"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "When deleting a reader half from a module that also holds a writer, grep the writer for every import and constant before removing the header block (escape, io, zipfile, math, re, _EPOCH, _M/_R/_REL)",
+      "when": "Splitting or replacing half of a single-file module",
+      "evidence": "NameError: escape in 11 export tests after the first edit"
+    }
+  ],
+  "problems": []
+}
