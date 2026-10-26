@@ -54,8 +54,8 @@ System stack `--font`: `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica
 | Token | Size | Use |
 |---|---|---|
 | `--t-xl` | 1.75rem (1.5rem at <= 599px), weight 650 | h1 |
-| `--t-lg` | 1.25rem, 650 | h2 (table titles: `caption h2`), brand |
-| `--t-md` | 1rem, line-height 1.5 | body, chart title (650) |
+| `--t-lg` | 1.25rem, 650 | h2, brand |
+| `--t-md` | 1rem, line-height 1.5 | body, chart title (650), table titles (`caption h2`, 650) |
 | `--t-sm` | 0.875rem | tables, `th` (650, `--muted`, original case), captions, notes |
 | `--t-xs` | 0.8125rem | badges |
 Numbers in tables and counts use `font-variant-numeric: tabular-nums` and right-align (`.num`). Thousands
@@ -73,7 +73,7 @@ Breakpoints: `<= 599px` phone, `600-899px` single column, `>= 900px` two-column 
 | `.skip` | "Skip to content", first focusable element | visible only on focus |
 | `.page-head` | h1 left, `.actions` right; wraps | |
 | `.btn`, `.btn-primary` | download links (`Export PPTX`, `Export XLSX`) | hover (soft fill, accent border), focus ring, active 1px press |
-| `.table-wrap > table` | scrolls sideways inside its own box, page never scrolls sideways. Title is `<caption><h2>Name</h2></caption>`: `caption` pads 12/16/8px, `caption h2` has margin 0, `--t-lg`. `th` shows names exactly as read (`Latitude`, `LON`) | row hover soft fill |
+| `.table-wrap > table` | scrolls sideways inside its own box, page never scrolls sideways. Title is `<caption><h2>Name</h2></caption>`: `caption` pads 12/16/8px, `caption h2` has margin 0 and `--t-md`. `th` shows names exactly as read (`Latitude`, `LON`) | row hover soft fill |
 | `.js-plotly-plot .modebar` | Plotly tool bar, drawn by the library, restyled only by the CSS here: opacity 1 always, buttons 28px min, icons `--muted` | focus ring 3px `--accent`, active icon `--accent` |
 | `.badge` | column type label (`numerical`, `categorical`, `temporal`, `geospatial`, `other`) in a pill, text always shown | |
 | `.note`, `.note-error` | left-bar message, used for fixed labels like `could not be read` | |
@@ -167,6 +167,9 @@ the page width.
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
+Ticket 408 (Board gate 167): `caption h2` is `--t-md` (1rem, 650, margin 0), not `--t-lg`; the global `h2` and `.brand`
+stay `--t-lg`. Type scale and Components tables updated. (This supersedes item (2) of ticket 405 below.)
+
 Design review (ticket 405), 1280, 800 and 375 px, light and dark, a demo folder with every chart kind, unreadable and
 other files: no console errors, all charts drawn. Fixed: (1) the breadcrumb with a long unbroken file name made the
 page scroll sideways by 104px at 375px, now `.crumb` has `overflow-wrap: anywhere`; (2) `caption h2` was 1rem, the

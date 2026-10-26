@@ -1,0 +1,70 @@
+{
+  "header": {
+    "ticket": 408,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1970020
+  },
+  "goal": "Table caption h2 size is --t-md (Board gate 167); designer updates DESIGN.md L57 and L76 to match",
+  "acceptance_criteria": [
+    {
+      "text": "app/static/css/databoot.css: `caption h2` uses font-size var(--t-md) (weight 650, margin 0, line-height kept); the global h2 and .brand stay --t-lg",
+      "passes": true
+    },
+    {
+      "text": "docs/DESIGN.md Type scale (L57): `--t-lg` row no longer lists table titles; `--t-md` row lists body, chart title and table titles (`caption h2`)",
+      "passes": true
+    },
+    {
+      "text": "docs/DESIGN.md Components (L76): the `.table-wrap > table` row says `caption h2` has margin 0 and `--t-md`",
+      "passes": true
+    },
+    {
+      "text": "tests/test_acceptance.py: the 5 caption literals (L186, 198, 274, 308, 349) are already `<caption><h2>X</h2></caption>`; this ticket makes no other edit to that file and does not list it in files; AC-22 holds and the full suite is green",
+      "passes": true
+    },
+    {
+      "text": "Page checked at 1280px and 375px in light and dark: captions read as table titles, no layout shift",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-22 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 54%]\n.............................................................            [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n133 passed, 64 warnings in 87.01s (0:01:27)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Changed only the font-size of caption h2 to var(--t-md) and left weight, margin and line-height alone",
+      "why": "Matches Board gate 167 and the acceptance criteria",
+      "evidence": "app/static/css/databoot.css:92"
+    },
+    {
+      "what": "Updated DESIGN.md Type scale rows, the Components row for .table-wrap > table, and added a ticket 408 note that supersedes ticket 405's item (2)",
+      "why": "Acceptance criteria for L57 and L76; the older note said caption h2 was raised to 1.25rem",
+      "evidence": "docs/DESIGN.md:57-58,76 and the Changes this round section"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Computed-style probing of caption h2 plus a no-horizontal-scroll check is enough to show that captions read as table titles at both widths and colour schemes"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "In this sandbox the command is python3, not python; run the full suite with PLAYWRIGHT_BROWSERS_PATH=/opt/playwright python3 -m pytest -q",
+      "when": "Running tests from the Bash tool",
+      "evidence": "python: command not found; python3 run gave 133 passed in 88s"
+    }
+  ],
+  "problems": []
+}
