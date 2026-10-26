@@ -15,7 +15,7 @@
   <caption>Could not be read</caption>
   <thead><tr><th scope="col">File</th><th scope="col">Reason</th></tr></thead>
   <tbody>{% for u in cat.unreadable %}
-    <tr><td class="path">{{ u.path }}</td><td><span class="note note-error">{{ u.reason }}</span></td></tr>{% endfor %}
+    <tr><td class="path">{{ u.path }}{% if u.sheet %} - {{ u.sheet }}{% endif %}</td><td><span class="note note-error">{{ u.reason }}</span></td></tr>{% endfor %}
   </tbody></table></div></section>
 {% endif %}
 {% if cat.others %}

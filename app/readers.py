@@ -11,6 +11,7 @@ import os
 EMPTY = "empty file"
 NO_HEADER = "no header row"
 NOT_RECORDS = "not a list of records"
+INVALID_JSON = "invalid JSON"
 DECODE = "could not decode text"
 LON, LAT = "longitude", "latitude"
 
@@ -74,7 +75,7 @@ def _load_json(f):
     try:
         return json.load(f)
     except ValueError:  # includes JSONDecodeError
-        raise ReadError(NOT_RECORDS) from None
+        raise ReadError(INVALID_JSON) from None
 
 
 def _records(items):
@@ -101,7 +102,7 @@ def _jsonl(path):
                 try:
                     d = json.loads(line)
                 except ValueError:
-                    raise ReadError(NOT_RECORDS) from None
+                    raise ReadError(INVALID_JSON) from None
                 yield from _records([d])
 
 

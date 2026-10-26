@@ -33,6 +33,7 @@ class Dataset:
 class Unreadable:
     path: str
     reason: str        # short fixed note, e.g. "empty file", "not a valid xlsx"
+    sheet: str | None = None  # set when one Excel sheet failed, else None
 
 
 @dataclass
@@ -95,7 +96,7 @@ def scan(folder) -> Catalog:
             try:
                 cat.datasets.append(_make(rel, sheet, kind, path))
             except Exception as e:
-                cat.unreadable.append(Unreadable(rel, str(e) if isinstance(e, ReadError) else FAILED))
+                cat.unreadable.append(Unreadable(rel, str(e) if isinstance(e, ReadError) else FAILED, sheet))
     return cat
 
 

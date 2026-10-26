@@ -81,8 +81,8 @@ def test_geojson_geometries(tmp_path):
     ("jsonl", "\n\n", "no header row"),
     ("json", '{"a": 1}', "not a list of records"),
     ("json", "[1, 2]", "not a list of records"),
-    ("json", "{oops", "not a list of records"),
-    ("jsonl", '{"a": 1}\nnope\n', "not a list of records"),
+    ("json", "{oops", "invalid JSON"),
+    ("jsonl", '{"a": 1}\nnope\n', "invalid JSON"),
     ("geojson", "[]", "not a list of records"),
 ])
 def test_failures(tmp_path, kind, text, note):

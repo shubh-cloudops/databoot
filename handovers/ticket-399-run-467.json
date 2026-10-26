@@ -1,0 +1,66 @@
+{
+  "header": {
+    "ticket": 399,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1963971
+  },
+  "goal": "Fixed notes (gate 166 W-1, W-2): 'invalid JSON' for broken .json/.jsonl, and Unreadable.sheet so a failed Excel sheet is listed as 'book.xlsx - Sheet'",
+  "acceptance_criteria": [
+    {
+      "text": "app/readers.py: `{oops` in a .json file and a bad line in a .jsonl file raise ReadError('invalid JSON') (new INVALID_JSON constant next to the other notes); `{\"a\": 1}` and `[1, 2]` keep 'not a list of records'",
+      "passes": true
+    },
+    {
+      "text": "app/catalog.py: Unreadable gains `sheet: str | None = None`; the per-sheet except in scan() passes the sheet name; a file-level failure leaves it None, so `Unreadable('x.csv', 'empty file').sheet is None`",
+      "passes": true
+    },
+    {
+      "text": "app/templates/home.html shows `path - sheet` in the 'Could not be read' File cell when sheet is set, plain path otherwise",
+      "passes": true
+    },
+    {
+      "text": "A workbook where one sheet fails lists `book.xlsx - <sheet>` as unreadable and its other sheets as datasets (test monkeypatches xlsx.read_sheet to fail for one sheet)",
+      "passes": true
+    },
+    {
+      "text": "tests/test_readers.py L84-85 expect 'invalid JSON'; tests/test_catalog.py gets the sheet case",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-12, AC-25, AC-26 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 57%]\n.....................................................                    [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 11 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 7 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n125 passed, 61 warnings in 66.84s (0:01:06)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Changed the shared _load_json to raise INVALID_JSON, so broken GeoJSON syntax also reports 'invalid JSON'",
+      "why": "One fix point; broken syntax is the same condition for json and geojson",
+      "evidence": "app/readers.py _load_json"
+    },
+    {
+      "what": "sheet field has a default None and is passed positionally only in the per-sheet except",
+      "why": "File-level failures stay Unreadable(rel, reason) with sheet None",
+      "evidence": "app/catalog.py Unreadable, scan()"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "GeoJSON with broken syntax should also say 'invalid JSON' (ticket names only .json/.jsonl)"
+  ],
+  "open_questions": [
+    "docs/ARCHITECTURE.md L92 notes table lists only 'not a list of records'; should the architect add an 'invalid JSON' row (I did not touch docs)?"
+  ],
+  "lessons": [],
+  "problems": []
+}

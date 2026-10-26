@@ -49,3 +49,25 @@ def test_corrupt_file_does_not_stop_scan(make_client, tmp_path):
     cat = catalog.scan(root)
     assert [d.path for d in cat.datasets] == ["b.csv"]
     assert [u.path for u in cat.unreadable] == ["a.json"]
+
+
+def test_failed_sheet_is_listed_with_its_name(make_client, tmp_path, monkeypatch):
+    from app import xlsx
+    from tests.conftest import write_xlsx
+    root = tmp_path / "d"
+    root.mkdir()
+    write_xlsx(root / "book.xlsx", {"Good": [["a"], [1]], "Bad": [["a"], [1]]})
+    real = xlsx.read_sheet
+
+    def flaky(path, sheet):
+        if sheet == "Bad":
+            raise ValueError("boom")
+        return real(path, sheet)
+    monkeypatch.setattr(xlsx, "read_sheet", flaky)
+    make_client(root)
+    cat = catalog.scan(root)
+    assert [(d.path, d.sheet) for d in cat.datasets] == [("book.xlsx", "Good")]
+    assert [(u.path, u.sheet) for u in cat.unreadable] == [("book.xlsx", "Bad")]
+    html = make_client(root).get("/").text
+    assert "book.xlsx - Bad" in html
+    assert catalog.Unreadable("x.csv", "empty file").sheet is None
