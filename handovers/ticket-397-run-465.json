@@ -1,0 +1,70 @@
+{
+  "header": {
+    "ticket": 397,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1960411
+  },
+  "goal": "Parquet on pyarrow only (R4, gate 162): delete the standard-library reader; a corrupt file is 'not a valid parquet file'",
+  "acceptance_criteria": [
+    {
+      "text": "app/parquet.py reads with pyarrow only; the thrift/snappy fallback, OK_CODECS and the codec table are deleted",
+      "passes": true
+    },
+    {
+      "text": "ZSTD, LZ4 and BROTLI files now read; the nine tests/fixtures/*.parquet files give 40 rows x 6 columns and the same values as flat.csv/optional.csv",
+      "passes": true
+    },
+    {
+      "text": "A file with the PAR1 magic but a bad footer, or any pyarrow read error, raises ReadError('not a valid parquet file'); a nested schema keeps ReadError('unsupported parquet encoding'); a 0-byte file keeps 'empty file'",
+      "passes": true
+    },
+    {
+      "text": "Home page lists a corrupt .parquet in 'Could not be read' with the reason 'not a valid parquet file' while other datasets still list and open",
+      "passes": true
+    },
+    {
+      "text": "tests/test_parquet.py: drop the `stdlib` fixture param and test_snappy_copies; test_unsupported_codec becomes 'zstd reads and equals flat.csv'; not-parquet bytes expect 'not a valid parquet file'; test_catalog_scan_lists_parquet expects 3 datasets and none unreadable",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-14, AC-20 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 58%]\n....................................................                     [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py::test_G_5\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n124 passed, 2 warnings in 65.63s (0:01:05)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "read() wraps pq.read_table in one try/except Exception -> ReadError('not a valid parquet file'); nested check stays outside the try",
+      "why": "Any pyarrow error means a bad file, while the nested ReadError('unsupported parquet encoding') must not be remapped",
+      "evidence": "app/parquet.py read()"
+    },
+    {
+      "what": "Changed tests/test_acceptance.py test_G_1 parquet count from 8 to 9",
+      "why": "zstd.parquet now reads, so the old count fails; the ticket says nine fixtures read",
+      "evidence": "tests/test_acceptance.py:321"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Importing pyarrow.parquet at module top is fine because pyarrow is a pinned runtime dependency"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "When a reader's behaviour changes, grep tests/test_acceptance.py for fixture counts and reason strings before the full run",
+      "when": "Changing which files a reader accepts",
+      "evidence": "test_G_1 asserted 8 parquet datasets because zstd used to be unreadable"
+    }
+  ],
+  "problems": []
+}

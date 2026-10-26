@@ -318,7 +318,7 @@ def test_G_1(make_client, data_dir):
     assert got["sub/events.jsonl"] == (10, 2)
     assert got["sub/cities.geojson"] == (4, 3)
     parquets = [n for n in got if n.endswith(".parquet")]
-    assert len(parquets) == 8  # every fixture except zstd.parquet, which G-7 covers
+    assert len(parquets) == 9  # every fixture, zstd.parquet too
     home = client.get("/").text
     for name in parquets:
         assert got[name] == (40, 6) and name in home
