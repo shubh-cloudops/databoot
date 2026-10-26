@@ -22,5 +22,8 @@
   {"id": "AC-21", "text": "Every count of 1,000 or more on the home and dashboard pages (rows, columns, bytes, N of M) is shown with thousands separators, for example 1,234 of 60,000."},
   {"id": "AC-22", "text": "On the home and dashboard pages each table's title (Datasets, Could not be read, Other files, Columns, First rows) is an h2 heading inside the table caption, and column headers show the column names in their original case."},
   {"id": "AC-23", "text": "requirements.txt lists xlsxwriter==3.3.0, python-pptx==1.0.2, openpyxl==3.1.5 and pyarrow==26.0.0, and the repository vendors none of these libraries; an XLSX exported by the app reopens in openpyxl without a 'no default style' warning."},
-  {"id": "AC-24", "text": "On a dashboard page the Plotly tool bar of each chart is visible without hovering, and its buttons can be reached with the Tab key."}
+  {"id": "AC-24", "text": "On a dashboard page the Plotly tool bar of each chart is visible without hovering, and its buttons can be reached with the Tab key."},
+  {"id": "AC-25", "text": "When one sheet of an Excel workbook cannot be read, the \"Could not be read\" table on the home page lists it as the file name and sheet (for example book.xlsx - Lookup), and the other sheets of that workbook still list and open as datasets."},
+  {"id": "AC-26", "text": "A .json or .jsonl file that is not valid JSON is listed as could not be read with the note \"invalid JSON\"; valid JSON that is not a list of records keeps the note \"not a list of records\"."},
+  {"id": "AC-27", "text": "The country map lists countries sorted by value, largest first, like the bar chart; the 3D map titles its z axis and colour bar with the name of the z column."}
 ]

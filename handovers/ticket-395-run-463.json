@@ -1,0 +1,88 @@
+{
+  "header": {
+    "ticket": 395,
+    "project": "you-think-of-the-project-name",
+    "from_role": "techlead",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "38d349eb1f24",
+    "tokens_left": 1912310
+  },
+  "goal": "Write plan/tickets.json: the build tickets for the approved architecture and design.",
+  "acceptance_criteria": [
+    {
+      "text": "Every acceptance item is covered by a ticket",
+      "passes": true
+    },
+    {
+      "text": "Each ticket is small, testable and has a layer",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py plan",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Appended AC-25, AC-26 and AC-27 to docs/acceptance.json for the Board's W-1..W-3 items",
+      "why": "Gate 166 says add an AC id for each; none existed and the architect only listed them as W-items, so the plan check would not cover them",
+      "evidence": "graphify-out/memory.md gate 166; docs/ARCHITECTURE.md L277-283; git diff docs/acceptance.json"
+    },
+    {
+      "what": "PPTX ticket placed before the XLSX ticket",
+      "why": "app/export.py imports app.xlsx internals (_ANS, _table, _rels, xlsx.write); rewriting export.py first lets the XLSX ticket delete them without breaking the site",
+      "evidence": "app/export.py L7-8, L91, L108"
+    },
+    {
+      "what": "Replaced plan/tickets.json with this round's tickets only",
+      "why": "The 'New round' commit 39bfcb7 is after the last change to plan/tickets.json (0c56599)",
+      "evidence": "git log -- plan/tickets.json"
+    },
+    {
+      "what": "Verify-only ticket for AC-13 and AC-15/17/19/21 folded into the caption ticket",
+      "why": "These ids changed or are new but need no code beyond keeping existing behaviour; check.py plan fails if an id has no ticket",
+      "evidence": "/tmp/diffac.py output; Start-DataBoot.ps1 L37-39"
+    },
+    {
+      "what": "tests/test_acceptance.py kept out of every files list",
+      "why": "QA's file; lesson from ticket 190 says tickets editing it fail verify. QA renames test_G_* and fixes caption literals",
+      "evidence": "LESSONS ticket 190; round 1 plan never listed it"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First write of acceptance.json with compact json.dumps",
+      "why_it_failed": "It reformatted the whole file (27-line diff); redone with the original one-item-per-line format so the diff is 4 lines"
+    },
+    {
+      "what": "Writing tickets.json through a bash heredoc",
+      "why_it_failed": "Blocked by the deny list; used Write and then ran the script"
+    }
+  ],
+  "assumptions": [
+    "Editing docs/acceptance.json to add AC-25..27 is allowed for the Tech Lead because gate 166 asks for it",
+    "The one-line home.html change that shows `path - sheet` can sit in the backend W-1 ticket",
+    "Non-acceptance test files (test_pages.py, test_parquet.py, etc.) may be edited by the build tickets that change the behaviour"
+  ],
+  "open_questions": [
+    "The h2 caption ticket changes `<caption>X</caption>` into the h2 form, which breaks the literals in tests/test_acceptance.py (L186, 198, 274, 308, 349). That file is QA's, so the suite may fail between ticket 8 and QA's ticket. Should ticket 8 be allowed to edit it?",
+    "Exports have still never been opened in real Excel or PowerPoint (the Board will do this on Windows after the round)"
+  ],
+  "lessons": [
+    {
+      "lesson": "When a Board answer asks for new AC ids and the doc has none, add them in the original file format (one item per line) before writing tickets, so check.py plan covers them",
+      "when": "Tech Lead plan where a gate says 'Add an AC id for each' work item",
+      "evidence": "gate 166; docs/acceptance.json AC-25..27"
+    },
+    {
+      "lesson": "Order tickets so a module is rewritten by its last importer first: rewrite export.py before deleting the xlsx helpers it imports",
+      "when": "Replacing hand-written code with a library across modules that import each other's internals",
+      "evidence": "app/export.py L7-8 imports from app.xlsx"
+    }
+  ],
+  "problems": []
+}
