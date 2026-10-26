@@ -1,0 +1,63 @@
+{
+  "header": {
+    "ticket": 407,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1958185
+  },
+  "goal": "3D map: fix the clipped 'lat' axis label at 1280px (Board gate 167) by increasing the map3d layout bottom margin",
+  "acceptance_criteria": [
+    {
+      "text": "dashboard.js map3d layout: the bottom margin (l.margin b, now 0) is raised until the 'lat' axis title is fully inside the chart box; top/left/right stay as they are so the always-visible modebar and z title still fit",
+      "passes": true
+    },
+    {
+      "text": "tests/test_browser.py: on points.tsv at 1280px wide, the bounding box of the lat axis title text lies inside the .js-plotly-plot box (bottom edge <= plot bottom); the same check at 375px does not regress",
+      "passes": true
+    },
+    {
+      "text": "Checked at 1280px and 375px in light and dark: no other label or the modebar is clipped; no external requests (AC-9)",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-6 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 54%]\n.............................................................            [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n133 passed, 64 warnings in 82.60s (0:01:22)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Set map3d layout margin b to 40 (was 0); t/l/r unchanged",
+      "why": "Latitude title was cut at the bottom edge; 40px leaves about 20px of clear space at 1280 and 375, light and dark",
+      "evidence": "app/static/js/dashboard.js:121; /tmp/shots/map3d-1280-light.png, map3d-375-dark.png"
+    },
+    {
+      "what": "Tested clipping by reading pixels of the last 3 rows of the WebGL canvas instead of a DOM bounding box",
+      "why": "Plotly 3D axis titles are drawn in the gl canvas, so no DOM text element exists for the lat title",
+      "evidence": "tests/test_browser.py test_map3d_lat_title_not_clipped_at_bottom; fails with b: 0 at both widths, passes with b: 40"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "A pixel-ink check on the canvas bottom rows is an acceptable stand-in for 'bounding box of the lat title inside .js-plotly-plot', since the title is not DOM text",
+    "The blank bottom rows rely on the transparent scene background, so any ink there means clipped content"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "Plotly scatter3d axis titles and ticks are WebGL pixels, not DOM nodes: test clipping by copying the gl canvas to a 2D canvas and counting non-transparent pixels in the edge rows, and confirm the test fails on the old value",
+      "when": "A ticket asks for a bounding-box check of a 3D axis label",
+      "evidence": "tests/test_browser.py test_map3d_lat_title_not_clipped_at_bottom"
+    }
+  ],
+  "problems": []
+}

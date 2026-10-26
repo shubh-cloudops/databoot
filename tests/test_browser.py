@@ -148,3 +148,22 @@ def test_map3d_z_axis_and_colorbar_titled_from_z_label(base, open_page):
       return [g._fullLayout.scene.zaxis.title.text, g._fullData[0].marker.colorbar.title.text]; }""")
     assert got == ["value", "value"]
     assert external == [] and errors == []
+
+
+@pytest.mark.parametrize("width", [1280, 375])
+def test_map3d_lat_title_not_clipped_at_bottom(base, open_page, width):
+    # Plotly draws 3D axis titles in the WebGL canvas, not the DOM: clipped text leaves ink on the canvas's last rows.
+    page, external, errors = open_page(dataset_path(base, "points.tsv"), width)
+    page.wait_for_selector('[data-kind="map3d"] .plot canvas')
+    page.wait_for_timeout(1000)
+    got = page.evaluate("""() => { const plot = document.querySelector('[data-kind="map3d"] .js-plotly-plot');
+      const gl = plot.querySelector('.gl-container canvas'), w = gl.width, h = gl.height;
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const x = c.getContext('2d'); x.drawImage(gl, 0, 0);
+      const rows = x.getImageData(0, h - 3, w, 3).data;
+      let ink = 0; for (let i = 3; i < rows.length; i += 4) if (rows[i] > 0) ink++;
+      return { ink: ink, title: plot._fullLayout.scene.yaxis.title.text, bottom: plot._fullLayout.margin.b,
+               inside: plot.getBoundingClientRect().bottom >= gl.getBoundingClientRect().bottom }; }""")
+    assert got["title"] == "Latitude" and got["bottom"] > 0 and got["inside"]
+    assert got["ink"] == 0
+    assert external == [] and errors == []
