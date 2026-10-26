@@ -6,7 +6,7 @@
   var id = (location.pathname.match(/\/datasets\/([^/]+)/) || [])[1];
   if (!plots.length || !id) return;
 
-  var CONFIG = { topojsonURL: "/static/vendor/topojson/", displaylogo: false, responsive: true, displayModeBar: "hover" };
+  var CONFIG = { topojsonURL: "/static/vendor/topojson/", displaylogo: false, responsive: true, displayModeBar: true };
   var phone = window.matchMedia("(max-width: 599px)");
   var dark = window.matchMedia("(prefers-color-scheme: dark)");
   var charts = null;
@@ -32,7 +32,8 @@
     return {
       paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", autosize: true, showlegend: false,
       font: { family: t["--font"], size: 13, color: t["--fg"] },
-      margin: { l: phone.matches ? 44 : 56, r: 16, t: 8, b: 48 },
+      margin: { l: phone.matches ? 44 : 56, r: 16, t: 36, b: 48 },  // t leaves room for the always-visible mode bar
+      modebar: { bgcolor: "rgba(0,0,0,0)", color: t["--muted"], activecolor: t["--fg"] },
       hoverlabel: { bgcolor: t["--surface"], bordercolor: t["--line-strong"], font: { color: t["--fg"] } },
       transition: { duration: 0 },
       xaxis: axis(t, c.x_label), yaxis: axis(t, c.y_label, { tickformat: "," })
@@ -93,15 +94,15 @@
       var ax = function (title, extra) { return axis(t, title, Object.assign({ backgroundcolor: "rgba(0,0,0,0)", showbackground: false }, extra)); };
       var marker = { size: 3, color: t.c[0] };
       if (real) marker = { size: 3, color: c.data.z, colorscale: [[0, t["--seq-lo"]], [1, t["--seq-hi"]]],
-        colorbar: { outlinewidth: 0, thickness: 12, tickfont: { color: t["--fg"] } } };
+        colorbar: { outlinewidth: 0, thickness: 12, tickfont: { color: t["--fg"] }, title: { text: c.z_label || "", font: { color: t["--fg"] } } } };
       delete l.xaxis; delete l.yaxis;
-      l.margin = { l: 0, r: 0, t: 0, b: 0 };
-      l.scene = { bgcolor: "rgba(0,0,0,0)", camera: { eye: phone.matches ? { x: 2.1, y: 2.1, z: 1.4 } : { x: 1.5, y: 1.5, z: 1 } }, xaxis: ax(c.x_label), yaxis: ax(c.y_label), zaxis: ax("", { visible: real }) };
+      l.margin = { l: 0, r: 0, t: 32, b: 0 };
+      l.scene = { bgcolor: "rgba(0,0,0,0)", camera: { eye: phone.matches ? { x: 2.1, y: 2.1, z: 1.4 } : { x: 1.5, y: 1.5, z: 1 } }, xaxis: ax(c.x_label), yaxis: ax(c.y_label), zaxis: ax(c.z_label, { visible: real }) };
       return [[{ type: "scatter3d", mode: "markers", x: c.data.lon, y: c.data.lat, z: c.data.z, marker: marker }], l];
     },
     country_map: function (c, t, l) {
       delete l.xaxis; delete l.yaxis;
-      l.margin = { l: 0, r: 0, t: 0, b: 0 };
+      l.margin = { l: 0, r: 0, t: 32, b: 0 };
       l.geo = { projection: { type: "natural earth" }, showframe: false, showcoastlines: true,
         coastlinecolor: t["--line-strong"], showcountries: true, countrycolor: t["--line-strong"], showland: true,
         landcolor: t["--bg"], bgcolor: "rgba(0,0,0,0)", showocean: false, showlakes: false };
@@ -121,6 +122,26 @@
     plot.appendChild(note);
   }
 
+  // Plotly's mode bar buttons are <a> without href: make them tabbable buttons. The observer repeats it whenever
+  // Plotly rebuilds the bar (any redraw or relayout); Enter and Space click like a mouse would.
+  function keyboardBar(plot) {
+    var fix = function () {
+      plot.querySelectorAll(".modebar-btn").forEach(function (b) {
+        if (b.getAttribute("tabindex") !== "0") b.setAttribute("tabindex", "0");
+        if (b.getAttribute("role") !== "button") b.setAttribute("role", "button");
+      });
+    };
+    if (!plot.dataset.kb) {
+      plot.dataset.kb = "1";
+      new MutationObserver(fix).observe(plot, { childList: true, subtree: true });
+      plot.addEventListener("keydown", function (e) {
+        var b = e.target.closest && e.target.closest(".modebar-btn");
+        if (b && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); b.click(); }
+      });
+    }
+    fix();
+  }
+
   function draw() {
     var t = tokens();
     charts.forEach(function (c) {
@@ -129,7 +150,7 @@
       if (!plot) return;
       try {
         var made = build[c.kind](c, t, layout(t, c));
-        Plotly.newPlot(plot, made[0], made[1], CONFIG).catch(function () { fail(plot); });
+        Plotly.newPlot(plot, made[0], made[1], CONFIG).then(function () { keyboardBar(plot); }).catch(function () { fail(plot); });
       } catch (e) { fail(plot); }
     });
   }

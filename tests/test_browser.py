@@ -111,3 +111,40 @@ def test_every_asset_url_is_local_and_served(base):
     assert "/static/vendor/plotly/plotly.min.js" in html and "/static/js/dashboard.js" in html
     for f in ("world_110m.json", "LICENSE"):
         assert urllib.request.urlopen(base + "/static/vendor/topojson/" + f).status == 200
+
+
+def test_modebar_visible_without_hover(base, open_page):
+    page, external, errors = open_page(dataset_path(base, "sales.csv"))
+    page.wait_for_selector('[data-kind="line"] .plot .modebar-btn')
+    bar = page.locator(".modebar").first
+    assert bar.evaluate("e => getComputedStyle(e).opacity") == "1"
+    assert bar.evaluate("e => getComputedStyle(e).visibility") == "visible"
+    assert bar.bounding_box()["width"] > 0
+    assert external == [] and errors == []
+
+
+def test_tab_reaches_modebar_btn_and_enter_clicks(base, open_page):
+    page, external, errors = open_page(dataset_path(base, "sales.csv"))
+    page.wait_for_selector('[data-kind="line"] .plot .modebar-btn')
+    assert page.locator(".modebar-btn:not([tabindex='0'][role='button'])").count() == 0
+    for _ in range(60):
+        page.keyboard.press("Tab")
+        if page.evaluate("document.activeElement.classList.contains('modebar-btn')"):
+            break
+    else:
+        pytest.fail("Tab never reached a .modebar-btn")
+    assert page.evaluate("getComputedStyle(document.activeElement).outlineWidth") == "3px"
+    page.evaluate("window.n = 0; document.activeElement.addEventListener('click', () => window.n++)")
+    page.keyboard.press("Enter")
+    page.keyboard.press("Space")
+    assert page.evaluate("window.n") == 2
+    assert errors == [] and external == []
+
+
+def test_map3d_z_axis_and_colorbar_titled_from_z_label(base, open_page):
+    page, external, errors = open_page(dataset_path(base, "points.tsv"))
+    page.wait_for_selector('[data-kind="map3d"] .plot canvas')
+    got = page.evaluate("""() => { const g = document.querySelector('[data-kind="map3d"] .plot');
+      return [g._fullLayout.scene.zaxis.title.text, g._fullData[0].marker.colorbar.title.text]; }""")
+    assert got == ["value", "value"]
+    assert external == [] and errors == []
