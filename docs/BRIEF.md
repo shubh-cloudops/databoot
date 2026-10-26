@@ -1,32 +1,30 @@
-# Brief: round 1
-
+# Brief: round 2
 ## Asked
-Build software that reads a data source (a pen drive, hard drive, disk, file or folder) and immediately turns what it finds into datasets, dashboards, graphs and 3D maps, so the owner can understand the data without anyone narrating it. The idea's last section says the software, not an AI, does this: fixed rules look at the data types and pick the visuals, with no language model, no text generation and no internet. It is to run offline on clients' machines, compared to an OS that detects hardware and draws a desktop. The idea also says it must run within 16GB RAM and on hardware like an RTX 3050 laptop.
+Apply the Board's suggestions to the existing project, in the order given. Switch the file-format code to libraries (xlsxwriter, python-pptx, openpyxl) and list four dependencies in requirements.txt with pinned versions. Update ARCHITECTURE.md to drop "standard library only". Make small display changes (table captions, Plotly modebar, column header text). The PM adds and rewords acceptance criteria, QA renames tests to match, and the line-ending changes in two CSV fixtures are reverted.
 
 ## Deliverable
-A locally run, offline web application (backend plus browser dashboard), packaged so a non-technical client can start it with one click.
+A change to the existing project (code, requirements.txt, ARCHITECTURE.md, acceptance criteria, tests, .gitattributes). Nothing new is built from scratch.
 
 ## Done when
-- Pointed at a folder or drive, the app reads CSV and Excel files and creates a dataset from each, with no internet.
-- Each column is classified as geospatial, temporal, categorical or numerical, and the result is saved as a JSON mapping.
-- Rules choose the charts from those types: time series for temporal plus numerical, bar chart for categorical plus numerical, 3D map for geospatial.
-- A dashboard appears in the browser with its layout built from those rules, and all its scripts and styles are served locally.
-- Large datasets are cut down (batched or downsampled) so the 16GB RAM limit and the 3D map hold up.
-- One click on the client's machine starts everything and opens the dashboard in the default browser.
+- requirements.txt lists xlsxwriter==3.3.0, python-pptx==1.0.2, openpyxl==3.1.5 and pyarrow==26.0.0, and no libraries are vendored.
+- The xlsx export in app/xlsx.py uses xlsxwriter, app/export.py uses python-pptx, and xlsx reading uses openpyxl with read_only=True.
+- ARCHITECTURE.md no longer says "standard library only".
+- Table captions are h2 headings, the Plotly modebar is always visible, and column headers show their real names (CSS uppercase removed).
+- Acceptance criteria have ids for G-1..G-7, AC-6 (Plotly 3D scatter) and AC-13 (Start-DataBoot.ps1) are reworded, and the test_G_* tests are renamed to match.
+- Line-ending changes in flat.csv and optional.csv are reverted, and .gitattributes exists with `* text=auto`.
 
 ## Unclear
-- "Any" file type is named, but the detailed steps only cover CSV, Excel and JSON. Are PDFs, Word files, SQL, shapefiles and GeoJSON required this round?
-- Are the PowerPoint, Excel report and Power BI exports from the earlier sections still wanted, or does "without narrating" replace them?
-- Is the single-click launcher Windows-only (PowerShell) and Docker-based, as written, or must it run elsewhere too?
-- Does "read a pen drive/disk" mean a mounted folder, or reading raw or unmounted devices?
-- What does "complete story" mean without text: is any written summary or caption allowed, or only visuals?
-- What should the app do when a file has no geospatial, temporal or categorical columns?
-- Are other chart types beyond the three listed rules expected?
-- The idea mixes three versions (AI agents, local LLM, rule-based). Is the rule-based one the only one in scope?
+- What are G-1..G-7, and what id format should they get? The idea does not define them.
+- What should the reworded AC-6 and AC-13 say? Only their subjects are named, not the new wording.
+- What should the test_G_* tests be renamed to? Presumably the new AC ids, but the idea does not say.
+- Which tables have captions that become h2? All of them, or only some?
+- Is app/export.py an export to PowerPoint? The idea only says "on python-pptx".
+- What is pyarrow for? It is to be listed, but no code change uses it.
+- "Revert" the CSV line endings to which state, the last commit? And should `* text=auto` renormalize other existing files?
 
 ## Not asked
-- Any AI or language model, whether cloud or local.
-- Internet access, cloud hosting or a SaaS version.
-- Written narration or generated insights text.
-- Power BI integration (it appears only in the superseded AI version).
-- Multi-user accounts, logins or client management.
+- Vendoring any library.
+- Any use of pyarrow in code.
+- Changes to branding or to anything the earlier rounds built, beyond the items listed.
+- New features, new export formats or new pages.
+- Changes to the Plotly chart type beyond rewording AC-6 and making the modebar visible.

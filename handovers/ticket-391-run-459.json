@@ -1,0 +1,61 @@
+{
+  "header": {
+    "ticket": 391,
+    "project": "you-think-of-the-project-name",
+    "from_role": "router",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "medium",
+    "prompt_version": "775d10f51fce",
+    "tokens_left": 1981494
+  },
+  "goal": "Read docs/IDEA.md with no history and write docs/BRIEF.md: what this round asks for.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/BRIEF.md has the sections Asked, Deliverable, Done when, Unclear and Not asked",
+      "passes": true
+    },
+    {
+      "text": "It restates only what docs/IDEA.md says",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py brief",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Treat the round as a change to the existing project, not a new build",
+      "why": "The idea lists targeted edits and says to keep everything earlier rounds built and the branding",
+      "evidence": "docs/IDEA.md L12: \"Keep everything the earlier rounds built and the business's branding; change only what these suggestions ask.\""
+    },
+    {
+      "what": "List pyarrow only as a dependency, with no code use",
+      "why": "The idea requires it in requirements.txt but names no change that uses it",
+      "evidence": "docs/IDEA.md L3: \"requirements.txt must list all four\""
+    },
+    {
+      "what": "Put the unexplained references (G-1..G-7, AC-6/AC-13 new wording, test_G_* new names, which tables) under Unclear",
+      "why": "The idea names them but gives no definitions or target wording, and filling the gaps would be guessing",
+      "evidence": "docs/IDEA.md L9: \"PM: add AC ids for G-1..G-7, reword AC-6 (Plotly 3D scatter) and AC-13 (Start-DataBoot.ps1); QA renames test_G_* to match.\""
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "\"Round N\" in the title is 2, taken from the idea's heading and the task statement",
+    "app/export.py is read as a python-pptx based export, since the idea only says \"on python-pptx\""
+  ],
+  "open_questions": [
+    "What are G-1..G-7 and what id format should they get?",
+    "What should the reworded AC-6 and AC-13 say?",
+    "What should the test_G_* tests be renamed to?",
+    "Which table captions become h2?",
+    "What is pyarrow for?",
+    "Which state should the CSV line endings revert to, and should `* text=auto` renormalize other files?"
+  ],
+  "lessons": [],
+  "problems": []
+}
