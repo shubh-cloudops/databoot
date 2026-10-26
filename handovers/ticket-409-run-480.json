@@ -1,0 +1,67 @@
+{
+  "header": {
+    "ticket": 409,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1971020
+  },
+  "goal": "ARCHITECTURE.md notes (Board gate 167): 'invalid JSON' row in the notes table (also for GeoJSON broken syntax) and histogram labels documented as 'a to b' (code wins); confirm requirements.txt pins for AC-23",
+  "acceptance_criteria": [
+    {
+      "text": "docs/ARCHITECTURE.md notes table (L91) has a row `invalid JSON` for json.JSONDecodeError in .json, .jsonl (any line) and .geojson; the '**new**' marker is dropped; no other row changes",
+      "passes": true
+    },
+    {
+      "text": "docs/ARCHITECTURE.md Exports table (L211) documents histogram bin labels as `\"a to b\"` (6 significant digits), matching app/xlsx.py and app/export.py; no code changes",
+      "passes": true
+    },
+    {
+      "text": "requirements.txt is unchanged and still pins xlsxwriter==3.3.0, python-pptx==1.0.2, openpyxl==3.1.5 and pyarrow==26.0.0 (AC-23); checked by grep, no library is vendored in the repo",
+      "passes": true
+    },
+    {
+      "text": "No test file is edited; AC-26 and AC-18 behaviour is unchanged and their existing tests pass",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-18, AC-23, AC-26 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 54%]\n.............................................................            [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n133 passed, 64 warnings in 88.06s (0:01:28)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Left the '**new**' marker on the 'not a valid parquet file' row (L94)",
+      "why": "Ticket says no other row changes",
+      "evidence": "docs/ARCHITECTURE.md:94"
+    },
+    {
+      "what": "Documented histogram labels as \"a to b\" with the note 'each edge with 6 significant digits'",
+      "why": "Code wins (gate 167); matches the :.6g format",
+      "evidence": "app/xlsx.py:93, app/export.py:72, docs/ARCHITECTURE.md:211"
+    },
+    {
+      "what": "Left requirements.txt unchanged",
+      "why": "It already pins the four AC-23 libraries; none is vendored",
+      "evidence": "cat requirements.txt; git ls-files | grep -iE 'xlsxwriter|openpyxl|pptx|pyarrow' lists only tests/test_export_pptx.py"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Row 91 wording 'in .json, .jsonl (any line) and .geojson' follows the ticket text exactly"
+  ],
+  "open_questions": [
+    "No test checks the AC-23 requirements pins yet; QA may want a test_AC_23"
+  ],
+  "lessons": [],
+  "problems": []
+}

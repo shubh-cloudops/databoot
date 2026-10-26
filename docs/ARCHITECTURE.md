@@ -88,7 +88,7 @@ No page or route is added this round, so no sitemap or NAV change.
   | `empty file` | size 0 (any kind) |
   | `no header row` | csv/tsv/xlsx sheet with no non-empty row |
   | `could not decode text` | csv/tsv not utf-8-sig and not cp1252 |
-  | `invalid JSON` | **new**: `json.JSONDecodeError` in json, jsonl (any line) or geojson |
+  | `invalid JSON` | `json.JSONDecodeError` in .json, .jsonl (any line) and .geojson |
   | `not a list of records` | valid JSON of the wrong shape (`{"a": 1}`, `[1, 2]`, geojson `[]`) |
   | `not a valid xlsx` | openpyxl cannot open the file or parse a sheet; workbook with no worksheets |
   | `not a valid parquet file` | **new**: any pyarrow error opening or reading the file (bad magic, bad footer, truncated) |
@@ -208,7 +208,7 @@ Layout is unchanged from round 1 (PRD constraint); only the writers change.
   |---|---|---|
   | line | x_label, y_label | `{"type": "line"}` |
   | bar, country_map | x_label, y_label | `{"type": "column"}` |
-  | histogram | bin label `"a–b"`, count | `{"type": "column"}`, gap 0 |
+  | histogram | bin label `"a to b"` (each edge with 6 significant digits), count | `{"type": "column"}`, gap 0 |
   | donut | label, value | `{"type": "doughnut"}` |
   | scatter | x_label, y_label | `{"type": "scatter"}` |
   | map3d | lon label, lat label, `z` | `{"type": "scatter"}` of lon/lat (Office map charts need Bing, online) |
