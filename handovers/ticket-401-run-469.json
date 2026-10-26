@@ -1,0 +1,88 @@
+{
+  "header": {
+    "ticket": 401,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1942882
+  },
+  "goal": "PPTX export on python-pptx (R2, gates 162/164): rewrite app/export.py so it no longer imports app.xlsx internals",
+  "acceptance_criteria": [
+    {
+      "text": "app/export.pptx(dataset, charts) builds with Presentation() at 16:9 (12192000 x 6858000) on the Blank layout: slide 1 holds the display name and 'N rows, M columns' with thousands separators, then one slide per chart",
+      "passes": true
+    },
+    {
+      "text": "Chart slides use add_chart: line LINE, bar/country_map/histogram COLUMN_CLUSTERED, donut DOUGHNUT, scatter/map3d XY_SCATTER; axis titles x_label/y_label, value axis number format '#,##0'; the rule caption and 'N of M points|rows' are the last text boxes",
+      "passes": true
+    },
+    {
+      "text": "The heatmap slide is a native table of r values with the blue-white-red fill; XML-illegal control characters are stripped from every string",
+      "passes": true
+    },
+    {
+      "text": "len(prs.slides) == 1 + len(charts) when read back by python-pptx and at least one shape.has_chart; the download route and filename `<stem>[-<sheet>].pptx` are unchanged",
+      "passes": true
+    },
+    {
+      "text": "export.py no longer imports from app.xlsx; tests/test_export_pptx.py replaces the L64-71 embedded-workbook internals with python-pptx reopen checks (chart type, categories, texts per slide) and keeps check_package",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-18 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 57%]\n......................................................                   [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 11 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 7 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n126 passed, 61 warnings in 67.70s (0:01:07)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Two separate last text boxes: rule caption, then 'N of M points|rows'",
+      "why": "AC says both are the last text boxes; one box per string keeps slide text exact",
+      "evidence": "app/export.py pptx()"
+    },
+    {
+      "what": "Heatmap cell font size set per run, only where a run exists",
+      "why": "Empty cells (null r) have no run, so indexing runs[0] would raise",
+      "evidence": "app/export.py _table"
+    },
+    {
+      "what": "Histogram category labels built in export.py ('a to b' with 6 significant digits)",
+      "why": "The old helper lived in app.xlsx, which export.py may no longer import; labels match the XLSX table",
+      "evidence": "app/export.py _data; app/xlsx.py:131-133"
+    },
+    {
+      "what": "test check_package parses only .xml/.rels parts and accepts parts covered by a Default content type",
+      "why": "python-pptx's default template includes a binary printer-settings part and Default-typed parts",
+      "evidence": "tests/test_export_pptx.py check_package; first run ParseError on printerSettings"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Parsing every non-.xlsx zip member as XML in the test",
+      "why_it_failed": "The python-pptx default template has a binary printerSettings part, so ElementTree raised ParseError"
+    }
+  ],
+  "assumptions": [
+    "Chart title is carried by the slide title text box, so the chart's own title is off (has_title False)",
+    "Donut keeps its legend; other kinds have none"
+  ],
+  "open_questions": [
+    "Exports still have not been opened in real PowerPoint (Board will do this on Windows)"
+  ],
+  "lessons": [
+    {
+      "lesson": "When reopening python-pptx output in tests, parse only .xml/.rels members: the default template carries a binary printerSettings part. Python-pptx reads an empty category label back as 'None'.",
+      "when": "writing tests for python-pptx exports",
+      "evidence": "tests/test_export_pptx.py"
+    }
+  ],
+  "problems": []
+}
