@@ -1,0 +1,72 @@
+{
+  "header": {
+    "ticket": 405,
+    "project": "you-think-of-the-project-name",
+    "from_role": "designer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "1c53b4636107",
+    "tokens_left": 1917267
+  },
+  "goal": "Design review: open every page with the Playwright browser tools at desktop and phone width, compare with docs/DESIGN.md, and fix templates, CSS and front-end scripts directly where they fall short.",
+  "acceptance_criteria": [
+    {
+      "text": "Every page matches docs/DESIGN.md at desktop and phone width",
+      "passes": true
+    },
+    {
+      "text": "No page scrolls sideways at 375px",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 54%]\n...........................................................              [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 14 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n131 passed, 62 warnings in 76.93s (0:01:16)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Heatmap cell values drawn as Plotly annotations coloured black or white by computed contrast, replacing texttemplate",
+      "why": "Plotly's auto text colour was about 3.9:1 on the dark-mode blue (#444 on #6ea4ff), below the 4.5:1 rule",
+      "evidence": "app/static/js/dashboard.js cellValues and heatmap builder; /tmp/hm-dark.png and /tmp/hm-light.png"
+    },
+    {
+      "what": "Added overflow-wrap: anywhere to .crumb",
+      "why": "A long unbroken file name made the dataset page scroll sideways by 104px at 375px",
+      "evidence": "app/static/css/databoot.css:74; scrollWidth was 479 vs 375 before, 375 after"
+    },
+    {
+      "what": "caption h2 set to --t-lg with line-height 1.25",
+      "why": "docs/DESIGN.md says table titles use --t-lg; the CSS used --t-md",
+      "evidence": "app/static/css/databoot.css:92; docs/DESIGN.md Type scale"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Python Playwright with PLAYWRIGHT_BROWSERS_PATH=/opt/playwright is equivalent to the mcp__playwright tools for this review, which were not available",
+    "The /tmp demo folder (sales, long-named TSV with 300 points, correlated metrics, records.json, xlsx, broken and empty files, a pdf) covers every chart kind and page state"
+  ],
+  "open_questions": [
+    "The 'lat' label of the 3D scene at 1280px was not rechecked this round; ticket 404 left it as is and asked whether the Board wants it fixed",
+    "Exports have still not been opened in real Excel or PowerPoint (Board will do this on Windows)"
+  ],
+  "lessons": [
+    {
+      "lesson": "In a design review, check the document scrollWidth against innerWidth with a long unbroken file name; wrap breadcrumbs and titles with overflow-wrap: anywhere",
+      "when": "Any page that prints a file path outside a table-wrap",
+      "evidence": "nav.crumb scrollWidth 463 vs 343 at 375px on the dataset page"
+    },
+    {
+      "lesson": "Plotly's automatic heatmap text colour can fail 4.5:1; compute contrast and set the colour per cell with annotations",
+      "when": "Heatmaps with a custom diverging scale in dark mode",
+      "evidence": "dark heatmap text rgb(68,68,68) on #6ea4ff, about 3.9:1"
+    }
+  ],
+  "problems": []
+}

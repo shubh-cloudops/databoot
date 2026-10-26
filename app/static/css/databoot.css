@@ -71,7 +71,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: var(--s5) var(--s4) var(
 .page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--s3) var(--s5);
   margin-bottom: var(--s4); }
 .page-head h1 { margin: 0; }
-.crumb { font-size: var(--t-sm); color: var(--muted); margin: 0 0 var(--s2); }
+.crumb { font-size: var(--t-sm); color: var(--muted); margin: 0 0 var(--s2); overflow-wrap: anywhere; }
 .crumb a { display: inline-flex; align-items: center; min-height: var(--tap); }
 .actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
 
@@ -89,7 +89,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: var(--s5) var(--s4) var(
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
 caption { text-align: left; padding: var(--s3) var(--s4) var(--s2); }
-caption h2 { margin: 0; font-size: var(--t-md); font-weight: 650; line-height: inherit; }  /* a real h2 inside the caption keeps the table's name and joins the outline, looking like the old caption */
+caption h2 { margin: 0; font-size: var(--t-lg); font-weight: 650; line-height: 1.25; }  /* a real h2 inside the caption keeps the table's name and joins the outline, looking like the old caption */
 th, td { text-align: left; padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); }
 /* headers show the column names exactly as read (no case change, no letter spacing) */
 th { font-weight: 650; color: var(--muted); font-size: var(--t-sm); white-space: nowrap; background: var(--bg); }

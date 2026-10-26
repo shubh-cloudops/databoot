@@ -108,7 +108,7 @@ the one source of truth, and passes a shared layout:
 - Per kind: line = `--c1` 2px, no markers unless `shown <= 40`; bar = `--c1`, gap 0.2, horizontal when the longest
   label has > 12 characters; donut = hole 0.55, legend right (below at 375px), `textinfo: "percent"`; histogram =
   `--c1`, bars touching (gap 0.02); scatter = `--c1` markers size 6, opacity 0.7; heatmap = diverging scale,
-  `zmin -1`, `zmax 1`, cell values printed, `null` cells blank; map3d = scatter3d markers size 3, `--seq` colour by
+  `zmin -1`, `zmax 1`, cell values printed as annotations in black or white, whichever contrasts more (>= 4.5:1) with that cell's colour, `null` cells blank; map3d = scatter3d markers size 3, `--seq` colour by
   z when z is real data, else `--c1`; with a `z_label` the z axis title and the colour bar title are that column
   name, and with `z_label` null (z is the constant 0) the z axis is hidden and there is no colour bar; country_map = choropleth, `--seq` scale, outlines `--line-strong`, coastlines
   on, `showframe` off, no base tiles.
@@ -167,6 +167,12 @@ the page width.
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
+Design review (ticket 405), 1280, 800 and 375 px, light and dark, a demo folder with every chart kind, unreadable and
+other files: no console errors, all charts drawn. Fixed: (1) the breadcrumb with a long unbroken file name made the
+page scroll sideways by 104px at 375px, now `.crumb` has `overflow-wrap: anywhere`; (2) `caption h2` was 1rem, the
+spec says `--t-lg`, now 1.25rem; (3) heatmap cell values used Plotly's automatic text colour (#444 on #6ea4ff, about
+3.9:1 in dark), now drawn by `dashboard.js` `cellValues` in black or white by computed contrast. No token change.
+
 Round 2 (ticket 394, architecture phase): `databoot.css` now styles `caption h2`, drops the upper-case and letter
 spacing from `th` (also `th` size `--t-xs` to `--t-sm`), forces the mode bar to opacity 1, makes its buttons 28px
 and gives focused ones the 3px `--accent` ring with a selector long enough to beat Plotly's own 1px black outline.

@@ -40,6 +40,27 @@
     };
   }
 
+  // Heatmap cell values: Plotly's own text colour is only ~3.9:1 on the bright dark-mode blue, so each cell gets
+  // black or white, whichever contrasts more with the colour the scale gives that cell.
+  function rgb(h) { return [1, 3, 5].map(function (i) { return parseInt(h.substr(i, 2), 16); }); }
+  function lum(v) {
+    var k = v.map(function (x) { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); });
+    return 0.2126 * k[0] + 0.7152 * k[1] + 0.0722 * k[2];
+  }
+  function cellValues(c, t) {
+    var out = [];
+    c.data.z.forEach(function (row, i) {
+      row.forEach(function (z, j) {
+        if (z === null) return;
+        var a = rgb(z < 0 ? t["--div-neg"] : t["--div-pos"]), m = rgb(t["--div-mid"]), w = Math.abs(z);
+        var L = lum(m.map(function (x, n) { return x + (a[n] - x) * w; }));
+        out.push({ x: c.data.labels[j], y: c.data.labels[i], xref: "x", yref: "y", showarrow: false,
+          text: z.toFixed(2), font: { size: 13, color: 1.05 / (L + 0.05) >= (L + 0.05) / 0.05 ? "#ffffff" : "#000000" } });
+      });
+    });
+    return out;
+  }
+
   // Each builder returns [data, layout] for one chart.
   var build = {
     line: function (c, t, l) {
@@ -85,9 +106,10 @@
     heatmap: function (c, t, l) {
       l.xaxis = axis(t, "", { type: "category" });
       l.yaxis = axis(t, "", { type: "category", autorange: "reversed" });
+      l.annotations = cellValues(c, t);
       return [[{ type: "heatmap", x: c.data.labels, y: c.data.labels, z: c.data.z, zmin: -1, zmax: 1,
         colorscale: [[0, t["--div-neg"]], [0.5, t["--div-mid"]], [1, t["--div-pos"]]], hoverongaps: false,
-        texttemplate: "%{z:.2f}", xgap: 1, ygap: 1, colorbar: { outlinewidth: 0, tickfont: { color: t["--fg"] } } }], l];
+        xgap: 1, ygap: 1, colorbar: { outlinewidth: 0, tickfont: { color: t["--fg"] } } }], l];
     },
     map3d: function (c, t, l) {
       var real = c.data.z.some(function (z) { return z !== null && z !== 0; });
