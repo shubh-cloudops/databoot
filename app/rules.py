@@ -79,8 +79,10 @@ def _map3d(columns, rows, mapping, settings):
     shown = _sample(points, settings.map_cap)
     lons, lats, zs = zip(*shown) if shown else ([], [], [])
     rule = f"geospatial {columns[lon]} + {columns[lat]}: 3D map" + (f", z = {columns[z[0]]}" if z else "")
-    return [_chart("map3d", f"{columns[z[0]] if z else 'points'} by location", columns[lon], columns[lat], rule,
-                   len(shown), len(points), {"lon": list(lons), "lat": list(lats), "z": list(zs)})]
+    chart = _chart("map3d", f"{columns[z[0]] if z else 'points'} by location", columns[lon], columns[lat], rule,
+                   len(shown), len(points), {"lon": list(lons), "lat": list(lats), "z": list(zs)})
+    chart["z_label"] = columns[z[0]] if z else None
+    return [chart]
 
 
 def _lines(columns, rows, mapping, settings):
@@ -134,6 +136,7 @@ def _country_map(columns, rows, mapping, settings):
             used += 1
     if not sums:
         return []
+    sums = dict(sorted(sums.items(), key=lambda kv: (-kv[1], kv[0])))
     mode = "ISO-3" if all(ISO3.fullmatch(k) for k in sums) else "country names"
     what = "rows" if n is None else columns[n]
     return [_chart("country_map", f"{what} by {columns[c]}", columns[c], "count" if n is None else f"{what} (sum)",

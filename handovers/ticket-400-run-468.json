@@ -1,0 +1,66 @@
+{
+  "header": {
+    "ticket": 400,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1966694
+  },
+  "goal": "Chart items (gate 166 W-3): country map sorted by value like bars, and map3d carries z_label for the z axis and colorbar title",
+  "acceptance_criteria": [
+    {
+      "text": "app/rules.py _country_map sorts locations by (-value, name) as the bar rule does; records.json gives locations ['Brazil','Japan','France'] with values [203,125,68]; the ISO-3 case gives ['FRA','JPN'] with [8,4]",
+      "passes": true
+    },
+    {
+      "text": "_map3d adds `z_label` to the chart dict: the numerical column name used for z, or null when z is the constant 0 (points.tsv with a value column gives 'value'; a lat/lon-only file gives null)",
+      "passes": true
+    },
+    {
+      "text": "/api/datasets/{id}/charts carries z_label and both exports still build (no exporter reads whole chart dicts)",
+      "passes": true
+    },
+    {
+      "text": "tests/test_rules_extra.py::test_country_map_iso3_and_names and tests/test_rules.py are updated for the new order and key; the 8-chart cap and chart ids are unchanged",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-16, AC-27 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 57%]\n.....................................................                    [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 11 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 7 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n125 passed, 61 warnings in 65.71s (0:01:05)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "z_label is set on the chart dict after _chart() instead of adding a parameter to _chart()",
+      "why": "Only map3d has the key; other chart kinds keep their exact dict shape",
+      "evidence": "app/rules.py _map3d"
+    },
+    {
+      "what": "Sorted the sums dict in _country_map before computing mode and building locations",
+      "why": "One sort feeds both the locations and values lists, same key as _bars",
+      "evidence": "app/rules.py _country_map; app/rules.py:113"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "z_label is a top-level key of the chart dict, next to x_label and y_label (gate 166 'z_label key' assumption)"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "Adding a key to one chart kind needs no change in main.py: /charts returns rules.charts() dicts as they are, and no test compares whole chart dicts",
+      "when": "Adding keys to a chart dict",
+      "evidence": "app/main.py:63-73; full suite 125 passed"
+    }
+  ],
+  "problems": []
+}

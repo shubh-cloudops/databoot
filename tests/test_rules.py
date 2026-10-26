@@ -38,13 +38,14 @@ def test_map_axes_and_z(make_client, data_dir):
     make_client(data_dir)
     m = charts_of(data_dir, "points.tsv")[0]
     assert m["kind"] == "map3d" and (m["x_label"], m["y_label"]) == ("LON", "Latitude")
+    assert m["z_label"] == "value"
     assert m["data"] == {"lon": [-0.12, 2.35, -74.0, 139.69], "lat": [51.5, 48.85, 40.71, 35.68], "z": [3.0, 4.5, 8.0, 9.5]}
 
 
 def test_map_without_numerical_z_is_zero():
     cols, rows = ["lat", "lon"], [["1", "2"], ["3", "4"]]
     m = rules.charts(cols, rows, profile.classify(cols, rows), config.get())[0]
-    assert m["data"]["z"] == [0, 0]
+    assert m["data"]["z"] == [0, 0] and m["z_label"] is None
 
 
 def test_no_map_with_only_one_geo_column():

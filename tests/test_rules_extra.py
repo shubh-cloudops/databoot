@@ -72,9 +72,12 @@ def test_country_map_iso3_and_names(make_client, data_dir):
     iso = only(run(["iso3", "gdp"], [["FRA", 3], ["JPN", 4], ["FRA", 5]], {"iso3": "categorical", "gdp": "numerical"}),
                "country_map")
     assert iso["data"] == {"locations": ["FRA", "JPN"], "values": [8, 4], "locationmode": "ISO-3"}
+    tie = only(run(["iso3", "n"], [["JPN", 1], ["FRA", 1], ["BRA", 5]], {"iso3": "categorical", "n": "numerical"}),
+               "country_map")
+    assert tie["data"]["locations"] == ["BRA", "FRA", "JPN"]  # ties break by name
     make_client(data_dir)  # sub/records.json: country is text with 3 distinct of 3 rows, so classified other
     names = only(charts_of(data_dir, "sub/records.json"), "country_map")
-    assert names["data"] == {"locations": ["France", "Japan", "Brazil"], "values": [68, 125, 203],
+    assert names["data"] == {"locations": ["Brazil", "Japan", "France"], "values": [203, 125, 68],
                              "locationmode": "country names"}
     cnt = only(run(["Country"], [["FRA"], ["Fra"], ["FRA"]], {"Country": "categorical"}), "country_map")
     assert cnt["data"] == {"locations": ["FRA", "Fra"], "values": [2, 1], "locationmode": "country names"}
