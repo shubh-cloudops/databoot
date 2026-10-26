@@ -1,10 +1,18 @@
-# Design: DataBoot (round 1)
+# Design: DataBoot (round 2)
 
 Stylesheet: `app/static/css/databoot.css` (all tokens and components below; linked by `app/templates/base.html`).
-Sources: docs/PRD.md, docs/ARCHITECTURE.md ("Pages", "Chart contract"), Board gate 160 (graphify-out/memory.md
-L4-17): **plain neutral style, no logo, system sans font**, text only as titles, axis labels, `N of M` counts and
-one rule caption. No docs/TRENDS.md this round (`team: -trends`), so no trend advice is used. No external
-fonts, images, icons or CDNs; no raster or SVG logo. The brand is the word "DataBoot" set in the system font.
+Sources: docs/PRD.md, docs/ARCHITECTURE.md ("Pages", R5, R6), Board gates 160 and 165: **branding unchanged:
+DataBoot, plain neutral style, system sans font, no logo, blank SVG favicon** (`app/static/blank.svg`), text only
+as titles, axis labels, `N of M` counts and one rule caption. No docs/TRENDS.md this round (`team: -trends`), so no
+trend advice is used. No external fonts, images, icons or CDNs; no raster or SVG logo. The brand is the word
+"DataBoot" set in the system font. No docs/brand/ and no site capture exist, so no logo is copied.
+
+**Round 2 delta** (everything not listed here is unchanged from round 1; tokens are unchanged):
+1. Table titles are real `h2` elements inside the `<caption>` (AC-22).
+2. Column headers keep their case: no upper-casing, no letter spacing (AC-22). `th` is `--t-sm`, not `--t-xs`.
+3. The Plotly mode bar is always visible and its buttons are in the Tab order with a visible ring (AC-24).
+4. 3D map z axis and colour bar are titled with the z column name (`z_label`), see Charts.
+5. Numbers with thousands separators and the new inventory/Parquet/XLSX datasets need no new component.
 
 ## Visual direction
 A quiet instrument panel: flat surfaces, hairline borders, one blue accent, and the charts carry the colour.
@@ -46,10 +54,10 @@ System stack `--font`: `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica
 | Token | Size | Use |
 |---|---|---|
 | `--t-xl` | 1.75rem (1.5rem at <= 599px), weight 650 | h1 |
-| `--t-lg` | 1.25rem, 650 | h2, brand, table caption |
+| `--t-lg` | 1.25rem, 650 | h2 (table titles: `caption h2`), brand |
 | `--t-md` | 1rem, line-height 1.5 | body, chart title (650) |
-| `--t-sm` | 0.875rem | tables, captions, notes |
-| `--t-xs` | 0.8125rem | table headings (upper case, 0.04em), badges |
+| `--t-sm` | 0.875rem | tables, `th` (650, `--muted`, original case), captions, notes |
+| `--t-xs` | 0.8125rem | badges |
 Numbers in tables and counts use `font-variant-numeric: tabular-nums` and right-align (`.num`). Thousands
 separators are used everywhere (Board gate 161), through the `num` filter.
 
@@ -65,7 +73,8 @@ Breakpoints: `<= 599px` phone, `600-899px` single column, `>= 900px` two-column 
 | `.skip` | "Skip to content", first focusable element | visible only on focus |
 | `.page-head` | h1 left, `.actions` right; wraps | |
 | `.btn`, `.btn-primary` | download links (`Export PPTX`, `Export XLSX`) | hover (soft fill, accent border), focus ring, active 1px press |
-| `.table-wrap > table` | scrolls sideways inside its own box, page never scrolls sideways | row hover soft fill |
+| `.table-wrap > table` | scrolls sideways inside its own box, page never scrolls sideways. Title is `<caption><h2>Name</h2></caption>`: `caption` pads 12/16/8px, `caption h2` has margin 0, `--t-lg`. `th` shows names exactly as read (`Latitude`, `LON`) | row hover soft fill |
+| `.js-plotly-plot .modebar` | Plotly tool bar, drawn by the library, restyled only by the CSS here: opacity 1 always, buttons 28px min, icons `--muted` | focus ring 3px `--accent`, active icon `--accent` |
 | `.badge` | column type label (`numerical`, `categorical`, `temporal`, `geospatial`, `other`) in a pill, text always shown | |
 | `.note`, `.note-error` | left-bar message, used for fixed labels like `could not be read` | |
 | `.empty` | dashed box: "No charts for this dataset" style fixed label, only when `charts == []` | |
@@ -90,12 +99,18 @@ the one source of truth, and passes a shared layout:
   axis line and ticks `--muted`; `margin` `{l:56, r:16, t:8, b:48}` (smaller `l:44` at 375px); `autosize` with
   `responsive: true`; **no Plotly title** (the figcaption is the title); axis titles from `x_label` / `y_label`.
 - `Plotly.newPlot(el, data, layout, {topojsonURL: "/static/vendor/topojson/", displaylogo: false, responsive: true})`.
-  Mode bar stays (zoom, pan, reset are useful for 3D), but `displayModeBar: "hover"`.
+  **Mode bar is always visible: `displayModeBar: true`** (not `"hover"`: hover mode hides the buttons from
+  keyboard users and from touch screens). Layout `modebar: {bgcolor: transparent, color: --muted, activecolor:
+  --accent}` so the icons follow the theme (`--muted` is 5.4 / 6.6 : 1 on the card). The CSS adds
+  `opacity: 1` as a guard. Buttons are `<a>` without `href`, so after every draw (and every redraw on theme or
+  breakpoint change) `dashboard.js` sets `tabindex="0"`, `role="button"` and `aria-label` (from `data-title`) on each
+  `.modebar-btn` and maps Enter and Space to click (ARCHITECTURE R6). Focus shows the same 3px `--accent` ring.
 - Per kind: line = `--c1` 2px, no markers unless `shown <= 40`; bar = `--c1`, gap 0.2, horizontal when the longest
   label has > 12 characters; donut = hole 0.55, legend right (below at 375px), `textinfo: "percent"`; histogram =
   `--c1`, bars touching (gap 0.02); scatter = `--c1` markers size 6, opacity 0.7; heatmap = diverging scale,
   `zmin -1`, `zmax 1`, cell values printed, `null` cells blank; map3d = scatter3d markers size 3, `--seq` colour by
-  z when z is real data, else `--c1`; country_map = choropleth, `--seq` scale, outlines `--line-strong`, coastlines
+  z when z is real data, else `--c1`; with a `z_label` the z axis title and the colour bar title are that column
+  name, and with `z_label` null (z is the constant 0) the z axis is hidden and there is no colour bar; country_map = choropleth, `--seq` scale, outlines `--line-strong`, coastlines
   on, `showframe` off, no base tiles.
 - Honest data: the point count shown in `.chart-count` is the server's `shown`/`total` (`N of M points` or `N of
   M rows`). When `shown < total` the caption says so and nothing else; no smoothing, no fake trend line. Plotly
@@ -113,8 +128,10 @@ the one source of truth, and passes a shared layout:
 ## Accessibility
 - Contrast as in the token tables. Focus: 3px `--accent` outline, 2px offset, on every link and button
   (`:focus-visible`); contrast with the surface >= 3:1 in both themes.
-- Tab order: skip link, brand, page actions, table links, chart mode-bar buttons. Landmarks: `header`, `main#main`.
-- One `h1` per page, then `h2` per section; tables have `caption` and `th scope`. Type badges carry text.
+- Tab order: skip link, brand, page actions, chart mode-bar buttons (visible, 28px, ring on focus), table links.
+  Landmarks: `header`, `main#main`. Mode-bar buttons have an `aria-label`.
+- One `h1` per page, then `h2` per table (inside its `<caption>`), no skipped level; figures keep a figcaption
+  title, not a heading. Tables have `caption` and `th scope`. Type badges carry text.
 - `lang="en"`; zoom is not blocked; layout reflows at 320px with no horizontal page scroll.
 
 ## Page layouts
@@ -122,7 +139,7 @@ Both pages share the header (56px) and `main` (max 1200px).
 
 ### Home `/`
 Desktop (>= 900px): h1 `DataBoot`; below it a `.muted` line with the scanned folder path (`.mono`). Then up to
-three `.table-wrap` tables, 32px apart, each with a `caption`:
+three `.table-wrap` tables, 32px apart, each titled by `<caption><h2>` (Datasets, Could not be read, Other files):
 1. Datasets: File path | Sheet | Rows (`.num`) | Columns (`.num`) | the file path is the link to `/datasets/{id}`.
 2. Could not be read: File | Reason (`.note-error` text colour `--danger`).
 3. Other files (file inventory): File | Type | Size (`.num`, bytes) | Modified (YYYY-MM-DD).
@@ -136,8 +153,9 @@ with `Export PPTX` (`.btn-primary`) and `Export XLSX` (`.btn`). Then, in order:
 1. `.charts` grid, two columns; `map3d`, `country_map` and `heatmap` span both columns; the rest are 320px tall
    cards in the rule order of ARCHITECTURE "Routing rules" (max 8). Each card: title, rule caption, `N of M`,
    plot.
-2. `h2` Columns: small table column | type badge.
-3. `h2` First 20 rows: `.data-table` scrolling inside its wrap, cells truncated with ellipsis at 28ch.
+2. Columns table (caption h2 `Columns`): column | type badge.
+3. First rows table (caption h2 `First 20 rows`, the number comes from the server): `.data-table` scrolling
+   inside its wrap, cells truncated with ellipsis at 28ch, headers in the file's own case.
 Charts come first because they are the product; the tables are the evidence behind them.
 375px: crumb, h1, buttons full width stacked (44px each), charts one column (plot 280px, wide kinds 340px),
 columns table, rows table (scrolls sideways in its box). Chart legends move below the plot. Nothing overflows
@@ -149,8 +167,16 @@ the page width.
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
-New: `app/static/css/databoot.css`; `app/templates/base.html` links it and adds the skip link, header and
-`main#main`. Home, dashboard and `dashboard.js` now use these classes.
+Round 2 (ticket 394, architecture phase): `databoot.css` now styles `caption h2`, drops the upper-case and letter
+spacing from `th` (also `th` size `--t-xs` to `--t-sm`), forces the mode bar to opacity 1, makes its buttons 28px
+and gives focused ones the 3px `--accent` ring with a selector long enough to beat Plotly's own 1px black outline.
+The engineer still has to change the two templates (`<caption><h2>`) and `dashboard.js` (`displayModeBar: true`,
+button tabindex, `modebar` colours, z titles); until then the CSS rules are inert. No token change, no new colour,
+no new motion. Mode-bar buttons are 28px (WCAG 2.2 target size minimum is 24px), smaller than the 44px of our own
+controls because they belong to the library; the same data is in the tables.
+
+Round 1 files: `app/static/css/databoot.css`; `app/templates/base.html` links it and adds the skip link, header and
+`main#main`. Home, dashboard and `dashboard.js` use these classes.
 
 Design review (ticket 386), checked in a real browser at 1280, 800 and 375 px, light and dark, reduced motion:
 no sideways page scroll at any width, no console errors, every `.plot` has an aria-label, focus ring is 3px

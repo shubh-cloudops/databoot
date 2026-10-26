@@ -53,8 +53,12 @@ code, .mono { font-family: var(--mono); font-size: 0.9em; overflow-wrap: anywher
   padding: var(--s2) var(--s4); border: 2px solid var(--accent); border-radius: var(--radius); }
 .skip:focus { top: var(--s2); }
 
-/* Plotly mode-bar buttons: same ring as every control */
-.modebar-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 0; }
+/* Plotly mode bar: always visible (displayModeBar: true; the opacity rule also beats the library's hover-only rule),
+   buttons are focusable (dashboard.js adds tabindex) and get the same ring as every control. The long selector
+   outranks Plotly's own injected `.modebar-btn:focus-visible` (1px black), which would be invisible on dark. */
+.js-plotly-plot .plotly .modebar, .js-plotly-plot .plotly .modebar-group { opacity: 1; }
+.js-plotly-plot .plotly .modebar-btn { height: 28px; min-width: 28px; }
+.js-plotly-plot .plotly .modebar .modebar-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 0; border-radius: 4px; }
 
 /* layout */
 .site-header { background: var(--surface); border-bottom: 1px solid var(--line); }
@@ -84,10 +88,11 @@ main { max-width: var(--maxw); margin: 0 auto; padding: var(--s5) var(--s4) var(
 /* tables */
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
-caption { text-align: left; padding: var(--s3) var(--s4) var(--s2); font-weight: 650; font-size: var(--t-md); }
+caption { text-align: left; padding: var(--s3) var(--s4) var(--s2); }
+caption h2 { margin: 0; font-size: var(--t-lg); }  /* a real h2 inside the caption keeps the table's name and joins the outline */
 th, td { text-align: left; padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line); }
-th { font-weight: 650; color: var(--muted); font-size: var(--t-xs); text-transform: uppercase; letter-spacing: 0.04em;
-  white-space: nowrap; background: var(--bg); }
+/* headers show the column names exactly as read (no case change, no letter spacing) */
+th { font-weight: 650; color: var(--muted); font-size: var(--t-sm); white-space: nowrap; background: var(--bg); }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--accent-soft); }
 td { vertical-align: middle; }
