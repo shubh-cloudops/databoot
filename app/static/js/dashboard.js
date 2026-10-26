@@ -119,7 +119,7 @@
         colorbar: { outlinewidth: 0, thickness: 12, tickfont: { color: t["--fg"] }, title: { text: c.z_label || "", font: { color: t["--fg"] } } } };
       delete l.xaxis; delete l.yaxis;
       l.margin = { l: 0, r: 0, t: 32, b: 40 };
-      l.scene = { bgcolor: "rgba(0,0,0,0)", camera: { eye: phone.matches ? { x: 2.1, y: 2.1, z: 1.4 } : { x: 1.5, y: 1.5, z: 1 } }, xaxis: ax(c.x_label), yaxis: ax(c.y_label), zaxis: ax(c.z_label, { visible: real }) };
+      l.scene = { bgcolor: "rgba(0,0,0,0)", camera: { eye: phone.matches ? { x: 3, y: 3, z: 1.9 } : { x: 1.8, y: 1.8, z: 1.2 } }, xaxis: ax(c.x_label), yaxis: ax(c.y_label), zaxis: ax(c.z_label, { visible: real }) };
       return [[{ type: "scatter3d", mode: "markers", x: c.data.lon, y: c.data.lat, z: c.data.z, marker: marker }], l];
     },
     country_map: function (c, t, l) {

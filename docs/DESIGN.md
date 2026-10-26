@@ -167,6 +167,12 @@ the page width.
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
+Design review (ticket 410), 1280 and 375 px, light and dark, every page of a demo folder (3D map, country map, line, bar,
+donut, histogram, scatter, unreadable and other files, a 404): no sideways scroll, no console error except the expected
+404 of an unknown id, all charts drawn, tap targets >= 44px. One fix: the 3D map camera is pulled back (eye 1.8/1.8/1.2 at
+desktop, 3/3/1.9 at <= 599px) because the lowest lat/lon tick labels were cut at the bottom of the scene at 1280 and the
+`elev` axis title was cut at the left at 375. Layout `margin.b` stays 40 (ticket 407). No token change.
+
 Ticket 408 (Board gate 167): `caption h2` is `--t-md` (1rem, 650, margin 0), not `--t-lg`; the global `h2` and `.brand`
 stay `--t-lg`. Type scale and Components tables updated. (This supersedes item (2) of ticket 405 below.)
 
