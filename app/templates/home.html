@@ -4,7 +4,7 @@
 <p class="muted mono">{{ folder }}</p>
 {% if cat.datasets %}
 <section class="block"><div class="table-wrap"><table>
-  <caption>Datasets</caption>
+  <caption><h2>Datasets</h2></caption>
   <thead><tr><th scope="col">File</th><th scope="col">Sheet</th><th scope="col" class="num">Rows</th><th scope="col" class="num">Columns</th></tr></thead>
   <tbody>{% for d in cat.datasets %}
     <tr><td class="path"><a href="/datasets/{{ d.id }}">{{ d.path }}</a></td><td>{{ d.sheet or "" }}</td><td class="num">{{ d.rows|num }}</td><td class="num">{{ d.columns|length|num }}</td></tr>{% endfor %}
@@ -12,7 +12,7 @@
 {% endif %}
 {% if cat.unreadable %}
 <section class="block"><div class="table-wrap"><table>
-  <caption>Could not be read</caption>
+  <caption><h2>Could not be read</h2></caption>
   <thead><tr><th scope="col">File</th><th scope="col">Reason</th></tr></thead>
   <tbody>{% for u in cat.unreadable %}
     <tr><td class="path">{{ u.path }}{% if u.sheet %} - {{ u.sheet }}{% endif %}</td><td><span class="note note-error">{{ u.reason }}</span></td></tr>{% endfor %}
@@ -20,7 +20,7 @@
 {% endif %}
 {% if cat.others %}
 <section class="block"><div class="table-wrap"><table>
-  <caption>Other files</caption>
+  <caption><h2>Other files</h2></caption>
   <thead><tr><th scope="col">File</th><th scope="col">Type</th><th scope="col" class="num">Size (bytes)</th><th scope="col">Modified</th></tr></thead>
   <tbody>{% for o in cat.others %}
     <tr><td class="path">{{ o.path }}</td><td>{{ o.type }}</td><td class="num">{{ o.size|num }}</td><td class="nowrap">{{ o.modified }}</td></tr>{% endfor %}

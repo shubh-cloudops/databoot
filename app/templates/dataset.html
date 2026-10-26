@@ -19,13 +19,13 @@
 <div class="empty">No charts for this dataset</div>
 {% endif %}
 <section class="block"><div class="table-wrap"><table>
-  <caption>Columns</caption>
+  <caption><h2>Columns</h2></caption>
   <thead><tr><th scope="col">Column</th><th scope="col">Type</th></tr></thead>
   <tbody>{% for col in d.columns %}
     <tr><td class="path">{{ col }}</td><td><span class="badge">{{ types[col] }}</span></td></tr>{% endfor %}
   </tbody></table></div></section>
 <section class="block"><div class="table-wrap"><table class="data-table">
-  <caption>First {{ rows|length|num }} rows</caption>
+  <caption><h2>First {{ rows|length|num }} rows</h2></caption>
   <thead><tr>{% for col in d.columns %}<th scope="col">{{ col }}</th>{% endfor %}</tr></thead>
   <tbody>{% for r in rows %}
     <tr>{% for v in r %}<td>{{ "" if v is none else v }}</td>{% endfor %}</tr>{% endfor %}

@@ -24,7 +24,7 @@ def test_home_tables(make_client, data_dir):
     assert f'href="/datasets/{ids[("sales.csv", None)]}"' in html
     assert f'href="/datasets/{ids[("sub/book.xlsx", "Revenue")]}"' in html
     for caption in ("Datasets", "Could not be read", "Other files"):
-        assert f"<caption>{caption}</caption>" in html
+        assert f"<caption><h2>{caption}</h2></caption>" in html
     assert "empty.csv" in html and "broken.xlsx" in html and "empty file" in html
     assert "manual.pdf" in html and 'href="/datasets/' not in html.split("manual.pdf")[1].split("</tr>")[0]
     assert "<td>pdf</td>" in html and ".hidden" not in html
@@ -43,10 +43,11 @@ def test_every_dashboard_has_types_and_at_most_20_rows(make_client, data_dir):
         r = client.get(f"/datasets/{d.id}")
         assert r.status_code == 200, d.path
         html = r.text
-        assert f"<h1>{d.path}" in html and "<caption>Columns</caption>" in html and "badge" in html
+        assert f"<h1>{d.path}" in html and "<caption><h2>Columns</h2></caption>" in html and "badge" in html
         assert f"/datasets/{d.id}/export.pptx" in html and f"/datasets/{d.id}/export.xlsx" in html
         rows = html.split('class="data-table"')[1].split("<tbody>")[1].count("<tr>")
         assert 1 <= rows <= 20
+        assert re.search(r"<caption><h2>First [\d,]+ rows</h2></caption>", html)
         assert not re.findall(r"<p[ >]", _main(html))
     assert client.get("/datasets/nope").status_code == 404
 
@@ -80,3 +81,7 @@ def test_big_csv_counts_have_separators(make_client, big_csv):
     shown = client.get(f"/api/datasets/{i}/charts").json()["charts"][0]["shown"]
     assert 0 < shown <= 50_000 and f"{shown:,} of 60,000 points" in html and "60,000 of 60,000 rows" in html
     assert html.split('class="data-table"')[1].split("<tbody>")[1].count("<tr>") == 20
+
+
+def test_headers_keep_their_case():
+    assert "uppercase" not in (config.ROOT / "app/static/css/databoot.css").read_text(encoding="utf-8")
