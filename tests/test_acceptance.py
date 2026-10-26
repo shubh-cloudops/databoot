@@ -183,7 +183,7 @@ def test_AC_7(make_client, data_dir):
     assert charts == []
     r = client.get(f"/datasets/{i}")
     assert r.status_code == 200
-    assert "<figure" not in r.text and "comment" in r.text and "<caption>Columns</caption>" in r.text
+    assert "<figure" not in r.text and "comment" in r.text and "<caption><h2>Columns</h2></caption>" in r.text
     assert "free text number 0" in r.text
     assert "Chart could not be drawn" not in r.text and "Internal Server Error" not in r.text
 
@@ -195,7 +195,7 @@ def test_AC_8(make_client, data_dir):
         assert r.status_code == 200, d["path"]
         html = r.text
         types = client.get(f"/api/datasets/{d['id']}/profile").json()
-        cols = html.split("<caption>Columns</caption>")[1].split("</table>")[0]
+        cols = html.split("<caption><h2>Columns</h2></caption>")[1].split("</table>")[0]
         for col, kind in types.items():
             assert re.search(rf"<td[^>]*>{re.escape(col)}</td><td><span class=\"badge\">{kind}</span></td>", cols), (d["path"], col)
         body = html.split('class="data-table"')[1].split("<tbody>")[1]
@@ -271,7 +271,7 @@ def test_AC_12(make_client, data_dir):
     client = make_client(data_dir)
     r = client.get("/")
     assert r.status_code == 200
-    unread = r.text.split("<caption>Could not be read</caption>")[1].split("</table>")[0]
+    unread = r.text.split("<caption><h2>Could not be read</h2></caption>")[1].split("</table>")[0]
     assert "empty.csv" in unread and "broken.xlsx" in unread
     assert "could not be read" in r.text.lower() or "Could not be read" in r.text
     paths = {d["path"] for d in client.get("/api/datasets").json()}
@@ -305,7 +305,7 @@ def _dir_with_parquet(data_dir):
 
 def _rows_of(html, caption):
     """Text of each <td> row of the table with this caption."""
-    table = re.search(rf"<caption>{caption}</caption>.*?</table>", html, re.S).group(0)
+    table = re.search(rf"<caption><h2>{caption}</h2></caption>.*?</table>", html, re.S).group(0)
     return [re.sub(r"<[^>]+>", " ", r).split() for r in re.findall(r"<tr>(.*?)</tr>", table, re.S) if "<td" in r]
 
 
@@ -346,7 +346,7 @@ def test_G_2(make_client, data_dir):
     assert by_name["manual.pdf"][3] == today
     assert ".hidden.csv" not in home
     assert not any(d["path"] in ("manual.pdf", "old.xls") for d in client.get("/api/datasets").json())
-    other = re.search(r"<caption>Other files</caption>.*?</table>", home, re.S).group(0)
+    other = re.search(r"<caption><h2>Other files</h2></caption>.*?</table>", home, re.S).group(0)
     assert "<a " not in other
 
 

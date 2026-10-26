@@ -1,0 +1,78 @@
+{
+  "header": {
+    "ticket": 404,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 2,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1904678
+  },
+  "goal": "Plotly modebar always visible and reachable with Tab (R6, gate 165), and the 3D map z axis and colorbar titled from z_label (gate 166 W-3)",
+  "acceptance_criteria": [
+    {
+      "text": "dashboard.js CONFIG uses displayModeBar: true and databoot.css sets the modebar opacity to 1, so the first .modebar is visible without hover",
+      "passes": true
+    },
+    {
+      "text": "After each draw (and each redraw) every .modebar-btn gets tabindex=0 and role=button, and Enter/Space triggers a click; pressing Tab from the page top reaches an element with class modebar-btn; the existing focus ring is shown",
+      "passes": true
+    },
+    {
+      "text": "map3d scene zaxis title and colorbar title are the chart's z_label; when z_label is null the z axis stays hidden and points use --c1 as before; no external requests (AC-9)",
+      "passes": true
+    },
+    {
+      "text": "Layout checked at 1280px and 375px in light and dark: the always-visible bar does not cover the chart title or the axis labels",
+      "passes": true
+    },
+    {
+      "text": "tests/test_browser.py: a no-hover opacity/visibility check and a Tab-reaches-modebar-btn check; a z-title check on points.tsv. Browser tests stay function-scoped",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-6, AC-24, AC-27 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 54%]\n...........................................................              [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 14 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n131 passed, 62 warnings in 76.02s (0:01:16)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Changed nothing in app code or browser tests; attempt 1's work already met the criteria",
+      "why": "test_browser.py passed 14/14 and screenshots at 1280/375 light/dark show the always-visible bar clear of titles and axis labels",
+      "evidence": "app/static/js/dashboard.js:9,97,100,127-146; app/static/css/databoot.css:56-61; tests/test_browser.py:116-150"
+    },
+    {
+      "what": "Edited 5 caption literals in tests/test_acceptance.py to the h2 form",
+      "why": "Gate 165 approved h2 captions and templates already render them, so 5 stale assertions failed the full suite",
+      "evidence": "app/templates/dataset.html:22,28; home.html:7,15,23; python -m pytest -q: 131 passed"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Editing tests/test_acceptance.py is allowed here because the ticket lists it as a file to read and the change only follows the approved h2 captions"
+  ],
+  "open_questions": [
+    "The 'lat' label of the 3D scene is clipped at the bottom of the plot at 1280 px; not caused by the modebar, so I left it. Does the Board want it fixed?",
+    "Exports have still not been opened in real Excel or PowerPoint (Board will do this on Windows)"
+  ],
+  "lessons": [
+    {
+      "lesson": "On a retry, run the ticket's test file first and the full suite once; a verify failure may be a stale literal from another ticket's template change, not this ticket's code",
+      "when": "Attempt 2+ of a ticket whose files are already committed",
+      "evidence": "5 test_acceptance failures from <caption> literals vs <caption><h2> templates; fixed with one sed"
+    },
+    {
+      "lesson": "For screenshots with real data, copy nothing from /live; write a small geo CSV in /tmp, run uvicorn with DATABOOT_DATA and a free port, and use --use-gl=swiftshader so the 3D map draws",
+      "when": "Checking map3d or modebar layout in Playwright",
+      "evidence": "/tmp/shoot.py produced 4 screenshots with no console errors"
+    }
+  ],
+  "problems": []
+}
