@@ -1,7 +1,9 @@
 import io
-import posixpath
+import warnings
 import zipfile
 from xml.etree import ElementTree as ET
+
+import openpyxl
 
 from app import xlsx
 from app.catalog import Dataset
@@ -48,26 +50,30 @@ def test_sales_download(make_client, data_dir):
     assert sum(r[1] for r in rows) == 6 and len(rows) == 20
 
 
-def test_every_part_parses_and_is_listed(make_client, data_dir):
+def test_reopens_in_openpyxl_with_charts_and_no_style_warning(make_client, data_dir):
     client = make_client(data_dir)
     for path, sheet in [("sales.csv", None), ("points.tsv", None), ("sub/records.json", None), ("sub/book.xlsx", "Revenue")]:
-        _, z = download(client, path, sheet)
-        root = parsed(z)  # raises on any malformed part
-        types = root["[Content_Types].xml"]
-        ns = "{http://schemas.openxmlformats.org/package/2006/content-types}"
-        listed = {e.get("PartName").lstrip("/") for e in types.iter(ns + "Override")}
-        for name in z.namelist():
-            if name != "[Content_Types].xml" and not name.endswith(".rels"):
-                assert name in listed, name
-        assert listed <= set(z.namelist())
-        # every relationship target exists
-        for name, rel in root.items():
-            if name.endswith(".rels"):
-                base = name.replace("_rels/", "").rsplit(".rels", 1)[0]
-                folder = base.rsplit("/", 1)[0] if "/" in base else ""
-                for e in rel:
-                    t = e.get("Target")
-                    assert (posixpath.normpath(posixpath.join(folder, t)) if not t.startswith("/") else t.lstrip("/")) in z.namelist()
+        r, _ = download(client, path, sheet)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            wb = openpyxl.load_workbook(io.BytesIO(r.content))
+        assert not [w for w in caught if "no default style" in str(w.message)]
+        assert wb.sheetnames[0] == "Data"
+        assert sum(len(ws._charts) for ws in wb) > 0
+        assert all(len(n) <= 31 for n in wb.sheetnames)
+
+
+def test_cells_stay_text_and_empty_chart_has_none():
+    d = Dataset("x", "a.csv", None, "csv", 2, ["a", "b"])
+    rows = [["=HYPERLINK(\"http://x\",\"y\")", "12"], ["http://example.com", float("nan")]]
+    empty = {"id": "chart-1", "kind": "line", "title": "t", "x_label": "x", "y_label": "y", "rule": "r",
+             "shown": 0, "total": 0, "data": {"x": [], "y": []}}
+    wb = openpyxl.load_workbook(io.BytesIO(xlsx.write(d, rows, [empty])))
+    ws = wb["Data"]
+    assert ws["A2"].value.startswith("=HYPERLINK") and ws["A2"].data_type == "s"
+    assert ws["B2"].value == "12" and ws["B2"].data_type == "s" and ws["A3"].hyperlink is None
+    assert "#NUM!" in ws["B3"].value  # nan_inf_to_errors
+    assert wb["chart-1 line"]["A1"].value == "x" and not wb["chart-1 line"]._charts
 
 
 def test_map3d_and_country_map(make_client, data_dir):
@@ -90,11 +96,12 @@ def test_heatmap_sheet_has_color_scale_and_no_chart():
     data = xlsx.write(d, rows, [heat])
     z = zipfile.ZipFile(io.BytesIO(data))
     assert not [n for n in z.namelist() if n.startswith("xl/charts")]
-    sheet = ET.fromstring(z.read("xl/worksheets/sheet2.xml"))
+    sheet = ET.fromstring(z.read("xl/worksheets/sheet2.xml"))  # xlsxwriter: sheetN.xml in sheet order
     cf = sheet.find(M + "conditionalFormatting")
     assert cf.get("sqref") == "B2:D4"
     scale = cf.find(f"{M}cfRule/{M}colorScale")
     assert len(scale.findall(M + "cfvo")) == 3 and len(scale.findall(M + "color")) == 3
+    assert [e.get("rgb") for e in scale.findall(M + "color")] == ["FF3B4CC0", "FFFFFFFF", "FFB40426"]
     assert xlsx.read_sheet(io.BytesIO(data), "chart-1 heatmap")[0] == ["column", "a", "b", "c"]
 
 
@@ -103,6 +110,7 @@ def test_odd_values_stay_valid_xml():
     rows = [["x\x00y\x0b", float("nan")], [True, 1e300]]
     data = xlsx.write(d, rows, [])
     parsed(zipfile.ZipFile(io.BytesIO(data)))
+    assert xlsx.read_sheet(io.BytesIO(data), "Data")[0] == ['a<&>"', "b"]
     assert xlsx.sheet_names(io.BytesIO(data)) == ["Data"]
 
 

@@ -1,0 +1,84 @@
+{
+  "header": {
+    "ticket": 402,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1946151
+  },
+  "goal": "XLSX export on xlsxwriter (R1, gates 162/164): replace the hand-written OOXML writer half of app/xlsx.py with Workbook(in_memory) and native charts",
+  "acceptance_criteria": [
+    {
+      "text": "write(dataset, rows, charts) uses xlsxwriter with strings_to_formulas, strings_to_urls and strings_to_numbers False and nan_inf_to_errors True; a cell '=HYPERLINK(...)' stays text",
+      "passes": true
+    },
+    {
+      "text": "First sheet is 'Data' with the column names as header; one sheet per chart named '<id> <kind>' (31 chars max) holds the chart table and a native chart (line, column, doughnut, scatter); the heatmap sheet has a 3_color_scale and no chart; a chart with 0 rows gets no chart",
+      "passes": true
+    },
+    {
+      "text": "openpyxl reopens an export with sum(len(ws._charts)) > 0 and, inside warnings.catch_warnings(record=True), without any message containing 'no default style' (AC-23)",
+      "passes": true
+    },
+    {
+      "text": "requirements.txt pins xlsxwriter==3.3.0, python-pptx==1.0.2, openpyxl==3.1.5, pyarrow==26.0.0 and no package of those four is vendored in the repository",
+      "passes": true
+    },
+    {
+      "text": "All hand-written writer code and constants are deleted from app/xlsx.py (only the openpyxl reader and write() remain); tests/test_export_xlsx.py chart-kind and heatmap checks are re-checked against xlsxwriter's part names",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-18, AC-23 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 56%]\n.......................................................                  [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 11 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n127 passed, 59 warnings in 67.58s (0:01:07)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Kept the histogram bin label format 'a to b' (6 significant digits) in the chart table",
+      "why": "export.py (ticket 401) builds the same labels and the existing test reads them; ARCHITECTURE.md's 'a\u2013b' is only descriptive",
+      "evidence": "app/xlsx.py _table; app/export.py _data"
+    },
+    {
+      "what": "Used the default_date_format option for datetimes and dates instead of per-cell formats",
+      "why": "ARCHITECTURE.md Exports specifies it; fewer moving parts",
+      "evidence": "app/xlsx.py _OPTIONS, _cell"
+    },
+    {
+      "what": "Chart sheet name is f\"{id} {kind}\"[:31]; series use list-form ranges so xlsxwriter quotes the sheet name",
+      "why": "Excel's 31-char sheet limit; keeps ranges like 'chart-1 line'!$A$2:$A$7",
+      "evidence": "app/xlsx.py write, _chart; tests/test_export_xlsx.py test_sales_download"
+    },
+    {
+      "what": "Test asserts nan cells contain '#NUM!' rather than equal it",
+      "why": "xlsxwriter nan_inf_to_errors writes a formula cell, so openpyxl reads '=#NUM!'",
+      "evidence": "tests/test_export_xlsx.py test_cells_stay_text_and_empty_chart_has_none"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Lone surrogate characters in cell strings are not expected from decoded files, so the old _BAD sanitiser was not ported; xlsxwriter escapes control characters itself",
+    "The axis title and #,##0 number format applied to scatter/map3d x axis is acceptable (only y gets #,##0)"
+  ],
+  "open_questions": [
+    "docs/ARCHITECTURE.md says histogram labels are 'a\u2013b' but code and PPTX use 'a to b'; should the doc be aligned?",
+    "Exports have still not been opened in real Excel (Board will do this on Windows)"
+  ],
+  "lessons": [
+    {
+      "lesson": "xlsxwriter nan_inf_to_errors writes a formula cell ('=#NUM!' in openpyxl); assert with 'in', and the hand-written conftest write_xlsx still triggers openpyxl's 'no default style' warning in other tests, so scope the warning check to the export load only",
+      "when": "Testing xlsxwriter exports with openpyxl under warnings.catch_warnings",
+      "evidence": "tests/test_export_xlsx.py; pytest warnings summary"
+    }
+  ],
+  "problems": []
+}
