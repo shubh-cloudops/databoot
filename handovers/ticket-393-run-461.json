@@ -1,0 +1,99 @@
+{
+  "header": {
+    "ticket": 393,
+    "project": "you-think-of-the-project-name",
+    "from_role": "architect",
+    "phase": "architecture",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "4acf784af3ed",
+    "tokens_left": 1860943
+  },
+  "goal": "Write or update docs/ARCHITECTURE.md and adapt the scaffold for the approved spec.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/ARCHITECTURE.md explains how every acceptance item will be met",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py architecture",
+    "passed": true,
+    "output_tail": "........................................................................ [ 52%]\n............s....................................................        [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py::test_G_5\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n136 passed, 1 skipped, 2 warnings in 132.03s (0:02:12)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Parquet reads with pyarrow only; the standard-library fallback is deleted, ZSTD/LZ4/BROTLI files load, a corrupt file is 'not a valid parquet file' and only nested schemas are 'unsupported parquet encoding'",
+      "why": "Gate 162: pyarrow is a runtime dependency and no fallback is needed; gate 165: pyarrow is the engine",
+      "evidence": "graphify-out/memory.md gate 162; app/parquet.py:26-54; docs/ARCHITECTURE.md Data access"
+    },
+    {
+      "what": "test_G_7 now uses a corrupt .parquet (magic, zeros, footer length) and asserts the note-error row, not the reason text",
+      "why": "With pyarrow installed it failed (zstd rejected by OK_CODECS); gate 165 says test_G_7 uses a corrupt .parquet",
+      "evidence": "first full run: FAILED tests/test_acceptance.py::test_G_7; tests/test_acceptance.py test_G_7"
+    },
+    {
+      "what": "Added xlsxwriter==3.3.0 to requirements.txt and .gitattributes '* text=auto'; checked out flat.csv and optional.csv",
+      "why": "Gates 164/165; every file in the index is already LF, so nothing else renormalises",
+      "evidence": "git ls-files --eol (no CRLF in the index); requirements.txt"
+    },
+    {
+      "what": "XLSX export on xlsxwriter with strings_to_formulas/urls/numbers off, nan_inf_to_errors, and the same sheet and chart layout",
+      "why": "Gate 162/164; cells from client files must never become formulas (CSV injection); the layout is a PRD constraint",
+      "evidence": "docs/ARCHITECTURE.md Exports; docs/PRD.md Constraints"
+    },
+    {
+      "what": "PPTX on python-pptx using its own embedded workbook; export.py no longer imports app.xlsx internals",
+      "why": "python-pptx depends on XlsxWriter and embeds chart data itself, which is what makes Edit Data work",
+      "evidence": "importlib.metadata.requires('python-pptx') includes XlsxWriter>=0.5.7"
+    },
+    {
+      "what": "openpyxl read_only=True, data_only=True, reset_dimensions(), close in finally, bool -> 'TRUE'/'FALSE'",
+      "why": "A /tmp probe showed openpyxl gives the round 1 values except booleans (True/False)",
+      "evidence": "/tmp/probe_xlsx.py output"
+    },
+    {
+      "what": "h2 inside <caption>; modebar shown with displayModeBar true plus CSS opacity 1, buttons given tabindex, role and key handlers after each draw",
+      "why": "Gate 165 h2 placement; Plotly modebar buttons are <a> without href, so they are not focusable",
+      "evidence": "app/static/js/dashboard.js:9; app/static/css/databoot.css:57,89"
+    },
+    {
+      "what": "Gate 162 leftovers written as W-1..W-3 with exact checks (Unreadable.sheet, 'invalid JSON', country map sorted by value, map3d z_label)",
+      "why": "Board asked for them; they have no AC ids, so the plan check would not cover them",
+      "evidence": "graphify-out/memory.md gate 162; app/rules.py:122-142 (country map unsorted)"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Reading the test_xlsx_read rewrite fixture (shared strings added by _rewrite) with openpyxl",
+      "why_it_failed": "openpyxl finds sharedStrings only through content types and relationships, which _rewrite does not add: IndexError. The test must use inlineStr cells"
+    }
+  ],
+  "assumptions": [
+    "The Plotly modebar keyboard fix in JS (tabindex, role=button, Enter/Space -> click) is acceptable rather than replacing Plotly's modebar",
+    "A map3d chart dict may gain a 'z_label' key; no test compares whole chart dicts (not fully grepped)",
+    "conftest write_xlsx stays hand-written; the 'no default style' warning when reading it is harmless because AC-23 checks only exports"
+  ],
+  "open_questions": [
+    "The gate 162 chart items (country map sort, map3d z title, Unreadable.sheet, 'invalid JSON') are in the doc as W-1..W-3, but the round 2 PRD says nothing new is built. Should the Tech Lead plan them this round?",
+    "Exports have still never been opened in real Excel or PowerPoint (not installed here)"
+  ],
+  "lessons": [
+    {
+      "lesson": "When a library becomes installed between rounds, run the full suite first: tests with an `if find_spec(lib)` branch flip to the other branch and can fail against app code that still rejects what the library can read",
+      "when": "Architecture ticket at the start of a round that adds dependencies",
+      "evidence": "test_G_7 failed because pyarrow decodes zstd but parquet.py rejects it"
+    },
+    {
+      "lesson": "Before moving an xlsx reader to openpyxl, check that test helpers which patch zip parts also register content types; openpyxl ignores parts that are not registered",
+      "when": "Moving from a zipfile-based OOXML reader to openpyxl",
+      "evidence": "/tmp/probe_xlsx.py IndexError on sharedStrings"
+    }
+  ],
+  "problems": []
+}

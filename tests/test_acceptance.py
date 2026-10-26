@@ -438,18 +438,15 @@ def test_G_6(make_client, data_dir):
 
 def test_G_7(make_client, data_dir):
     """Parquet errors: a file the reader cannot decode is listed as unreadable with its reason, and others still open."""
-    import importlib.util
-    import shutil
-    shutil.copy(ROOT / "tests/fixtures/zstd.parquet", data_dir / "zstd.parquet")
+    good = (ROOT / "tests/fixtures/plain.parquet").read_bytes()
+    (data_dir / "bad.parquet").write_bytes(good[:4] + b"\x00" * 64 + good[-8:])  # magic and footer length, no real footer
     client = make_client(data_dir)
     home = client.get("/").text
-    if importlib.util.find_spec("pyarrow"):  # pyarrow decodes zstd itself
-        assert ("zstd.parquet", None) in _ids(client)
-    else:
-        row = re.search(r"<tr><td[^>]*>zstd\.parquet</td>.*?</tr>", home, re.S).group(0)
-        assert "unsupported parquet encoding" in row
-        assert ("zstd.parquet", None) not in _ids(client)
+    row = re.search(r"<tr><td[^>]*>bad\.parquet</td>.*?</tr>", home, re.S).group(0)
+    assert "note-error" in row  # the reason text is ARCHITECTURE.md "Data access"
+    assert ("bad.parquet", None) not in _ids(client)
     assert client.get("/").status_code == 200 and "sales.csv" in home
+    assert client.get(f"/datasets/{_ids(client)[('sales.csv', None)]}").status_code == 200
 
 
 def test_G_thousands(make_client, data_dir, big_csv):
