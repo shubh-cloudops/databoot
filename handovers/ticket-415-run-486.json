@@ -1,0 +1,58 @@
+{
+  "header": {
+    "ticket": 415,
+    "project": "you-think-of-the-project-name",
+    "from_role": "coach",
+    "phase": "learn",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "847e9e9f8b68",
+    "tokens_left": 1931645
+  },
+  "goal": "Learn from round 2: update the shared skills and lessons and this project's MEMORY.md from /logs/digest.md.",
+  "acceptance_criteria": [
+    {
+      "text": "Skills and lessons come only from evidence in the digest",
+      "passes": true
+    },
+    {
+      "text": "MEMORY.md is current and short",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py learn",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Extended four existing skills instead of adding new ones",
+      "why": "Round 2 evidence fits playwright, office-export, acceptance-tests and resume-ticket procedures; near-duplicates are forbidden",
+      "evidence": "/learning/skills/*/SKILL.md; digest tickets 393-414"
+    },
+    {
+      "what": "Rewrote MEMORY.md for the end of round 2 and dropped the parked round 1 blocker (ticket 389)",
+      "why": "Gate 165 says libraries are baked into the image and tickets 398-402 replaced the hand-written OOXML",
+      "evidence": "digest gate 165, tickets 398, 401, 402"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The digest has no Faded history section, so nothing needed re-confirming",
+    "The .gitattributes/line-ending decision of gate 165 was not shown as done in the digest, so MEMORY.md says to check git"
+  ],
+  "open_questions": [
+    "Round 3 candidate: per-sheet isolation for corrupt sheet XML (gate 170)",
+    "Exports still have not been opened in real Excel or PowerPoint (Board will do this on Windows)"
+  ],
+  "lessons": [
+    {
+      "lesson": "In a Coach ticket, merge new lessons into existing lines of LESSONS.md and re-run check.py learn; the file must stay under 80 lines",
+      "when": "Updating LESSONS.md near its limit",
+      "evidence": "81 lines after the first edit, 79 after merging"
+    }
+  ],
+  "problems": []
+}
