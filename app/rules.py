@@ -4,6 +4,7 @@ import re
 import statistics
 from datetime import date, datetime
 
+from app import score
 from app.profile import DATE_FORMATS, NUMBER
 
 MAX_CHARTS = 8
@@ -59,9 +60,9 @@ def _first(columns, mapping, kind, n=1):
     return [i for i, c in enumerate(columns) if mapping.get(c) == kind][:n]
 
 
-def _chart(kind, title, x, y, rule, shown, total, data):
+def _chart(kind, title, x, y, rule, shown, total, data, score):
     return {"kind": kind, "title": title, "x_label": x, "y_label": y, "rule": rule,
-            "shown": shown, "total": total, "data": data}
+            "shown": shown, "total": total, "data": data, "score": score}
 
 
 def _map3d(columns, rows, mapping, settings):
@@ -80,7 +81,8 @@ def _map3d(columns, rows, mapping, settings):
     lons, lats, zs = zip(*shown) if shown else ([], [], [])
     rule = f"geospatial {columns[lon]} + {columns[lat]}: 3D map" + (f", z = {columns[z[0]]}" if z else "")
     chart = _chart("map3d", f"{columns[z[0]] if z else 'points'} by location", columns[lon], columns[lat], rule,
-                   len(shown), len(points), {"lon": list(lons), "lat": list(lats), "z": list(zs)})
+                   len(shown), len(points), {"lon": list(lons), "lat": list(lats), "z": list(zs)},
+                   0.6 if len(points) >= 2 else 0)
     chart["z_label"] = columns[z[0]] if z else None
     return [chart]
 
@@ -98,7 +100,8 @@ def _lines(columns, rows, mapping, settings):
             out.append(_chart("line", f"{columns[n]} by {columns[t]}", columns[t], f"{columns[n]} (sum)",
                               f"temporal {columns[t]} + numerical {columns[n]}: line, sum per {columns[t]}",
                               len(points), len(sums),
-                              {"x": [_iso(k) for k, _ in points], "y": [_clean(v) for _, v in points]}))
+                              {"x": [_iso(k) for k, _ in points], "y": [_clean(v) for _, v in points]},
+                              score.spearman(range(len(sums)), [v for _, v in sorted(sums.items())])))
     return out
 
 
@@ -117,7 +120,8 @@ def _bars(columns, rows, mapping, settings):
             out.append(_chart("bar", f"{what} by {columns[c]}", columns[c], "count" if n is None else f"{what} (sum)",
                               f"categorical {columns[c]}" + ("" if n is None else f" + numerical {columns[n]}")
                               + f": bar, {how} per {columns[c]}",
-                              used, used, {"x": [k for k, _ in ranked], "y": [_clean(v) for _, v in ranked]}))
+                              used, used, {"x": [k for k, _ in ranked], "y": [_clean(v) for _, v in ranked]},
+                              score.gini(sums.values())))
     return out
 
 
@@ -143,7 +147,8 @@ def _country_map(columns, rows, mapping, settings):
                    f"text {columns[c]}" + ("" if n is None else f" + numerical {columns[n]}")
                    + f": country map, {'count' if n is None else 'sum'} per {columns[c]} ({mode})",
                    used, used, {"locations": list(sums), "values": [_clean(v) for v in sums.values()],
-                                "locationmode": mode})]
+                                "locationmode": mode},
+                   0.6 if len(sums) >= 2 else 0)]
 
 
 def _donut(columns, rows, mapping, settings):
@@ -160,7 +165,8 @@ def _donut(columns, rows, mapping, settings):
     used = sum(counts.values())
     return [_chart("donut", f"rows by {columns[c]}", columns[c], "count",
                    f"categorical {columns[c]} ({len(counts)} values): donut, count per {columns[c]}", used, used,
-                   {"labels": [k for k, _ in ranked], "values": [v for _, v in ranked]})]
+                   {"labels": [k for k, _ in ranked], "values": [v for _, v in ranked]},
+                   score.gini(counts.values()))]
 
 
 def _histogram(columns, rows, mapping, settings):
@@ -182,7 +188,8 @@ def _histogram(columns, rows, mapping, settings):
     edges = [lo + (hi - lo) * i / bins for i in range(bins)] + [hi]
     return [_chart("histogram", f"{columns[n]} distribution", columns[n], "count",
                    f"numerical {columns[n]}: histogram, {bins} equal-width {'bins' if bins > 1 else 'bin'}",
-                   len(vals), len(vals), {"edges": [_clean(e) for e in edges], "counts": counts})]
+                   len(vals), len(vals), {"edges": [_clean(e) for e in edges], "counts": counts},
+                   score.skew(vals))]
 
 
 def _scatter(columns, rows, mapping, settings):
@@ -195,7 +202,8 @@ def _scatter(columns, rows, mapping, settings):
     xs, ys = zip(*shown) if shown else ([], [])
     return [_chart("scatter", f"{columns[b]} vs {columns[a]}", columns[a], columns[b],
                    f"numerical {columns[a]} + numerical {columns[b]}: scatter", len(shown), len(points),
-                   {"x": list(xs), "y": list(ys)})]
+                   {"x": list(xs), "y": list(ys)},
+                   score.pearson([x for x, _ in points], [y for _, y in points]))]
 
 
 def _heatmap(columns, rows, mapping, settings):
@@ -216,11 +224,14 @@ def _heatmap(columns, rows, mapping, settings):
     names = [columns[i] for i in ix]
     return [_chart("heatmap", "correlation of numerical columns", "column", "column",
                    f"numerical {', '.join(names)}: Pearson correlation, pairwise complete rows",
-                   used, used, {"labels": names, "z": z})]
+                   used, used, {"labels": names, "z": z},
+                   max((abs(v) for i, row in enumerate(z) for j, v in enumerate(row) if i != j and v is not None),
+                       default=0))]
 
 
 def charts(columns, rows, mapping, settings):
     """Chart dicts for one dataset; mapping is profile.classify's {column: type}. [] when no rule matches (AC-7)."""
     rules = (_map3d, _country_map, _lines, _bars, _donut, _histogram, _scatter, _heatmap)
     found = [c for rule in rules for c in rule(columns, rows, mapping, settings)][:MAX_CHARTS]
+    found = sorted(({**c, "score": round(c["score"], 2)} for c in found), key=lambda c: -c["score"])  # stable
     return [{"id": f"chart-{i}", **c} for i, c in enumerate(found, 1)]

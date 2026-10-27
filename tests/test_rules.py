@@ -13,13 +13,13 @@ def test_sales_bar_and_line(make_client, data_dir):
     make_client(data_dir)
     cs = charts_of(data_dir, "sales.csv")
     assert [c["id"] for c in cs] == ["chart-1", "chart-2", "chart-3", "chart-4"]
-    assert [c["kind"] for c in cs] == ["line", "bar", "donut", "histogram"]
-    line, bar = cs[:2]
+    assert [c["kind"] for c in cs] == ["line", "histogram", "bar", "donut"]
+    line, bar = (next(c for c in cs if c["kind"] == k) for k in ("line", "bar"))
     assert line["kind"] == "line" and line["data"]["x"][0] == "2024-01-01" and line["data"]["y"] == [10, 20, 5, 7, 3, 1]
     assert bar["kind"] == "bar" and dict(zip(bar["data"]["x"], bar["data"]["y"])) == {"North": 16, "South": 23, "East": 7}
     assert bar["data"]["x"] == ["South", "North", "East"]
     assert bar["shown"] == bar["total"] == 6
-    assert set(bar) == {"id", "kind", "title", "x_label", "y_label", "rule", "shown", "total", "data"}
+    assert set(bar) == {"id", "kind", "title", "x_label", "y_label", "rule", "shown", "total", "data", "score"}
 
 
 def test_xlsx_revenue_line(make_client, data_dir):
@@ -57,7 +57,8 @@ def test_no_map_with_only_one_geo_column():
 def test_big_map_is_sampled(make_client, big_csv):
     client = make_client(big_csv)
     (d,) = client.get("/api/datasets").json()
-    m = client.get(f"/api/datasets/{d['id']}/charts").json()["charts"][0]
+    m = client.get(f"/api/datasets/{d['id']}/charts").json()["charts"]
+    m = next(c for c in m if c["kind"] == "map3d")
     assert m["kind"] == "map3d" and m["total"] == 60_000 and 0 < m["shown"] <= 50_000
     assert len(m["data"]["lon"]) == m["shown"]
 
@@ -88,5 +89,5 @@ def test_charts_route(make_client, data_dir):
     r = client.get(f"/api/datasets/{d['id']}/charts")
     assert r.status_code == 200
     body = r.json()
-    assert body["dataset"] == d["id"] and [c["kind"] for c in body["charts"]] == ["line", "bar", "donut", "histogram"]
+    assert body["dataset"] == d["id"] and [c["kind"] for c in body["charts"]] == ["line", "histogram", "bar", "donut"]
     assert client.get("/api/datasets/nope/charts").status_code == 404

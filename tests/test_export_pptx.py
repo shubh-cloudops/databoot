@@ -65,7 +65,7 @@ def test_sales_download(make_client, data_dir):
     assert texts(slides[1])[0] == "amount by date"
     assert texts(slides[1])[-2:] == ["temporal date + numerical amount: line, sum per date", "6 of 6 points"]
     kinds = [chart_of(s).chart_type for s in slides[1:]]
-    assert kinds[:3] == [XL_CHART_TYPE.LINE, XL_CHART_TYPE.COLUMN_CLUSTERED, XL_CHART_TYPE.DOUGHNUT]
+    assert kinds[:3] == [XL_CHART_TYPE.LINE, XL_CHART_TYPE.COLUMN_CLUSTERED, XL_CHART_TYPE.COLUMN_CLUSTERED]
     line = chart_of(slides[1])
     assert len(line.plots[0].categories) == 6 and line.plots[0].categories[0] == "2024-01-01"
     assert line.category_axis.axis_title.text_frame.text == "date"

@@ -78,7 +78,7 @@ def test_big_csv_counts_have_separators(make_client, big_csv):
     assert "<td class=\"num\">60,000</td>" in client.get("/").text
     i = _ids(client)[("big.csv", None)]
     html = client.get(f"/datasets/{i}").text
-    shown = client.get(f"/api/datasets/{i}/charts").json()["charts"][0]["shown"]
+    shown = next(c for c in client.get(f"/api/datasets/{i}/charts").json()["charts"] if c["kind"] == "map3d")["shown"]
     assert 0 < shown <= 50_000 and f"{shown:,} of 60,000 points" in html and "60,000 of 60,000 rows" in html
     assert html.split('class="data-table"')[1].split("<tbody>")[1].count("<tr>") == 20
 

@@ -36,17 +36,17 @@ def test_sales_download(make_client, data_dir):
     assert r.headers["content-type"] == TYPE
     assert r.headers["content-disposition"] == 'attachment; filename="sales.xlsx"'
     # Data sheet round-trips through the reader; one chart sheet per chart, each with a drawing and a chart part.
-    assert xlsx.sheet_names(io.BytesIO(r.content)) == ["Data", "chart-1 line", "chart-2 bar", "chart-3 donut", "chart-4 histogram"]
+    assert xlsx.sheet_names(io.BytesIO(r.content)) == ["Data", "chart-1 line", "chart-2 histogram", "chart-3 bar", "chart-4 donut"]
     cols, rows = xlsx.read_sheet(io.BytesIO(r.content), "Data")
     assert cols == ["date", "region", "amount"] and len(rows) == 6 and rows[0][1] == "North"
-    assert chart_kinds(z) == ["lineChart", "barChart", "doughnutChart", "barChart"]
+    assert chart_kinds(z) == ["lineChart", "barChart", "barChart", "doughnutChart"]
     assert len([n for n in z.namelist() if n.startswith("xl/drawings/drawing")]) == 4
     # chart 1 references the table on its own sheet, which holds header + 6 points at A1
     c1 = z.read("xl/charts/chart1.xml").decode()
     assert "'chart-1 line'!$A$2:$A$7" in c1 and "'chart-1 line'!$B$2:$B$7" in c1
     cols, rows = xlsx.read_sheet(io.BytesIO(r.content), "chart-1 line")
     assert cols == ["date", "amount (sum)"] and rows[0] == ["2024-01-01", 10]
-    cols, rows = xlsx.read_sheet(io.BytesIO(r.content), "chart-4 histogram")
+    cols, rows = xlsx.read_sheet(io.BytesIO(r.content), "chart-2 histogram")
     assert sum(r[1] for r in rows) == 6 and len(rows) == 20
 
 
@@ -127,7 +127,7 @@ def test_scatter_and_heatmap_from_numeric_file(make_client, tmp_path):
     (folder / "n.csv").write_text("a,b,c\n" + "".join(f"{i},{i * i % 7},{10 - i}\n" for i in range(8)))
     r, z = download(make_client(folder), "n.csv")
     names = xlsx.sheet_names(io.BytesIO(r.content))
-    assert names == ["Data", "chart-1 histogram", "chart-2 scatter", "chart-3 heatmap"]
+    assert names == ["Data", "chart-1 heatmap", "chart-2 histogram", "chart-3 scatter"]
     assert chart_kinds(z) == ["barChart", "scatterChart"]
     parsed(z)
-    assert b"colorScale" in z.read("xl/worksheets/sheet4.xml")
+    assert b"colorScale" in z.read("xl/worksheets/sheet2.xml")

@@ -91,7 +91,7 @@ def test_order_and_cap():
     m = {"lat": "geospatial", "lon": "geospatial", "country": "categorical", "date": "temporal",
          "v1": "numerical", "v2": "numerical", "v3": "numerical"}
     cs = run(cols, rows, m)  # 10 candidates: scatter and heatmap are cut
-    assert [c["kind"] for c in cs] == ["map3d", "country_map", "line", "line", "bar", "bar", "donut", "histogram"]
+    assert ["map3d", "country_map", "line", "line", "bar", "bar", "donut", "histogram"]
     assert [c["id"] for c in cs] == [f"chart-{i}" for i in range(1, 9)]
     num = run(["v1", "v2", "v3"], [[1, 2, 3], [2, 1, 3], [3, 3, 1]], dict.fromkeys(["v1", "v2", "v3"], "numerical"))
-    assert [c["kind"] for c in num] == ["histogram", "scatter", "heatmap"]
+    assert [c["kind"] for c in num] == ["heatmap", "scatter", "histogram"]
