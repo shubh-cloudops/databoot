@@ -233,5 +233,31 @@
    "docs/ARCHITECTURE.md",
    "requirements.txt"
   ]
+ },
+ {
+  "goal": "Redo ticket 403 in full (Board gate 168, supersedes gate 167's wording on the test file): table captions as <caption><h2>X</h2></caption> sized --t-md, column headers in real case, and the 5 caption literals in tests/test_acceptance.py updated to the h2 form",
+  "layer": "frontend",
+  "criteria": [
+   "home.html renders 'Datasets', 'Could not be read' and 'Other files', and dataset.html renders 'Columns' and 'First N rows', each exactly as `<caption><h2>NAME</h2></caption>`",
+   "app/static/css/databoot.css: `caption h2` uses font-size var(--t-md); no `text-transform` rule on th (the word `uppercase` appears nowhere in the file); a header such as `Latitude` or `LON` shows in its original case (check with a computed-style probe of th text-transform = none)",
+   "tests/test_acceptance.py: only the 5 caption literals at L186, L198, L274, L308 and L349 are changed to `<caption><h2>X</h2></caption>` (git diff of that file shows only those lines); no other edit to that file",
+   "AC-15, AC-17, AC-19, AC-21 still hold: Other files rows have no link, each figcaption has one .chart-rule and one .chart-count and no other prose, title/h1 read DataBoot, counts of 1,000 or more use the num filter",
+   "Checked at 1280px and 375px in light and dark: no layout shift or horizontal scroll in the tables; background stays transparent",
+   "Done = the full pytest suite is green (python3 -m pytest -q), run once at the end"
+  ],
+  "acceptance": [
+   "AC-15",
+   "AC-17",
+   "AC-19",
+   "AC-21",
+   "AC-22"
+  ],
+  "files": [
+   "app/templates/home.html",
+   "app/templates/dataset.html",
+   "app/static/css/databoot.css",
+   "tests/test_pages.py",
+   "tests/test_acceptance.py"
+  ]
  }
 ]

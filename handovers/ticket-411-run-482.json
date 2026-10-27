@@ -1,0 +1,55 @@
+{
+  "header": {
+    "ticket": 411,
+    "project": "you-think-of-the-project-name",
+    "from_role": "techlead",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "38d349eb1f24",
+    "tokens_left": 1970517
+  },
+  "goal": "Revise your earlier work for the build phase. The Board rejected it with this comment: Tech Lead: create ONE new frontend ticket that redoes ticket 403 in full:\r\n1. Table captions as <caption><h2>X</h2></caption> (size --t-md).\r\n2. Column headers in real case (remove CSS text-transform uppercase).\r\n3. In the same ticket, update the 5 caption literals in tests/test_acceptance.py (L186, 198, 274, 308, 349) to the h2 form. No other edits to that file.\r\nDone = full pytest suite green.\r\nAssumptions OK (pixel-ink check, computed-style probe, 375px tick overlap acceptable, transparent background).",
+  "acceptance_criteria": [
+    {
+      "text": "Every acceptance item is covered by a ticket",
+      "passes": true
+    },
+    {
+      "text": "Each ticket is small, testable and has a layer",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py plan",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Appended one frontend ticket (index 12) redoing ticket 403 in full and left entries 0-11 untouched",
+      "why": "Board gate 168 asked for exactly one new ticket; the orchestrator skips built entries",
+      "evidence": "plan/tickets.json; python3 /opt/prodagents/check.py plan: check passed"
+    },
+    {
+      "what": "Listed tests/test_acceptance.py in this ticket's files, limited to the 5 caption literals",
+      "why": "Gate 168 explicitly allows those edits; ticket 7 had forbidden them",
+      "evidence": "tests/test_acceptance.py L186,198,274,308,349"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Ticket 12 may end up as a verify-only pass because templates, CSS and the 5 test literals already show the h2 form and --t-md",
+    "Reusing the acceptance ids AC-15, AC-17, AC-19, AC-21 and AC-22 is right, since ticket 403 covered those"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "On a Board rejection that asks to redo a ticket, check the repo first, because the work may already exist. Still append the ticket with explicit checkable criteria, and loosen a file restriction only where the Board names the lines.",
+      "when": "Revising plan/tickets.json after a rejection",
+      "evidence": "app/templates/home.html:7, databoot.css:92 and tests/test_acceptance.py:186 already match gate 168"
+    }
+  ],
+  "problems": []
+}
