@@ -85,6 +85,31 @@ main { max-width: var(--maxw); margin: 0 auto; padding: var(--s5) var(--s4) var(
 .btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .btn-primary:hover { background: var(--accent); filter: brightness(1.08); }
 
+/* KPI strip: figures of the filtered rows, straight from the server (dl > div > dt + dd) */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s3); margin: 0 0 var(--s4); }
+.kpis > div { min-width: 0; padding: var(--s3) var(--s4); background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); }
+.kpis dt { font-size: var(--t-sm); color: var(--muted); overflow-wrap: anywhere; }
+.kpis dd { margin: 0; font-size: var(--t-lg); font-weight: 650; line-height: 1.25; font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere; }
+
+/* filters: a plain GET form, native controls, no JS needed (dashboard.js only submits on change) */
+.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s3) var(--s4); margin: 0 0 var(--s4); }
+.field { display: grid; gap: var(--s1); flex: 1 1 160px; max-width: 260px; min-width: 0; }
+.field label { font-size: var(--t-sm); font-weight: 600; color: var(--muted); overflow-wrap: anywhere; }
+.field select, .field input { width: 100%; min-width: 0; min-height: var(--tap); padding: 0 var(--s3); font: inherit;
+  color: var(--fg); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius);
+  text-overflow: ellipsis; }
+.field select:hover, .field input:hover { border-color: var(--accent); }
+.chips-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin: 0 0 var(--s4); }
+.chips { display: flex; flex-wrap: wrap; gap: var(--s2); list-style: none; margin: 0; padding: 0; }
+.chips a { display: inline-flex; align-items: center; gap: var(--s2); min-height: var(--tap); padding: 0 var(--s3);
+  color: var(--fg); background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 999px;
+  font-size: var(--t-sm); font-weight: 600; text-decoration: none; overflow-wrap: anywhere;
+  transition: background-color var(--dur) var(--ease); }
+.chips a::after { content: "\00d7"; content: "\00d7" / ""; font-size: var(--t-lg); line-height: 1; }
+.chips a:hover { background: var(--surface); }
+
 /* tables */
 .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
@@ -114,7 +139,7 @@ section.block { margin-top: var(--s6); }
 .empty { color: var(--muted); padding: var(--s5) var(--s4); text-align: center; background: var(--surface);
   border: 1px dashed var(--line-strong); border-radius: var(--radius); }
 
-/* chart grid: 2 columns from 900px, wide kinds span both */
+/* chart grid: 2 columns from 900px; the first chart (highest score) spans both, the rest sit two per row */
 .charts { display: grid; grid-template-columns: 1fr; gap: var(--s4); margin: var(--s4) 0 0; padding: 0; }
 .chart { margin: 0; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
@@ -136,7 +161,7 @@ section.block { margin-top: var(--s6); }
   main { padding: var(--s6) var(--s5) var(--s7); }
   .site-header .inner { padding: 0 var(--s5); }
   .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .chart[data-kind="map3d"], .chart[data-kind="country_map"], .chart[data-kind="heatmap"] { grid-column: 1 / -1; }
+  .charts > .chart:first-child { grid-column: 1 / -1; }
 }
 @media (max-width: 599px) {
   h1 { font-size: 1.5rem; }
@@ -144,6 +169,9 @@ section.block { margin-top: var(--s6); }
   .chart .plot { height: 280px; min-height: 280px; }
   .chart[data-kind="map3d"] .plot, .chart[data-kind="country_map"] .plot, .chart[data-kind="heatmap"] .plot { height: 340px; }
   .actions .btn { flex: 1 1 100%; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .field { flex: 1 1 100%; max-width: none; }
+  .filters .btn { flex: 1 1 100%; }
   th, td { padding: var(--s2) var(--s3); }
 }
 
@@ -153,4 +181,4 @@ section.block { margin-top: var(--s6); }
   .btn:active { transform: none; }
   .plot.is-loading { background: var(--line); }
 }
-@media print { .site-header, .actions, .skip { display: none; } }
+@media print { .site-header, .actions, .skip, .filters, .chips-row { display: none; } }

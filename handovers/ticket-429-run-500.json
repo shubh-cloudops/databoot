@@ -1,0 +1,70 @@
+{
+  "header": {
+    "ticket": 429,
+    "project": "you-think-of-the-project-name",
+    "from_role": "designer",
+    "phase": "architecture",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "1c53b4636107",
+    "tokens_left": 1931753
+  },
+  "goal": "Write or update docs/DESIGN.md and the shared stylesheet for the approved spec and architecture.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/DESIGN.md defines layout, colour, type, motion and components",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py design",
+    "passed": true,
+    "output_tail": "........................................................................ [ 46%]\n........................................................................ [ 92%]\n............                                                             [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 25 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n156 passed, 75 warnings in 106.33s (0:01:46)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "No token change; added KPI, filter, chip components and a first-chart-full-width grid rule",
+      "why": "Round 4 needs new components but the Board kept the branding; existing tokens cover every need",
+      "evidence": "docs/DESIGN.md 'Round 4 delta'; app/static/css/databoot.css .kpis/.filters/.chips/.charts > .chart:first-child"
+    },
+    {
+      "what": "Score shown as caption text only, no meter or badge",
+      "why": "Grid order already encodes rank; a second encoding would repeat it and AC-17 allows one rule caption per chart",
+      "evidence": "docs/DESIGN.md Round 4 delta item 4; docs/ARCHITECTURE.md L425"
+    },
+    {
+      "what": "Plot heights unchanged for the full-width first chart",
+      "why": "A first-child height rule would outrank the data-kind map heights by specificity; width and position carry the rank",
+      "evidence": "databoot.css chart height rules"
+    },
+    {
+      "what": "Chips and Clear filters sit in a .chips-row wrapper; ul.chips uses flex, not display: contents",
+      "why": "display: contents drops list semantics in some browsers",
+      "evidence": "databoot.css .chips-row/.chips"
+    },
+    {
+      "what": "Cross-filter has no extra visual hint",
+      "why": "Text rule forbids generated sentences; a filtered column's chart disappears, so there is no selected state to draw",
+      "evidence": "docs/DESIGN.md Charts, Cross-filter paragraph"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The frontend ticket emits the markup specified in DESIGN.md Components (div.field > label + select, chips-row > ul.chips, dl.kpis > div > dt + dd)",
+    "Maps and heatmap at half width with their current 420px height look acceptable; to be checked in the design review"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "When the CSS for new components lands before the templates, say in DESIGN.md that it is inert and give the exact markup, so the frontend ticket does not guess class names",
+      "when": "Architecture-phase design tickets that precede the build tickets",
+      "evidence": "docs/DESIGN.md 'Changes this round', ticket 429"
+    }
+  ],
+  "problems": []
+}

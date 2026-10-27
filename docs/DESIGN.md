@@ -1,4 +1,4 @@
-# Design: DataBoot (round 2)
+# Design: DataBoot (round 4)
 
 Stylesheet: `app/static/css/databoot.css` (all tokens and components below; linked by `app/templates/base.html`).
 Sources: docs/PRD.md, docs/ARCHITECTURE.md ("Pages", R5, R6), Board gates 160 and 165: **branding unchanged:
@@ -6,6 +6,19 @@ DataBoot, plain neutral style, system sans font, no logo, blank SVG favicon** (`
 as titles, axis labels, `N of M` counts and one rule caption. No docs/TRENDS.md this round (`team: -trends`), so no
 trend advice is used. No external fonts, images, icons or CDNs; no raster or SVG logo. The brand is the word
 "DataBoot" set in the system font. No docs/brand/ and no site capture exist, so no logo is copied.
+
+**Round 4 delta** (Board gate 175; branding unchanged from gate 160; `team: -trends`, so no docs/TRENDS.md and no trend
+advice is used; **no token change**: no new colour, size, space or motion value):
+1. KPI strip under the page head (`dl.kpis`, Rows, Columns, Missing, up to three `<column> (sum)`).
+2. Filter form (`form.filters`: one `.field` select per categorical column, two date inputs when a temporal column
+   exists, `Apply`), then removable chips and `Clear filters` (`.chips-row`) only while a filter is active.
+3. Grid: the first chart (highest score) spans the full width, all others sit two per row from 900px, one per row
+   below. The round 2 rule that made map3d, country map and heatmap span both columns is gone (AC-34).
+4. The rule caption ends in ` · score 0.NN`: same `.chart-rule` span and style, no new component. The score is
+   text only: no meter, badge or colour scale, because the order of the grid already shows rank and a second
+   encoding would repeat it.
+5. Clicking a bar or donut slice filters (AC-39); the keyboard equivalent is the dropdowns, which do the same thing.
+Everything below not mentioned here is as in round 2.
 
 **Round 2 delta** (everything not listed here is unchanged from round 1; tokens are unchanged):
 1. Table titles are real `h2` elements inside the `<caption>` (AC-22).
@@ -64,7 +77,7 @@ separators are used everywhere (Board gate 161), through the `num` filter.
 ## Spacing, shape, layout
 4px grid: `--s1..--s7` = 4, 8, 12, 16, 24, 32, 48. Radius 6px. Max content width 1200px, centred. Page padding
 16px (24px from 900px). Tap targets (buttons, brand link, table links) are at least 44px high (`--tap`).
-Breakpoints: `<= 599px` phone, `600-899px` single column, `>= 900px` two-column chart grid.
+Breakpoints: `<= 599px` phone (gate 175: "phone width" is this one), `600-899px` single column, `>= 900px` two-column chart grid.
 
 ## Components
 | Class | What | States |
@@ -75,6 +88,9 @@ Breakpoints: `<= 599px` phone, `600-899px` single column, `>= 900px` two-column 
 | `.btn`, `.btn-primary` | download links (`Export PPTX`, `Export XLSX`) | hover (soft fill, accent border), focus ring, active 1px press |
 | `.table-wrap > table` | scrolls sideways inside its own box, page never scrolls sideways. Title is `<caption><h2>Name</h2></caption>`: `caption` pads 12/16/8px, `caption h2` has margin 0 and `--t-md`. `th` shows names exactly as read (`Latitude`, `LON`) | row hover soft fill |
 | `.js-plotly-plot .modebar` | Plotly tool bar, drawn by the library, restyled only by the CSS here: opacity 1 always, buttons 28px min, icons `--muted` | focus ring 3px `--accent`, active icon `--accent` |
+| `dl.kpis > div` | KPI tile: `dt` label (`--t-sm`, `--muted`), `dd` figure (`--t-lg`, 650, tabular numbers, thousands separators). Surface card, hairline border. Not interactive | none |
+| `form.filters`, `.field` | `<label>` above a native `<select>` or `<input type="date">`, 44px high, `--line-strong` border, `--surface` fill, `--fg` text (the controls take `color-scheme`). `.field` is `div.field > label + select` (id on the control, `for` on the label). Fields are 160-260px wide and wrap; `Apply` is a `.btn` in the same row | hover accent border, focus ring |
+| `.chips-row > ul.chips > li > a` | active filter, a pill with the label text (`region = North`) and a CSS `×`; the link removes that filter and has `aria-label="Remove filter region = North"`. After the list comes `a.btn` `Clear filters`. The row is not rendered with no filters | hover surface fill, focus ring |
 | `.badge` | column type label (`numerical`, `categorical`, `temporal`, `geospatial`, `other`) in a pill, text always shown | |
 | `.note`, `.note-error` | left-bar message, used for fixed labels like `could not be read` | |
 | `.empty` | dashed box: "No charts for this dataset" style fixed label, only when `charts == []` | |
@@ -83,6 +99,10 @@ Breakpoints: `<= 599px` phone, `600-899px` single column, `>= 900px` two-column 
 | `.plot-error` | fixed text `Chart could not be drawn` in `--danger` | |
 
 ### States
+- **Filtered**: a filter is a normal page load (GET), so there is no spinner of ours; the browser shows its own.
+  The page after it shows the chips, the matching selects and dates, and the KPI and chart counts of the filtered
+  rows. A chart whose rule no longer matches is simply absent (gate 175), with no placeholder. If no chart is left,
+  the one `.empty` box shows; if no row is left the KPIs read 0 and `Missing` reads `0.0%`.
 - **Loading**: only `.plot.is-loading`, set from the first paint until the fetch settles. It is a real pending
   request, so the shimmer is honest; it ends in a drawn chart or `.plot-error`. With reduced motion it is a flat
   `--line` block.
@@ -115,6 +135,10 @@ the one source of truth, and passes a shared layout:
 - Honest data: the point count shown in `.chart-count` is the server's `shown`/`total` (`N of M points` or `N of
   M rows`). When `shown < total` the caption says so and nothing else; no smoothing, no fake trend line. Plotly
   default transitions are off (`transition: {duration: 0}`), so no chart animates on load.
+- Cross-filter (AC-39): bar and donut categories are clickable (Plotly's own pointer cursor over a bar or slice is the
+  only hint; no text and no icon is added). Click sets `f.<x_label>=<category>` and reloads; a second click on the same
+  category removes it. A chart on a filtered column disappears with its rule, so there is no "selected bar" style to
+  draw. Mouse-only by nature; the dropdowns and chips are the keyboard and touch-reader route to the same result.
 - Keyboard and screen reader: each `figure` has `aria-label` = chart title; each `.plot` has `role="img"` with
   `aria-label` = `<title>: <rule caption>`; the data is also in the first-20-rows table above/below.
 
@@ -150,23 +174,42 @@ column has `min-width: 12ch` and wraps long paths (`overflow-wrap: anywhere`). T
 ### Dashboard `/datasets/{id}`
 Desktop: `.crumb` link `DataBoot` / file; `.page-head` with h1 (file name, sheet in `.muted`) and `.actions`
 with `Export PPTX` (`.btn-primary`) and `Export XLSX` (`.btn`). Then, in order:
-1. `.charts` grid, two columns; `map3d`, `country_map` and `heatmap` span both columns; the rest are 320px tall
-   cards in the rule order of ARCHITECTURE "Routing rules" (max 8). Each card: title, rule caption, `N of M`,
-   plot.
-2. Columns table (caption h2 `Columns`): column | type badge.
-3. First rows table (caption h2 `First 20 rows`, the number comes from the server): `.data-table` scrolling
+1. `dl.kpis`: a row of tiles, `repeat(auto-fit, minmax(150px, 1fr))`, 12px gap; 4 to 6 tiles fill the width.
+2. `form.filters`: one row of fields that wraps, `Apply` last. No card around it: the controls themselves are white
+   (surface) boxes on the page background.
+3. `.chips-row` (only with an active filter): chips left to right, `Clear filters` last.
+4. `.charts` grid, two columns; max 8 cards in **score order** (highest first, ties in the rule order of ARCHITECTURE
+   "Round 4: interest score"). The first card spans both columns; the others sit two per row (cards 2 and 3, 4 and 5, 6
+   and 7, 8 alone on the left, as the grid fills). Plot heights are unchanged (320px, 300 donut, 420 maps and heatmap):
+   rank shows in the width and the position, not in extra height. Each card: title, rule caption ending in `· score
+   0.NN`, `N of M`, plot.
+5. Columns table (caption h2 `Columns`): column | type badge.
+6. First rows table (caption h2 `First 20 rows`, the number comes from the server): `.data-table` scrolling
    inside its wrap, cells truncated with ellipsis at 28ch, headers in the file's own case.
-Charts come first because they are the product; the tables are the evidence behind them.
-375px: crumb, h1, buttons full width stacked (44px each), charts one column (plot 280px, wide kinds 340px),
-columns table, rows table (scrolls sideways in its box). Chart legends move below the plot. Nothing overflows
+The First rows table stays below every chart; it has no score and no caption line (gate 175). The KPIs and filters
+come first because they say what the charts below are about.
+375px: crumb, h1, buttons full width stacked (44px each), KPI tiles two per row, filter fields stacked full width
+(44px each, `Apply` full width), chips wrapping, then charts one column in score order (plot 280px, maps and heatmap
+340px), columns table, rows table (scrolls sideways in its box). Chart legends move below the plot. Nothing overflows
 the page width.
 
 ## Honesty rules (for design review)
 - Skeleton shimmer only while a fetch is pending. No fake progress bars, no "live" dots, no sparkline filler.
+- The score is the server's number, printed as given; the order is the order of the data, not a styled ranking. Chips and
+  selects show only filters that are in the URL; nothing is highlighted that is not applied.
 - Every number on screen comes from the server response; chart counts are `shown`/`total` as given.
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
+Round 4 (ticket 429, architecture phase, Board gate 175): `databoot.css` gains `.kpis`, `.filters`/`.field`,
+`.chips-row`/`.chips`, drops the map3d/country_map/heatmap grid span and adds `.charts > .chart:first-child` (full
+width), and the phone rule gets two-column KPIs and full-width fields. The templates and `dashboard.js` do not use
+them yet: the frontend ticket must emit exactly the markup in Components (`dl.kpis > div > dt + dd`, `form.filters >
+.field`, `.chips-row > ul.chips`, `a.btn` `Clear filters`) and keep one `.chart-rule` per figure. Tab order is now:
+skip, brand, export links, filter controls, `Apply`, chips, `Clear filters`, mode-bar buttons, table links. Contrast:
+chip text is `--fg` on `--accent-soft` (> 12:1 both themes), chip border `--accent` against the page 5.7 / 7.5, control
+border `--line-strong` 3.2 / 4.3 (>= 3:1 for a control edge). No new motion; reduced motion unchanged. No token change.
+
 Design review (ticket 413), 1280 and 375 px, light and dark, Home, three datasets (8 charts incl. 3D and country map; a
 long-named TSV; an unreadable file), a 404: no sideways scroll (scrollWidth = viewport), all 10 plots drawn, no `.plot-error`,
 no console error except the expected 404, tap targets >= 44px, `th` text-transform none, 40 Tab stops in dark with reduced
