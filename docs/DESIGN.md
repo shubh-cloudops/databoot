@@ -167,6 +167,11 @@ the page width.
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
+Design review (ticket 413), 1280 and 375 px, light and dark, Home, three datasets (8 charts incl. 3D and country map; a
+long-named TSV; an unreadable file), a 404: no sideways scroll (scrollWidth = viewport), all 10 plots drawn, no `.plot-error`,
+no console error except the expected 404, tap targets >= 44px, `th` text-transform none, 40 Tab stops in dark with reduced
+motion all show a >= 2px outline. Nothing fell short, so no template, CSS or script change. No token change.
+
 Design review (ticket 410), 1280 and 375 px, light and dark, every page of a demo folder (3D map, country map, line, bar,
 donut, histogram, scatter, unreadable and other files, a 404): no sideways scroll, no console error except the expected
 404 of an unknown id, all charts drawn, tap targets >= 44px. One fix: the 3D map camera is pulled back (eye 1.8/1.8/1.2 at

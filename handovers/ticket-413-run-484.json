@@ -1,0 +1,67 @@
+{
+  "header": {
+    "ticket": 413,
+    "project": "you-think-of-the-project-name",
+    "from_role": "designer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "1c53b4636107",
+    "tokens_left": 1960327
+  },
+  "goal": "Design review: open every page with the Playwright browser tools at desktop and phone width, compare with docs/DESIGN.md, and fix templates, CSS and front-end scripts directly where they fall short.",
+  "acceptance_criteria": [
+    {
+      "text": "Every page matches docs/DESIGN.md at desktop and phone width",
+      "passes": true
+    },
+    {
+      "text": "No page scrolls sideways at 375px",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 54%]\n.............................................................            [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n133 passed, 64 warnings in 86.21s (0:01:26)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Made no template, CSS or script changes",
+      "why": "Every page matched DESIGN.md at 1280 and 375 px in light and dark: no sideways scroll, no console errors besides the expected 404, tap targets >= 44px, focus rings >= 2px",
+      "evidence": "/tmp/review.py and /tmp/tab.py output; screenshots /tmp/shots/light-1280-3.png and light-375-3.png"
+    },
+    {
+      "what": "Added a ticket 413 review note to DESIGN.md with no token change",
+      "why": "Lessons say to record 'no token change' on an audit round with no new look",
+      "evidence": "docs/DESIGN.md Changes this round"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Read a full-page screenshot with a bare Read",
+      "why_it_failed": "The pretool hook stops a first Read of a large file; sending the same Read again works"
+    }
+  ],
+  "assumptions": [
+    "Python Playwright with PLAYWRIGHT_BROWSERS_PATH=/opt/playwright is equivalent to the mcp__playwright tools, which were not available",
+    "Overlapping 3D tick labels at the front corner at 375px stay acceptable (Board gate 168)",
+    "I did not view the dark-mode screenshots, so the dark colour check rests on computed styles and the ticket 405/410 contrast fixes"
+  ],
+  "open_questions": [
+    "Exports have still not been opened in real Excel or PowerPoint (Board will do this on Windows)"
+  ],
+  "lessons": [
+    {
+      "lesson": "When DESIGN.md and app/ are unchanged since the last review, run one script for pages x widths x schemes (scrollWidth, plots, .plot-error, tap targets, console) and one Tab pass, view one screenshot per width, and skip further fixes",
+      "when": "Repeat design review ticket with no app changes",
+      "evidence": "ticket 413: two scripts plus two screenshots were enough"
+    }
+  ],
+  "problems": []
+}
