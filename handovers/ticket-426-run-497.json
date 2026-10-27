@@ -1,0 +1,63 @@
+{
+  "header": {
+    "ticket": 426,
+    "project": "you-think-of-the-project-name",
+    "from_role": "router",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "medium",
+    "prompt_version": "775d10f51fce",
+    "tokens_left": 1981076
+  },
+  "goal": "Read docs/IDEA.md with no history and write docs/BRIEF.md: what this round asks for.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/BRIEF.md has the sections Asked, Deliverable, Done when, Unclear and Not asked",
+      "passes": true
+    },
+    {
+      "text": "It restates only what docs/IDEA.md says",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py brief",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Treated this round as a change to the existing dashboard web app, not a new build",
+      "why": "The idea says to keep everything earlier rounds built and the branding, and to change only what the suggestions ask",
+      "evidence": "docs/IDEA.md: 'Keep everything the earlier rounds built and the business's branding; change only what these suggestions ask.'"
+    },
+    {
+      "what": "Listed the 7 numbered suggestions plus the Tests line as the 'Done when' outcomes",
+      "why": "They are the observable outcomes the idea names",
+      "evidence": "docs/IDEA.md lines 4-14"
+    },
+    {
+      "what": "Put no-AI, offline, no-new-dependency and no-network under Not asked",
+      "why": "The idea states these constraints explicitly",
+      "evidence": "docs/IDEA.md line 3: 'NO AI, offline, no new dependencies'; line 14: 'no external network requests'"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "'The existing chart route' and 'the existing fixed chart order' refer to things from earlier rounds that the idea does not describe, so the brief restates them without detail",
+    "'Trends off' is read as a team setting, not a product feature, and is listed as unclear"
+  ],
+  "open_questions": [
+    "Which value and time columns does the line chart use when there are several?",
+    "Do the KPIs and exports reflect the active filters?",
+    "What score and caption does the table get, and how are degenerate or absent charts handled?",
+    "How is a cross-filter removed, and can several categories be selected?",
+    "Does clicking a chart on a column with more than 50 distinct values set a filter?",
+    "What do the exports' title slide and summary sheet say when no filters are active?",
+    "What counts as a phone width, and what hardware is the 1 s target measured on?",
+    "What does 'trends off' mean?"
+  ],
+  "lessons": [],
+  "problems": []
+}
