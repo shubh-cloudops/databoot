@@ -585,3 +585,75 @@ def test_AC_27(live, data_dir):
         assert errors == []
     finally:
         close()
+
+
+def _ps1():
+    return (ROOT / "Start-DataBoot.ps1").read_text()
+
+
+def _candidates(ps1):
+    line = next(l for l in ps1.splitlines() if l.strip().startswith("$Candidates ="))
+    return re.findall(r'@\("py", "(-3\.\d+)"\)|@\("(python)"\)', line)
+
+
+def test_AC_28():
+    ps1 = _ps1()
+    assert [a or b for a, b in _candidates(ps1)] == ["-3.13", "-3.12", "-3.11", "python"]
+    # every candidate, python included, goes through the 3.11-3.13 version check
+    cond = re.search(r'sys\.exit\(0 if (.+?) else 1\)', ps1).group(1)
+    ok = [v for v in range(8, 16) if eval(cond, {"sys": type("S", (), {"version_info": (3, v, 0)})})]
+    assert ok == [11, 12, 13]
+    loop = ps1[ps1.index("foreach ($c in $Candidates)"):ps1.index("if (-not $py)")]
+    assert "-c $Check" in loop and "$py = $c; break" in loop
+    # a machine with 3.12 and 3.14 only: 3.13 and 3.11 fail, 3.12 is the first that passes
+    installed = {"-3.12": (3, 12), "python": (3, 14)}
+    picked = next(k for k in ["-3.13", "-3.12", "-3.11", "python"] if k in installed and 11 <= installed[k][1] <= 13)
+    assert picked == "-3.12"
+    assert "-m venv .venv" in ps1 and "& $py[0] @rest -m venv .venv" in ps1
+
+
+def test_AC_29():
+    ps1 = _ps1()
+    body = ps1[ps1.index("function Fail"):]
+    body = body[:body.index("\n}")]
+    pos = [body.index(s) for s in ("Write-Host $Message", "Remove-Item -Recurse -Force .venv", "Read-Host", "exit 1")]
+    assert pos == sorted(pos)
+    assert 'if (-not $py) { Fail "DataBoot needs Python 3.12.' in ps1
+    launch = ps1.index(".venv\\Scripts\\python.exe -m app.launch")
+    for marker in ("-m venv .venv", "--no-index --find-links wheels -r requirements.txt",
+                   "\n        .venv\\Scripts\\python.exe -m pip install -r requirements.txt"):
+        assert ps1.index(marker) < launch
+        nxt = ps1[ps1.index(marker) + len(marker):].split("\n", 2)[1]  # the line directly after the command
+        assert "$LASTEXITCODE -ne 0" in nxt and re.search(r'Fail "[^"]{10,}"', nxt), marker
+    assert ps1.count("Fail \"") == 4 and ps1.rindex("Fail ") < launch
+
+
+def test_AC_30():
+    ps1 = _ps1()
+
+    def hardcoded(script):  # the check the AC asks for: fewer than 3.13, 3.12 and 3.11 in the candidate list
+        return not all(v in " ".join(a or b for a, b in _candidates(script)) for v in ("-3.13", "-3.12", "-3.11"))
+
+    assert not hardcoded(ps1)
+    only311 = re.sub(r'(\$Candidates = ).*', r'\1@(@("py", "-3.11"))', ps1)
+    assert hardcoded(only311)
+    assert not re.search(r"py -3\.1\d+ -m venv", ps1)
+
+
+def test_AC_31(make_client, data_dir):
+    from tests.conftest import write_xlsx
+    rows = [("month", "revenue"), ("a", 1), ("b", 2)]
+    for name, bad in (("book.xlsx", b"<<not xml"), ("trunc.xlsx", b'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"')):
+        write_xlsx(data_dir / name, {"Bad": bad, "Good": rows})  # corrupt sheet first, so it cannot hide behind a good one
+    client = make_client(data_dir)
+    home = client.get("/").text
+    unread = home.split("<caption><h2>Could not be read</h2></caption>")[1].split("</table>")[0]
+    ids = _ids(client)
+    for name in ("book.xlsx", "trunc.xlsx"):
+        row = re.search(rf'<tr>(?:(?!</tr>).)*{name} - Bad(?:(?!</tr>).)*</tr>', unread, re.S)
+        assert row and "not a valid xlsx" in row.group(0), name
+        assert (name, "Bad") not in ids
+        assert (name, "Good") in ids
+        page = client.get(f"/datasets/{ids[(name, 'Good')]}")
+        assert page.status_code == 200
+        assert client.get(f"/api/datasets/{ids[(name, 'Good')]}/charts").json()["charts"]
