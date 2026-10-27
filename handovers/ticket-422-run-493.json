@@ -1,0 +1,76 @@
+{
+  "header": {
+    "ticket": 422,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1971048
+  },
+  "goal": "Launcher checks the exit code after venv creation and after BOTH pip installs, wheels and online (Board gate 171), with the same Fail path: message naming the step, delete partial .venv, pause, exit 1",
+  "acceptance_criteria": [
+    {
+      "text": "In Start-DataBoot.ps1 directly after `-m venv .venv`: `if ($LASTEXITCODE -ne 0) { Fail \"Could not create the Python environment (.venv).\" }`",
+      "passes": true
+    },
+    {
+      "text": "Directly after the `--no-index --find-links wheels` pip install: `if ($LASTEXITCODE -ne 0) { Fail \"Could not install the packages from wheels.\" }`",
+      "passes": true
+    },
+    {
+      "text": "Directly after the online `pip install -r requirements.txt`: `if ($LASTEXITCODE -ne 0) { Fail \"Could not install the packages (pip install -r requirements.txt).\" }`",
+      "passes": true
+    },
+    {
+      "text": "Every Fail call comes before the final `.venv\\Scripts\\python.exe -m app.launch $Folder` line, so a failed step never reaches it; each message names its step",
+      "passes": true
+    },
+    {
+      "text": "The pip install lines keep working when wheels\\ exists or not, and nothing in the -Docker branch changes",
+      "passes": true
+    },
+    {
+      "text": "tests/test_launcher_files.py text tests: splitting the script at `-m venv .venv`, at `--find-links wheels` and at the online `pip install -r requirements.txt`, the text after each (up to the next native command) contains `$LASTEXITCODE -ne 0` and `Fail`; the last `Fail` position is before the `-m app.launch` position",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-29 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 48%]\n........................................................................ [ 97%]\n...                                                                      [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 24 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n147 passed, 74 warnings in 107.67s (0:01:47)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Put each exit-code check on the line directly after its native command, inside the wheels/online if-branches",
+      "why": "Acceptance criteria require the check directly after each command; the branches keep the wheels-or-not behaviour",
+      "evidence": "Start-DataBoot.ps1:57-65"
+    },
+    {
+      "what": "Test checks the single line after each marker, with the online pip marker anchored to its indented line",
+      "why": "Splitting on a bare 'pip install -r requirements.txt' text would be ambiguous; the wheels line does not contain that exact string, but anchoring is safer",
+      "evidence": "tests/test_launcher_files.py test_ps1_exit_code_checks_before_launch"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Pip warnings on stderr under Windows PowerShell 5.1 with $ErrorActionPreference Stop are unchanged from before and out of scope for this ticket"
+  ],
+  "open_questions": [
+    "The Board must run the launcher on Windows (3.12 + 3.14, and with no suitable Python) and with a forced pip failure; it was not run here (no PowerShell)"
+  ],
+  "lessons": [
+    {
+      "lesson": "Use python3, not python, for pytest in this image",
+      "when": "running the test suite in /work",
+      "evidence": "`python: command not found`; `python3 -m pytest -q` passed 147 tests"
+    }
+  ],
+  "problems": []
+}

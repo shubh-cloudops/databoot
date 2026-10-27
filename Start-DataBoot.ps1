@@ -55,10 +55,13 @@ if (-not (Test-Path .venv\Scripts\python.exe)) {
     if (-not $py) { Fail "DataBoot needs Python 3.12. Install it with: winget install -e --id Python.Python.3.12" }
     $rest = @($py | Select-Object -Skip 1)
     & $py[0] @rest -m venv .venv
+    if ($LASTEXITCODE -ne 0) { Fail "Could not create the Python environment (.venv)." }
     if (Test-Path wheels) {
         .venv\Scripts\python.exe -m pip install --no-index --find-links wheels -r requirements.txt
+        if ($LASTEXITCODE -ne 0) { Fail "Could not install the packages from wheels." }
     } else {
         .venv\Scripts\python.exe -m pip install -r requirements.txt
+        if ($LASTEXITCODE -ne 0) { Fail "Could not install the packages (pip install -r requirements.txt)." }
     }
 }
 .venv\Scripts\python.exe -m app.launch $Folder

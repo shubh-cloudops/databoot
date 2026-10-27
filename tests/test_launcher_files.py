@@ -52,3 +52,13 @@ def test_dockerfile():
     assert d.startswith("FROM python:3.11-slim")
     for needle in ("requirements.txt", "COPY app/", "ENV DATABOOT_DATA=/data", "uvicorn", "app.main:app", "0.0.0.0", "8765"):
         assert needle in d, needle
+
+
+def test_ps1_exit_code_checks_before_launch():
+    ps1 = text("Start-DataBoot.ps1")
+    launch = ps1.index("-m app.launch")
+    for marker in ("-m venv .venv", "--find-links wheels", "\n        .venv\\Scripts\\python.exe -m pip install -r requirements.txt"):
+        after = ps1[ps1.index(marker) + len(marker):]
+        after = after.split("\n", 2)[1]  # the line directly after the command
+        assert "$LASTEXITCODE -ne 0" in after and "Fail" in after, marker
+    assert ps1.rindex("Fail ") < launch
