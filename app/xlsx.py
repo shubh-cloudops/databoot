@@ -5,6 +5,7 @@ Anything that is not a readable workbook raises ReadError("not a valid xlsx").
 Writing: write(dataset, rows, charts) -> bytes, see the end of this file.
 """
 import io
+import zipfile
 from datetime import date, datetime
 
 from openpyxl import load_workbook
@@ -23,9 +24,25 @@ def _value(v):
     return v or None if isinstance(v, str) else v
 
 
-def _load(path):
+_EMPTY = b'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>'
+
+
+def _load(path, keep=None):
+    """Open the workbook with every worksheet part blanked except `keep` (a part name such as xl/worksheets/sheet2.xml).
+
+    openpyxl parses each sheet's XML while loading, so one corrupt sheet would fail the whole workbook.
+    """
+    # ponytail: N+1 zip copies per workbook (one in sheet_names, one per read_sheet); cache the blanked bytes if big books get slow.
     try:
-        return load_workbook(path, read_only=True, data_only=True)
+        if hasattr(path, "seek"):
+            path.seek(0)
+        out = io.BytesIO()
+        with zipfile.ZipFile(path) as zi, zipfile.ZipFile(out, "w") as zo:
+            for info in zi.infolist():
+                n = info.filename
+                blank = n.startswith("xl/worksheets/") and n.endswith(".xml") and "/_rels/" not in n and n != keep
+                zo.writestr(info, _EMPTY if blank else zi.read(n))
+        return load_workbook(out, read_only=True, data_only=True)
     except Exception:  # not a zip, missing file, no workbook part: all "not a valid xlsx"
         raise ReadError(NOT_XLSX) from None
 
@@ -40,12 +57,21 @@ def sheet_names(path):
         book.close()
 
 
-def read_sheet(path, sheet):
-    """(columns, rows): the first non-empty row is the header; rows are padded or cut to its width."""
+def _part(path, sheet):
     book = _load(path)
     try:
         if sheet not in book.sheetnames:
             raise ReadError(NOT_XLSX)
+        # ponytail: _worksheet_path is private to openpyxl (ReadOnlyWorksheet), checked against the 3.1.5 pin in requirements.txt.
+        return book[sheet]._worksheet_path.lstrip("/")
+    finally:
+        book.close()
+
+
+def read_sheet(path, sheet):
+    """(columns, rows): the first non-empty row is the header; rows are padded or cut to its width."""
+    book = _load(path, _part(path, sheet))
+    try:
         ws = book[sheet]
         ws.reset_dimensions()
         rows = ([_value(v) for v in r] for r in ws.iter_rows(values_only=True))

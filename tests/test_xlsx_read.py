@@ -68,3 +68,26 @@ def test_corrupt_xml(tmp_path):
     _rewrite(src, dst, {"xl/worksheets/sheet1.xml": "<worksheet><sheetData><row"})
     with pytest.raises(ReadError, match="not a valid xlsx"):
         xlsx.read_sheet(dst, "S")
+
+
+@pytest.mark.parametrize("bad", [b"<<not xml", None])
+def test_corrupt_sheet_is_isolated(tmp_path, bad):
+    good = [["a", "d"], [1, ("date", 45292)]]
+    if bad is None:  # truncated sheet XML
+        bad = b'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c'
+    p = tmp_path / "a.xlsx"
+    write_xlsx(p, {"Good": good, "Bad": bad, "Also": [["b"], [2]]})
+    assert xlsx.sheet_names(p) == ["Good", "Bad", "Also"]
+    assert xlsx.read_sheet(p, "Good") == (["a", "d"], [[1, datetime(2024, 1, 1)]])
+    assert xlsx.read_sheet(p, "Also") == (["b"], [[2]])
+    with pytest.raises(ReadError, match="not a valid xlsx"):
+        xlsx.read_sheet(p, "Bad")
+
+
+def test_bytesio_source(tmp_path):
+    import io
+    p = tmp_path / "a.xlsx"
+    write_xlsx(p, {"A": [["x"], [1]]})
+    buf = io.BytesIO(p.read_bytes())
+    assert xlsx.sheet_names(buf) == ["A"]
+    assert xlsx.read_sheet(buf, "A") == (["x"], [[1]])

@@ -71,3 +71,15 @@ def test_failed_sheet_is_listed_with_its_name(make_client, tmp_path, monkeypatch
     html = make_client(root).get("/").text
     assert "book.xlsx - Bad" in html
     assert catalog.Unreadable("x.csv", "empty file").sheet is None
+
+
+def test_corrupt_sheet_lists_the_others(make_client, tmp_path):
+    from tests.conftest import write_xlsx
+    root = tmp_path / "d"
+    root.mkdir()
+    write_xlsx(root / "book3.xlsx", {"Good": [["a"], [1]], "Bad": b"<<not xml", "Also": [["b"], [2]]})
+    make_client(root)
+    cat = catalog.scan(root)
+    assert [(d.path, d.sheet) for d in cat.datasets] == [("book3.xlsx", "Good"), ("book3.xlsx", "Also")]
+    assert [(u.path, u.sheet, u.reason) for u in cat.unreadable] == [("book3.xlsx", "Bad", "not a valid xlsx")]
+    assert "book3.xlsx - Bad" in make_client(root).get("/").text
