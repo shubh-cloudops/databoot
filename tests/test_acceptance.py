@@ -1,13 +1,8 @@
 """One test per item in docs/acceptance.json, named after its id. They drive the app through its HTTP routes;
 Playwright is used where only a browser can show the result (drawn charts).
 
-AC-13 names Start-DataOS.ps1; Board gate 161 renamed it Start-DataBoot.ps1, and AC-13 / AC-6 ("Deck.gl") wording is
-stale in acceptance.json. These tests follow the gate.
-
-Board gate 162 asked the PM for AC ids for work items G-1..G-7 (docs/ARCHITECTURE.md "Work items without AC ids")
-and docs/acceptance.json still has none. Their tests are named test_G_<n> after the work item and must be
-renamed to the AC ids once the PM adds them. test_G_thousands is the Board's "thousands separators" item
-(gate 161), which has no G number.
+Board gate 165 gave the work items G-1..G-7 and the thousands-separator item the ids AC-14..AC-21; AC-13 and
+AC-6 were reworded in acceptance.json (Start-DataBoot.ps1, Plotly 3D scatter).
 """
 import io
 import json
@@ -309,7 +304,7 @@ def _rows_of(html, caption):
     return [re.sub(r"<[^>]+>", " ", r).split() for r in re.findall(r"<tr>(.*?)</tr>", table, re.S) if "<td" in r]
 
 
-def test_G_1(make_client, data_dir):
+def test_AC_14(make_client, data_dir):
     """File types: TSV, JSON, JSONL, GeoJSON and Parquet are listed with row and column counts."""
     client = make_client(_dir_with_parquet(data_dir))
     got = {d["path"]: (d["rows"], d["columns"]) for d in client.get("/api/datasets").json()}
@@ -333,7 +328,7 @@ def test_G_1(make_client, data_dir):
         assert client.get(f"/datasets/{a}").status_code == 200
 
 
-def test_G_2(make_client, data_dir):
+def test_AC_15(make_client, data_dir):
     """File inventory: unrecognised files are listed with type, size and date, and have no dashboard."""
     (data_dir / "old.xls").write_bytes(b"xx")
     client = make_client(data_dir)
@@ -350,7 +345,7 @@ def test_G_2(make_client, data_dir):
     assert "<a " not in other
 
 
-def test_G_3(make_client, data_dir):
+def test_AC_16(make_client, data_dir):
     """Extra charts: donut, histogram, scatter, correlation heatmap and country map, max 8 per dataset."""
     (data_dir / "num.csv").write_text("a,b,c\n" + "".join(f"{i},{(i * 7) % 11},{2 * i + 1}\n" for i in range(12)))
     (data_dir / "many.csv").write_text("date,region,country,lat,lon,a,b,c\n" + "".join(
@@ -379,7 +374,7 @@ def test_G_3(make_client, data_dir):
     assert client.get(f"/datasets/{i}").text.count("<figure") == len(many)
 
 
-def test_G_4(make_client, data_dir):
+def test_AC_17(make_client, data_dir):
     """Caption and text: one rule caption and one 'N of M' per figure; no other prose in <main>."""
     client = make_client(data_dir)
     for d in client.get("/api/datasets").json():
@@ -399,7 +394,7 @@ def test_G_4(make_client, data_dir):
         assert [p for p in re.findall(r"<p[ >].*", main) if "path" not in p and "folder" not in p.lower()] == [], d["path"]
 
 
-def test_G_5(make_client, data_dir):
+def test_AC_18(make_client, data_dir):
     """Exports: XLSX reopens in openpyxl and PPTX in python-pptx, each with native charts (count > 0)."""
     from openpyxl import load_workbook
     from pptx import Presentation
@@ -425,7 +420,7 @@ def test_G_5(make_client, data_dir):
         assert n > 0, name
 
 
-def test_G_6(make_client, data_dir):
+def test_AC_19(make_client, data_dir):
     """Name: the product is called DataBoot in every page title and h1 where the page has no dataset name."""
     client = make_client(data_dir)
     home = client.get("/").text
@@ -436,7 +431,7 @@ def test_G_6(make_client, data_dir):
     assert not re.search(r"DataOS", home + client.get(f"/datasets/{d['id']}").text, re.I)
 
 
-def test_G_7(make_client, data_dir):
+def test_AC_20(make_client, data_dir):
     """Parquet errors: a file the reader cannot decode is listed as unreadable with its reason, and others still open."""
     good = (ROOT / "tests/fixtures/plain.parquet").read_bytes()
     (data_dir / "bad.parquet").write_bytes(good[:4] + b"\x00" * 64 + good[-8:])  # magic and footer length, no real footer
@@ -449,7 +444,7 @@ def test_G_7(make_client, data_dir):
     assert client.get(f"/datasets/{_ids(client)[('sales.csv', None)]}").status_code == 200
 
 
-def test_G_thousands(make_client, data_dir, big_csv):
+def test_AC_21(make_client, data_dir, big_csv):
     """Thousands separators on counts everywhere (1,234 of 56,789), including bytes and point counts."""
     client = make_client(big_csv)
     home = client.get("/").text
@@ -461,3 +456,132 @@ def test_G_thousands(make_client, data_dir, big_csv):
     assert shown >= 1000 and f"{shown:,} of 60,000 points" in page
     text = re.sub(r"<[^>]+>", " ", re.search(r"<main.*?</main>", page, re.S).group(0))
     assert not re.search(r"(?<![\d.,-])\d{4,}(?![\d-])", re.sub(r"\d{4}-\d{2}-\d{2}", "", text)), "unseparated number in page text"
+
+
+def _page(base, path, width=1280):
+    """Open a page in Chromium; return (page, browser context closer). Caller must call close()."""
+    p = sync_playwright().start()
+    b = p.chromium.launch()
+    page = b.new_page(viewport={"width": width, "height": 900})
+    errors = []
+    page.on("console", lambda m: m.type == "error" and errors.append(m.text))
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(base + path)
+    page.wait_for_load_state("networkidle")
+    return page, errors, lambda: (b.close(), p.stop())
+
+
+def test_AC_22(live, data_dir):
+    home_tables = ["Datasets", "Could not be read", "Other files"]
+    ids = _ids_http(live)
+    page, errors, close = _page(live, "/")
+    try:
+        caps = page.locator("table > caption > h2").all_inner_texts()
+        assert caps == home_tables
+        assert page.locator("table > caption:not(:has(> h2))").count() == 0
+    finally:
+        close()
+    page, errors, close = _page(live, "/datasets/" + ids[("points.tsv", None)])
+    try:
+        caps = page.locator("table > caption > h2").all_inner_texts()
+        assert caps == ["Columns", "First 4 rows"]
+        # column headers keep the case of the column names ("Latitude", "LON"), as the browser renders them
+        heads = page.locator("table th[scope=col]").all_inner_texts()
+        assert "Latitude" in heads and "LON" in heads
+        assert page.locator("table th").first.evaluate("e => getComputedStyle(e).textTransform") == "none"
+    finally:
+        close()
+
+
+def _ids_http(base):
+    return {(d["path"], d["sheet"]): d["id"] for d in json.load(urllib.request.urlopen(base + "/api/datasets"))}
+
+
+def test_AC_23(make_client, data_dir):
+    import subprocess
+    import warnings
+    from openpyxl import load_workbook
+    pins = dict(l.strip().split("==") for l in (ROOT / "requirements.txt").read_text().split() if "==" in l)
+    assert {k: pins.get(k) for k in ("xlsxwriter", "python-pptx", "openpyxl", "pyarrow")} == {
+        "xlsxwriter": "3.3.0", "python-pptx": "1.0.2", "openpyxl": "3.1.5", "pyarrow": "26.0.0"}
+    tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True).stdout.lower().split("\n")
+    for lib in ("xlsxwriter", "openpyxl", "pptx", "pyarrow"):
+        assert not [f for f in tracked if f.startswith(lib) or f"/{lib}/" in f or f"site-packages/{lib}" in f], lib
+    client = make_client(data_dir)
+    i = _ids(client)[("sales.csv", None)]
+    r = client.get(f"/datasets/{i}/export.xlsx")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        load_workbook(io.BytesIO(r.content))
+    assert not [w for w in caught if "no default style" in str(w.message)]
+
+
+def test_AC_24(live):
+    ids = _ids_http(live)
+    page, errors, close = _page(live, "/datasets/" + ids[("sales.csv", None)])
+    try:
+        page.wait_for_selector('[data-kind="line"] .plot .modebar-btn')
+        bar = page.locator(".modebar").first
+        assert bar.evaluate("e => getComputedStyle(e).opacity") == "1"  # no hover has happened
+        assert bar.evaluate("e => getComputedStyle(e).visibility") == "visible"
+        assert bar.bounding_box()["width"] > 0
+        for _ in range(60):
+            page.keyboard.press("Tab")
+            if page.evaluate("document.activeElement.classList.contains('modebar-btn')"):
+                break
+        else:
+            pytest.fail("Tab never reached a .modebar-btn")
+        page.evaluate("window.n = 0; document.activeElement.addEventListener('click', () => window.n++)")
+        page.keyboard.press("Enter")
+        assert page.evaluate("window.n") == 1
+        assert errors == []
+    finally:
+        close()
+
+
+def test_AC_25(make_client, data_dir):
+    # A sheet with no header row cannot be read; its sibling sheet must still list and open.
+    # (A sheet whose XML is truncated makes openpyxl fail the whole workbook: see open_questions.)
+    from tests.conftest import write_xlsx
+    write_xlsx(data_dir / "book2.xlsx", {"Revenue": [("month", "revenue"), ("a", 1), ("b", 2)], "Lookup": []})
+    client = make_client(data_dir)
+    home = client.get("/").text
+    unread = home.split("<caption><h2>Could not be read</h2></caption>")[1].split("</table>")[0]
+    assert re.search(r'<td class="path">book2\.xlsx - Lookup</td>', unread)
+    ids = _ids(client)
+    assert ("book2.xlsx", "Lookup") not in ids
+    assert ("book2.xlsx", "Revenue") in ids and "book2.xlsx" in home
+    assert client.get(f"/datasets/{ids[('book2.xlsx', 'Revenue')]}").status_code == 200
+    assert client.get(f"/api/datasets/{ids[('book2.xlsx', 'Revenue')]}/charts").json()["charts"]
+
+
+def test_AC_26(make_client, data_dir):
+    (data_dir / "bad.json").write_text("{not json")
+    (data_dir / "bad.jsonl").write_text('{"a": 1}\nnope\n')
+    (data_dir / "obj.json").write_text('{"a": 1}')
+    client = make_client(data_dir)
+    unread = client.get("/").text.split("<caption><h2>Could not be read</h2></caption>")[1].split("</table>")[0]
+    rows = {r[0]: " ".join(r[1:]) for r in (re.sub(r"<[^>]+>", " ", x).split() for x in re.findall(r"<tr>(.*?)</tr>", unread, re.S) if "<td" in x)}
+    assert rows["bad.json"] == "invalid JSON"
+    assert rows["bad.jsonl"] == "invalid JSON"
+    assert rows["obj.json"] == "not a list of records"
+    assert not {"bad.json", "bad.jsonl", "obj.json"} & {d["path"] for d in client.get("/api/datasets").json()}
+
+
+def test_AC_27(live, data_dir):
+    ids = _ids_http(live)
+    charts = json.load(urllib.request.urlopen(f"{live}/api/datasets/{ids[('sub/records.json', None)]}/charts"))["charts"]
+    cmap = next(c for c in charts if c["kind"] == "country_map")
+    assert cmap["data"]["values"] == sorted(cmap["data"]["values"], reverse=True) == [203, 125, 68]
+    assert cmap["data"]["locations"] == ["Brazil", "Japan", "France"]
+    bar = next(c for c in json.load(urllib.request.urlopen(f"{live}/api/datasets/{ids[('sales.csv', None)]}/charts"))["charts"] if c["kind"] == "bar")
+    assert bar["data"]["y"] == sorted(bar["data"]["y"], reverse=True)  # same order rule as the bar chart
+    page, errors, close = _page(live, "/datasets/" + ids[("points.tsv", None)])
+    try:
+        page.wait_for_selector('[data-kind="map3d"] .plot canvas')
+        got = page.evaluate("""() => { const g = document.querySelector('[data-kind="map3d"] .plot');
+          return [g._fullLayout.scene.zaxis.title.text, g._fullData[0].marker.colorbar.title.text]; }""")
+        assert got == ["value", "value"]  # the z column of points.tsv
+        assert errors == []
+    finally:
+        close()
