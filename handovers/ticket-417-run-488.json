@@ -1,0 +1,82 @@
+{
+  "header": {
+    "ticket": 417,
+    "project": "you-think-of-the-project-name",
+    "from_role": "pm",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "a2dbf282ff46",
+    "tokens_left": 1945500
+  },
+  "goal": "Write or update docs/PRD.md and docs/acceptance.json for the idea in docs/IDEA.md.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/PRD.md describes the product",
+      "passes": true
+    },
+    {
+      "text": "docs/acceptance.json lists testable acceptance items",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py spec",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Scoped round 3 to the Start-DataBoot.ps1 Python detection and exit-code handling (AC-28, AC-29), a no-hardcoded-version test (AC-30), and logging the AC-25 corrupt-sheet gap in ARCHITECTURE.md (AC-31)",
+      "why": "The brief and IDEA ask for exactly these and say to change nothing else",
+      "evidence": "docs/BRIEF.md Asked; docs/IDEA.md line 8"
+    },
+    {
+      "what": "Read 'log AC-25 per-sheet isolation' as writing the gap down in a document, and put building it under Could",
+      "why": "Gate 170 said 'log it as a round 3 candidate'; the brief marks the meaning as unclear; this is the smallest reading",
+      "evidence": "gate 170; docs/BRIEF.md Unclear"
+    },
+    {
+      "what": "Kept AC-1..AC-27 ids and texts unchanged, added AC-28..AC-31",
+      "why": "Later-round rule: keep existing ids and add the next free ones",
+      "evidence": "docs/acceptance.json"
+    },
+    {
+      "what": "Switched trends, designer, frontend and design_review off",
+      "why": "No page, template, CSS or JS change this round",
+      "evidence": "docs/BRIEF.md Not asked; docs/team.json"
+    },
+    {
+      "what": "Wrote into the constraints that launcher tests are text checks, and that tests/test_launcher_files.py:17 needs its 'py -3.11' check changed if the script builds the command from a version list",
+      "why": "There is no pwsh or powershell in the image, and that existing check would fail on a loop-based script",
+      "evidence": "`which pwsh powershell` printed nothing; tests/test_launcher_files.py:17"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Running python3 /opt/prodagents/check.py spec",
+      "why_it_failed": "The command needed approval and was not run"
+    }
+  ],
+  "assumptions": [
+    "No Python 3.11-3.13 found uses the same failure path (message, pause, exit 1)",
+    "The python fallback accepts only 3.11 to 3.13, not 3.14",
+    "Every pip install command in the venv path (wheels and online) gets a $LASTEXITCODE check",
+    "docs/reference/ (deck.gl, unstructured.io) is not the business's site; the gate 160 branding stays: DataBoot name, no logo, system sans font, blank SVG favicon"
+  ],
+  "open_questions": [
+    "Branding: no business site capture and no docs/brand/ logo were found (docs/reference/ holds deck.gl and unstructured.io library captures). Please confirm the gate 160 branding stays: name DataBoot, plain neutral style, system sans font, no logo, blank SVG favicon. Or give a logo as an image link in the gate comment.",
+    "'Log AC-25 per-sheet isolation for corrupt sheets': I read this as recording the gap in docs/ARCHITECTURE.md (AC-31). Should this round instead build per-sheet isolation, so a workbook with one corrupt sheet XML still lists its other sheets?",
+    "If no Python 3.11-3.13 is found, is the shared message + pause + exit 1 enough, or should the message also say which Python to install?",
+    "Should the python fallback really reject 3.14 (as the brief says), even though it is the version the Board's machine has?"
+  ],
+  "lessons": [
+    {
+      "lesson": "On a launcher-only round, check whether PowerShell exists in the image; if not, say in the PRD that launcher tests are text checks and point to existing tests that pin old literals (like 'py -3.11') so the engineer updates them",
+      "when": "Rounds that change Start-DataBoot.ps1 or other Windows scripts",
+      "evidence": "`which pwsh powershell` empty; tests/test_launcher_files.py:17"
+    }
+  ],
+  "problems": []
+}

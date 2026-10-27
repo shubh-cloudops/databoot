@@ -1,6 +1,6 @@
 {
-  "trends": {"run": false, "why": "Board gate 160 switched trends off; round 2 is library and accessibility fixes, no new design research needed"},
-  "designer": {"run": true, "why": "DESIGN.md must change (modebar always visible, h2 captions, header case) and the build needs a design review"},
-  "frontend": {"run": true, "why": "Template captions to h2, CSS uppercase removal and the Plotly modebar setting are front-end tickets"},
-  "design_review": {"run": true, "why": "Visible changes to tables and charts on the home and dashboard pages need a screenshot check"}
+  "trends": {"run": false, "why": "Round 3 is a PowerShell launcher fix and a doc note; no design or virality research needed"},
+  "designer": {"run": false, "why": "No page, template, CSS or JS changes; DESIGN.md stays as it is"},
+  "frontend": {"run": false, "why": "No front-end work: the change is Start-DataBoot.ps1, a test and an ARCHITECTURE.md note"},
+  "design_review": {"run": false, "why": "No visible change to any page, so no screenshot review is needed"}
 }

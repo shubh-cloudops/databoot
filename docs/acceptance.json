@@ -25,5 +25,9 @@
   {"id": "AC-24", "text": "On a dashboard page the Plotly tool bar of each chart is visible without hovering, and its buttons can be reached with the Tab key."},
   {"id": "AC-25", "text": "When one sheet of an Excel workbook cannot be read, the \"Could not be read\" table on the home page lists it as the file name and sheet (for example book.xlsx - Lookup), and the other sheets of that workbook still list and open as datasets."},
   {"id": "AC-26", "text": "A .json or .jsonl file that is not valid JSON is listed as could not be read with the note \"invalid JSON\"; valid JSON that is not a list of records keeps the note \"not a list of records\"."},
-  {"id": "AC-27", "text": "The country map lists countries sorted by value, largest first, like the bar chart; the 3D map titles its z axis and colour bar with the name of the z column."}
+  {"id": "AC-27", "text": "The country map lists countries sorted by value, largest first, like the bar chart; the 3D map titles its z axis and colour bar with the name of the z column."},
+  {"id": "AC-28", "text": "Start-DataBoot.ps1 creates the venv with the newest Python from 3.11 to 3.13 it finds: it tries py -3.13, py -3.12 and py -3.11 in that order, then python only when that python reports a version from 3.11 to 3.13, so a machine with Python 3.12 and 3.14 and no 3.11 gets a 3.12 venv."},
+  {"id": "AC-29", "text": "When no Python 3.11 to 3.13 is found, or venv creation or a pip install returns a non-zero exit code, Start-DataBoot.ps1 prints a message naming the failed step, deletes the partial .venv folder, waits for a key press so the window stays open, and exits with code 1 instead of running .venv\\Scripts\\python.exe."},
+  {"id": "AC-30", "text": "A test fails if Start-DataBoot.ps1 creates the venv with one hardcoded Python version (for example only py -3.11) instead of trying 3.13, 3.12 and 3.11."},
+  {"id": "AC-31", "text": "docs/ARCHITECTURE.md lists AC-25 per-sheet isolation as a known gap: a workbook in which one sheet's XML is corrupt is listed whole as not a valid xlsx and its other sheets do not list."}
 ]
