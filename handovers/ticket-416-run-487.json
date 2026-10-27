@@ -1,0 +1,60 @@
+{
+  "header": {
+    "ticket": 416,
+    "project": "you-think-of-the-project-name",
+    "from_role": "router",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "medium",
+    "prompt_version": "775d10f51fce",
+    "tokens_left": 1982543
+  },
+  "goal": "Read docs/IDEA.md with no history and write docs/BRIEF.md: what this round asks for.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/BRIEF.md has the sections Asked, Deliverable, Done when, Unclear and Not asked",
+      "passes": true
+    },
+    {
+      "text": "It restates only what docs/IDEA.md says",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py brief",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Scoped the brief to three changes: the Start-DataBoot.ps1 Python-detection and error-handling fix, AC-25 per-sheet isolation logging for corrupt sheets, and one test that the launcher has no hardcoded single Python version",
+      "why": "These are the only items the idea lists, and it says to change only what these suggestions ask",
+      "evidence": "docs/IDEA.md line 8: \"change only what these suggestions ask\""
+    },
+    {
+      "what": "Listed Python 3.14 and versions older than 3.11 under Not asked",
+      "why": "The idea limits the search to 3.11-3.13 even though 3.14 is installed on the Board's machine",
+      "evidence": "docs/IDEA.md line 4: \"pick the newest installed Python 3.11-3.13\""
+    },
+    {
+      "what": "Treated the failure handling as: print a clear message, delete the partial .venv, pause, exit 1",
+      "why": "The idea spells out this exact sequence for a failed native command",
+      "evidence": "docs/IDEA.md line 4: \"print a clear message, delete the partial .venv, pause so the window stays open, exit 1\""
+    }
+  ],
+  "tried_and_failed": [
+    "Running python3 /opt/prodagents/check.py brief was blocked by the zero-context hook, so the brief is unchecked"
+  ],
+  "assumptions": [
+    "The Deliverable is a change to an existing project (a PowerShell launcher plus a test), since this is round 3 and the idea says to keep earlier work"
+  ],
+  "open_questions": [
+    "What does 'log AC-25 per-sheet isolation' mean, and where should the log go (runtime message or a project document)?",
+    "What should the launcher do if no Python 3.11-3.13 is found?",
+    "Should the python fallback accept only 3.11-3.13 or any version from 3.11 up?",
+    "Which pip command should the exit-code check cover?"
+  ],
+  "lessons": [],
+  "problems": []
+}

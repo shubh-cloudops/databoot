@@ -1,30 +1,30 @@
-# Brief: round 2
+# Brief: round 3
+
 ## Asked
-Apply the Board's suggestions to the existing project, in the order given. Switch the file-format code to libraries (xlsxwriter, python-pptx, openpyxl) and list four dependencies in requirements.txt with pinned versions. Update ARCHITECTURE.md to drop "standard library only". Make small display changes (table captions, Plotly modebar, column header text). The PM adds and rewords acceptance criteria, QA renames tests to match, and the line-ending changes in two CSV fixtures are reverted.
+Fix a bug the Board found on Windows 11: Start-DataBoot.ps1 hardcodes `py -3.11`. The machine has Python 3.12 and 3.14, so venv creation fails silently and the script then crashes on `.venv\Scripts\python.exe`.
+The launcher should pick the newest installed Python from 3.11 to 3.13. It tries `py -3.13`, `py -3.12`, `py -3.11`, then `python` with a version check.
+After every native command (venv, pip) it checks `$LASTEXITCODE`. On failure it prints a clear message, deletes the partial `.venv`, pauses so the window stays open, and exits 1.
+Also log AC-25 per-sheet isolation for corrupt sheets (this came from round 2 QA), and add a test that the launcher has no hardcoded single Python version.
 
 ## Deliverable
-A change to the existing project (code, requirements.txt, ARCHITECTURE.md, acceptance criteria, tests, .gitattributes). Nothing new is built from scratch.
+A change to an existing project: the Start-DataBoot.ps1 launcher script, a log entry for AC-25 per-sheet isolation, and one new test.
 
 ## Done when
-- requirements.txt lists xlsxwriter==3.3.0, python-pptx==1.0.2, openpyxl==3.1.5 and pyarrow==26.0.0, and no libraries are vendored.
-- The xlsx export in app/xlsx.py uses xlsxwriter, app/export.py uses python-pptx, and xlsx reading uses openpyxl with read_only=True.
-- ARCHITECTURE.md no longer says "standard library only".
-- Table captions are h2 headings, the Plotly modebar is always visible, and column headers show their real names (CSS uppercase removed).
-- Acceptance criteria have ids for G-1..G-7, AC-6 (Plotly 3D scatter) and AC-13 (Start-DataBoot.ps1) are reworded, and the test_G_* tests are renamed to match.
-- Line-ending changes in flat.csv and optional.csv are reverted, and .gitattributes exists with `* text=auto`.
+- On a machine with Python 3.12 and 3.14 (no 3.11), the launcher creates the venv and starts without crashing.
+- The launcher tries `py -3.13`, `-3.12`, `-3.11` in that order, then `python` with a version check, and only accepts 3.11 to 3.13.
+- If the venv or pip step fails, the launcher prints a clear message, removes the partial `.venv`, pauses, and exits with code 1.
+- Corrupt sheets are logged under AC-25 per-sheet isolation.
+- A test fails if the launcher hardcodes a single Python version.
+- Everything earlier rounds built still works, and the branding is unchanged.
 
 ## Unclear
-- What are G-1..G-7, and what id format should they get? The idea does not define them.
-- What should the reworded AC-6 and AC-13 say? Only their subjects are named, not the new wording.
-- What should the test_G_* tests be renamed to? Presumably the new AC ids, but the idea does not say.
-- Which tables have captions that become h2? All of them, or only some?
-- Is app/export.py an export to PowerPoint? The idea only says "on python-pptx".
-- What is pyarrow for? It is to be listed, but no code change uses it.
-- "Revert" the CSV line endings to which state, the last commit? And should `* text=auto` renormalize other existing files?
+- "Log AC-25 per-sheet isolation for corrupt sheets": does this mean writing a runtime log message when a corrupt sheet is skipped, or recording AC-25 in a project document such as a QA log? Where should the log go?
+- What should happen if no Python 3.11 to 3.13 is found at all? The idea names the failure checks for venv and pip only. Should it use the same message, pause and exit 1?
+- Should the `python` fallback accept only 3.11 to 3.13, or any version at or above 3.11?
+- Which pip command should be checked? The idea says "venv, pip" without naming specific commands.
 
 ## Not asked
-- Vendoring any library.
-- Any use of pyarrow in code.
-- Changes to branding or to anything the earlier rounds built, beyond the items listed.
-- New features, new export formats or new pages.
-- Changes to the Plotly chart type beyond rewording AC-6 and making the modebar visible.
+- Supporting Python 3.14 or versions older than 3.11.
+- Changes to branding, layout, or features from earlier rounds.
+- Changes to other scripts, or to platforms other than Windows.
+- Any new feature beyond the fix, the AC-25 logging, and the one test.
