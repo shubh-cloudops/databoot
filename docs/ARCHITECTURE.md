@@ -8,6 +8,12 @@ filtered exports. No new dependency, no new page or route path, so no sitemap or
 
 No docs/TRENDS.md this round (docs/team.json: trends off, gate 175), so I used no trend advice.
 
+**Gate 176 overrides this document (AC-40, new AC-42).** (a) First load: a 200,000-row CSV reaches the dashboard in
+<= 5 s cold (AC-42): `profile.classify` looks at the first 10,000 rows only (deterministic; `total` for the 50% rule
+is that sample size), plus the Counter lever below; charts and KPIs still use all loaded rows. (b) The PPTX title
+slide line starts `Rows: M` unfiltered and `Rows: N of M` filtered (N filtered rows, M dataset rows), then
+`, C columns`; the `Filters: ...` line stays. This replaces "keeps the dataset size line" in Exports.
+
 **Gate 175 overrides the PRD on AC-38 and AC-39.** The PRD had C2 (second click removes the filter) as a Could and
 no chips; the Board said "build C2 now" and "each active filter shows as a removable chip, plus Clear filters". I
 reworded AC-38 (chips) and AC-39 (second click removes) in acceptance.json and moved C2 into PRD M13. Ids unchanged.
