@@ -1,0 +1,71 @@
+{
+  "header": {
+    "ticket": 423,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1974031
+  },
+  "goal": "Test-only packages stay out of the client install (Board gate 171): text test that requirements.txt holds runtime pins only and requirements-dev.txt adds pytest and httpx; README names both",
+  "acceptance_criteria": [
+    {
+      "text": "New tests/test_requirements_split.py: requirements.txt has no line starting with pytest or httpx and still pins fastapi, jinja2, uvicorn, pyarrow==26.0.0, openpyxl==3.1.5, python-pptx==1.0.2, xlsxwriter==3.3.0",
+      "passes": true
+    },
+    {
+      "text": "requirements-dev.txt starts with `-r requirements.txt` and pins `pytest==9.1.1` and `httpx==0.28.1`",
+      "passes": true
+    },
+    {
+      "text": "README.md names requirements-dev.txt for the test install; Dockerfile and Start-DataBoot.ps1 still install requirements.txt only",
+      "passes": true
+    },
+    {
+      "text": "No file under app/ imports httpx or pytest (the test greps app/*.py)",
+      "passes": true
+    },
+    {
+      "text": "Existing test_AC_23 (four library pins in requirements.txt, none vendored) still passes; no edit to tests/test_acceptance.py",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-23 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 47%]\n........................................................................ [ 94%]\n........                                                                 [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 24 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n152 passed, 74 warnings in 108.25s (0:01:48)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Wrote only tests/test_requirements_split.py; no change to requirements files, README, Dockerfile or the launcher",
+      "why": "Ticket 418 already made the split and README line; this ticket asks for the text test",
+      "evidence": "requirements.txt, requirements-dev.txt, README.md:6; python3 -m pytest -q tests/test_requirements_split.py: 5 passed"
+    },
+    {
+      "what": "The app import check looks for import/from lines at the start of a line in app/*.py",
+      "why": "A plain grep for the word would also match comments or strings; the ticket asks for imports",
+      "evidence": "tests/test_requirements_split.py test_app_does_not_import_test_tools"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Pins are checked as exact lines (e.g. 'pyarrow==26.0.0'); fastapi, jinja2 and uvicorn are checked by name prefix with '=='",
+    "The check is limited to app/*.py, as the ticket says, not subfolders"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "When a ticket asks for a test of something an earlier ticket built, check the files first; only the test may be missing",
+      "when": "A ticket says 'text test that X' and the architect or another ticket may already have made X",
+      "evidence": "requirements-dev.txt and README.md already matched; ticket 418 decisions"
+    }
+  ],
+  "problems": []
+}
