@@ -6,6 +6,13 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
+function Fail($Message) {
+    Write-Host $Message
+    if (Test-Path .venv) { Remove-Item -Recurse -Force .venv }
+    Read-Host "Press Enter to close"
+    exit 1
+}
+
 if (-not $Folder) {
     Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
@@ -32,7 +39,22 @@ if ($Docker) {
 }
 
 if (-not (Test-Path .venv\Scripts\python.exe)) {
-    if (Get-Command py -ErrorAction SilentlyContinue) { py -3.11 -m venv .venv } else { python -m venv .venv }
+    $Candidates = @(@("py", "-3.13"), @("py", "-3.12"), @("py", "-3.11"), @("python"))
+    $Check = "import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] <= (3, 13) else 1)"
+    $py = $null
+    foreach ($c in $Candidates) {
+        if (-not (Get-Command $c[0] -ErrorAction SilentlyContinue)) { continue }
+        $rest = @($c | Select-Object -Skip 1)
+        # Windows PowerShell 5.1 turns py's stderr into an error under "Stop"
+        $ErrorActionPreference = "Continue"
+        & $c[0] @rest -c $Check *> $null
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = "Stop"
+        if ($code -eq 0) { $py = $c; break }
+    }
+    if (-not $py) { Fail "DataBoot needs Python 3.12. Install it with: winget install -e --id Python.Python.3.12" }
+    $rest = @($py | Select-Object -Skip 1)
+    & $py[0] @rest -m venv .venv
     if (Test-Path wheels) {
         .venv\Scripts\python.exe -m pip install --no-index --find-links wheels -r requirements.txt
     } else {

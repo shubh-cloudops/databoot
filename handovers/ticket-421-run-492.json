@@ -1,0 +1,86 @@
+{
+  "header": {
+    "ticket": 421,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1968488
+  },
+  "goal": "Launcher picks the newest Python 3.11-3.13 and fails cleanly when there is none (Board gate 171: accept 3.11-3.13 only, 3.14 rejected; message 'DataBoot needs Python 3.12. Install it with: winget install -e --id Python.Python.3.12', pause, exit 1)",
+  "acceptance_criteria": [
+    {
+      "text": "Start-DataBoot.ps1 defines `function Fail($Message)` that does Write-Host $Message, then `if (Test-Path .venv) { Remove-Item -Recurse -Force .venv }`, then Read-Host (to pause), then `exit 1`, in that order",
+      "passes": true
+    },
+    {
+      "text": "One line `$Candidates = @(@(\"py\", \"-3.13\"), @(\"py\", \"-3.12\"), @(\"py\", \"-3.11\"), @(\"python\"))` holds the versions in that order; the script has no literal `py -3.1x -m venv` line",
+      "passes": true
+    },
+    {
+      "text": "The script holds `$Check` = `import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] <= (3, 13) else 1)`; a loop skips a candidate when Get-Command (with -ErrorAction SilentlyContinue) finds nothing, runs the check on every candidate including py ones (so 3.14 is rejected), with `$ErrorActionPreference = \"Continue\"` set locally and restored (or try/catch) so py's stderr 'No suitable Python runtime' does not throw in Windows PowerShell 5.1; the first candidate with $LASTEXITCODE -eq 0 is used",
+      "passes": true
+    },
+    {
+      "text": "The venv is created with `& $py[0] @rest -m venv .venv` on the chosen candidate; when none matches the script calls `Fail \"DataBoot needs Python 3.12. Install it with: winget install -e --id Python.Python.3.12\"` (exact text)",
+      "passes": true
+    },
+    {
+      "text": "The folder dialog, folder check, -Docker branch, wheels install and final `.venv\\Scripts\\python.exe -m app.launch $Folder` lines are unchanged",
+      "passes": true
+    },
+    {
+      "text": "tests/test_launcher_files.py: replace the needle \"py -3.11\" with \"-3.11\" (every other needle stays) and add text tests: -3.13, -3.12, -3.11 appear in that order inside the `$Candidates` line followed by \"python\"; the script contains `(3, 11) <= sys.version_info[:2] <= (3, 13)`; `re.search(r\"py -3\\.1\\d+ -m venv\", ps1)` does not match; the exact no-Python message is present; `function Fail` holds Remove-Item -Recurse -Force .venv, Read-Host and exit 1 in that order",
+      "passes": true
+    },
+    {
+      "text": "There is no PowerShell in the image, so the tests are text checks only; the Board runs the script on Windows with 3.12 + 3.14 and with no suitable Python",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-28, AC-30 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 49%]\n........................................................................ [ 98%]\n..                                                                       [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 24 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n146 passed, 74 warnings in 104.22s (0:01:44)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Candidate loop sets $ErrorActionPreference to Continue only around the native check call and restores Stop right after, and uses `*> $null` to discard output",
+      "why": "Windows PowerShell 5.1 raises NativeCommandError on native stderr under Stop; py prints 'No suitable Python runtime' to stderr",
+      "evidence": "Start-DataBoot.ps1 candidate loop"
+    },
+    {
+      "what": "Fail pauses with Read-Host 'Press Enter to close'",
+      "why": "AC asks for Read-Host to pause so the window stays open",
+      "evidence": "Start-DataBoot.ps1 function Fail"
+    },
+    {
+      "what": "Did not add exit-code checks after venv creation and pip installs",
+      "why": "Ticket scope is the Python search and no-Python failure; the checks belong to the next ticket in the plan",
+      "evidence": "ticket 421 acceptance criteria; ticket 419 decisions"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The $Candidates test finds the line by its leading '$Candidates =' and checks index order of -3.13, -3.12, -3.11, \"python\"",
+    "Windows PowerShell 5.1 or later runs the script; syntax uses only features available there"
+  ],
+  "open_questions": [
+    "The Board must run the script on Windows with 3.12 + 3.14 and with no suitable Python; it was not run here (no PowerShell)"
+  ],
+  "lessons": [
+    {
+      "lesson": "In this image the command is python3, not python; use python3 -m pytest",
+      "when": "Running the test suite",
+      "evidence": "bash: python: command not found"
+    }
+  ],
+  "problems": []
+}
