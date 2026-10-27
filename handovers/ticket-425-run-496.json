@@ -1,0 +1,56 @@
+{
+  "header": {
+    "ticket": 425,
+    "project": "you-think-of-the-project-name",
+    "from_role": "coach",
+    "phase": "learn",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "847e9e9f8b68",
+    "tokens_left": 1927805
+  },
+  "goal": "Learn from round 3: update the shared skills and lessons and this project's MEMORY.md from /logs/digest.md.",
+  "acceptance_criteria": [
+    {
+      "text": "Skills and lessons come only from evidence in the digest",
+      "passes": true
+    },
+    {
+      "text": "MEMORY.md is current and short",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py learn",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Created skill windows-launcher-script-text-tests and folded per-sheet isolation, QA handover and test-only-ticket lessons into existing skills and LESSONS.md",
+      "why": "Round 3 tickets 417-423 and gates 171-174 produced a recurring pattern (launcher script that cannot be run, text tests) and a working isolation route",
+      "evidence": "/logs/digest.md tickets 417-423, gates 171-174"
+    },
+    {
+      "what": "Rewrote MEMORY.md for round 3 (AC-28..31, launcher and isolation design, requirements split, open state)",
+      "why": "Round 2 open-state item (per-sheet isolation) was built; new Board decisions from gate 171",
+      "evidence": "/logs/digest.md gate 171, tickets 420-423"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The digest had no 'Faded history' list, so no items needed re-confirming or deleting"
+  ],
+  "open_questions": [
+    "QA ticket 424 was parked with no handover; the 156-passed figure comes from gate 174, not from a run in this ticket"
+  ],
+  "lessons": [
+    {
+      "lesson": "When the image has no PowerShell, plan launcher work as a Fail-path ticket, an exit-code ticket and a text-test ticket, and tell the Board which Windows cases to try",
+      "when": "Rounds that change a Windows launcher script",
+      "evidence": "tickets 417-423, gates 172, 173"
+    }
+  ],
+  "problems": []
+}
