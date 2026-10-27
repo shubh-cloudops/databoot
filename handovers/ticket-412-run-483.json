@@ -1,0 +1,80 @@
+{
+  "header": {
+    "ticket": 412,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1963773
+  },
+  "goal": "Redo ticket 403 in full (Board gate 168, supersedes gate 167's wording on the test file): table captions as <caption><h2>X</h2></caption> sized --t-md, column headers in real case, and the 5 caption literals in tests/test_acceptance.py updated to the h2 form",
+  "acceptance_criteria": [
+    {
+      "text": "home.html renders 'Datasets', 'Could not be read' and 'Other files', and dataset.html renders 'Columns' and 'First N rows', each exactly as `<caption><h2>NAME</h2></caption>`",
+      "passes": true
+    },
+    {
+      "text": "app/static/css/databoot.css: `caption h2` uses font-size var(--t-md); no `text-transform` rule on th (the word `uppercase` appears nowhere in the file); a header such as `Latitude` or `LON` shows in its original case (check with a computed-style probe of th text-transform = none)",
+      "passes": true
+    },
+    {
+      "text": "tests/test_acceptance.py: only the 5 caption literals at L186, L198, L274, L308 and L349 are changed to `<caption><h2>X</h2></caption>` (git diff of that file shows only those lines); no other edit to that file",
+      "passes": true
+    },
+    {
+      "text": "AC-15, AC-17, AC-19, AC-21 still hold: Other files rows have no link, each figcaption has one .chart-rule and one .chart-count and no other prose, title/h1 read DataBoot, counts of 1,000 or more use the num filter",
+      "passes": true
+    },
+    {
+      "text": "Checked at 1280px and 375px in light and dark: no layout shift or horizontal scroll in the tables; background stays transparent",
+      "passes": true
+    },
+    {
+      "text": "Done = the full pytest suite is green (python3 -m pytest -q), run once at the end",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-15, AC-17, AC-19, AC-21, AC-22 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 54%]\n.............................................................            [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 18 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n133 passed, 64 warnings in 86.23s (0:01:26)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Made no code or test changes",
+      "why": "Templates, CSS (--t-md, no uppercase) and the 5 test literals already met every criterion; the probe and the full suite confirmed it",
+      "evidence": "app/templates/home.html:7,15,23; dataset.html:22,28; app/static/css/databoot.css:92; tests/test_acceptance.py:186,198,274,308,349; python3 -m pytest -q: 133 passed"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First probe run pointed the dataset link at a junk broken.csv written by my own script",
+      "why_it_failed": "The script recreated broken.csv on every run, so deleting the file did nothing; I removed the line from the script instead"
+    }
+  ],
+  "assumptions": [
+    "Python Playwright with PLAYWRIGHT_BROWSERS_PATH=/opt/playwright is equivalent to the mcp__playwright tools, which were not available",
+    "A th computed text-transform of none plus rendered text 'Latitude' and 'LON' satisfies the original-case probe"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "On a redo ticket, grep the templates, CSS and test literals for the target state first; if they already match, only verify in the browser and run the suite instead of editing",
+      "when": "A ticket redoes work that earlier tickets may already have done",
+      "evidence": "Grep of '<caption' and 'uppercase' showed all criteria met before any edit"
+    },
+    {
+      "lesson": "pkill is not installed in this shell; start probe servers from the Python script and terminate the Popen handle, and make scripts idempotent about their fixture files",
+      "when": "Starting a temporary uvicorn for a browser probe",
+      "evidence": "pkill: command not found; the script re-wrote broken.csv on each run"
+    }
+  ],
+  "problems": []
+}
