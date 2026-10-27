@@ -1,0 +1,102 @@
+{
+  "header": {
+    "ticket": 427,
+    "project": "you-think-of-the-project-name",
+    "from_role": "pm",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "a2dbf282ff46",
+    "tokens_left": 1929240
+  },
+  "goal": "Write or update docs/PRD.md and docs/acceptance.json for the idea in docs/IDEA.md.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/PRD.md describes the product",
+      "passes": true
+    },
+    {
+      "text": "docs/acceptance.json lists testable acceptance items",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py spec",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Kept AC-1..AC-31 unchanged and added AC-32..AC-41 for the round 4 suggestions",
+      "why": "Later round: keep existing ids; nothing in IDEA changes an old item, and the new behaviour stays off with no query params",
+      "evidence": "docs/IDEA.md items 1-7; docs/acceptance.json"
+    },
+    {
+      "what": "Scoring only reorders the charts already picked (8-chart cap and rule selection unchanged); ties keep the rules tuple order",
+      "why": "IDEA says ties are broken by the existing fixed order and to change only what is asked",
+      "evidence": "app/rules.py:224-226"
+    },
+    {
+      "what": "Read 'table = always last' as the First rows table staying below every chart",
+      "why": "There is no table chart kind; the page renders charts, then the Columns and First rows tables",
+      "evidence": "app/rules.py:62-226; app/templates/dataset.html:12-28"
+    },
+    {
+      "what": "Score appended as ' \u00b7 score 0.NN' to the existing rule caption",
+      "why": "Keeps AC-17 (one caption per chart) and the existing caption text; the test only counts the chart-rule spans",
+      "evidence": "tests/test_acceptance.py:388; dataset.html:14"
+    },
+    {
+      "what": "Filter list goes on a new XLSX 'Summary' sheet; Data stays first",
+      "why": "AC-18 requires the first sheet to be named Data, and the XLSX has no summary sheet today",
+      "evidence": "app/xlsx.py:156-159; AC-18"
+    },
+    {
+      "what": "KPIs reflect active filters; 1 s target measured server-side on the charts API",
+      "why": "IDEA item 5 says the click redraws every chart and the KPIs; a server-side time can be tested in the image",
+      "evidence": "docs/IDEA.md:11,13; app/config.py:23 (max_rows 200,000)"
+    },
+    {
+      "what": "team.json: trends off; designer, frontend and design_review on",
+      "why": "Board said trends off; new visible UI (KPI strip, filters, grid, click cross-filter)",
+      "evidence": "docs/IDEA.md:15"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Writing acceptance.json and team.json with a python3 script, and running check.py spec",
+      "why_it_failed": "Bash heredoc was blocked, and python3 on a script plus check.py needed approval that was not given; switched to Edit/Write; check not run"
+    }
+  ],
+  "assumptions": [
+    "Scores are computed on the full filtered rows (up to DATABOOT_MAX_ROWS), rounded to 2 decimals before a stable sort",
+    "Line score uses the summed value per time point that the chart plots; bar and donut Gini use the totals the chart draws",
+    "Degenerate inputs (fewer than 2 values or constant values) score 0",
+    "A dropdown takes one value; categorical columns are already at most 50 distinct (AC-3), so every bar or donut category can be clicked to filter",
+    "Phone width uses the existing CSS narrow breakpoint; the designer fixes the exact value",
+    "Query parameter names are left to the architect"
+  ],
+  "open_questions": [
+    "Branding: no business site capture and no docs/brand/ were found (docs/reference/ holds deck.gl and unstructured.io library captures only). Confirm that the gate 160 branding stays: name DataBoot, plain neutral style, system sans font, no logo, blank SVG favicon. Or provide a logo as an image link in the gate comment.",
+    "Is 'table = always last' right to mean the First rows table stays below all charts? No chart of kind table exists.",
+    "Should scoring be able to change which charts make the 8-chart cap, or only reorder them (spec says only reorder)?",
+    "Should a second click on the active bar or slice remove the filter (spec has it as Could C2), and should a dropdown allow several values (spec says one)?",
+    "Line charts with several numerical columns: each line chart is scored on its own value column. Is that what the Board means?",
+    "On what hardware should the 1 s target hold? The spec measures the charts API in the test image.",
+    "check.py spec was not run in this ticket (approval needed); the orchestrator will run it"
+  ],
+  "lessons": [
+    {
+      "lesson": "When Bash heredocs or python3 scripts are blocked, add acceptance items with one Edit that anchors on the last item's closing text and the closing bracket",
+      "when": "PM ticket that appends acceptance items",
+      "evidence": "ticket 427: heredoc blocked as 'expansion obfuscation'; the Edit on acceptance.json worked"
+    },
+    {
+      "lesson": "Before writing ACs on chart captions or exports, grep tests for exact caption and sheet checks (chart-rule count, first sheet Data) so new items extend them rather than break them",
+      "when": "Round that changes captions, layout or exports",
+      "evidence": "tests/test_acceptance.py:388; AC-18"
+    }
+  ],
+  "problems": []
+}

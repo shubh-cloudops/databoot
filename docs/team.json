@@ -1,6 +1,6 @@
 {
-  "trends": {"run": false, "why": "Round 3 is a PowerShell launcher fix and a doc note; no design or virality research needed"},
-  "designer": {"run": false, "why": "No page, template, CSS or JS changes; DESIGN.md stays as it is"},
-  "frontend": {"run": false, "why": "No front-end work: the change is Start-DataBoot.ps1, a test and an ARCHITECTURE.md note"},
-  "design_review": {"run": false, "why": "No visible change to any page, so no screenshot review is needed"}
+  "trends": {"run": false, "why": "Board said trends off; the plain neutral style was chosen in gate 160, no research needed"},
+  "designer": {"run": true, "why": "New KPI strip, filter bar, score-driven full-width/2-column grid and phone layout need DESIGN.md and a design review"},
+  "frontend": {"run": true, "why": "Dropdowns, date range, URL state with Back button, Clear filters and Plotly click cross-filter are front-end work"},
+  "design_review": {"run": true, "why": "Visible layout change (KPI strip, filters, grid) needs the final screenshot review"}
 }
