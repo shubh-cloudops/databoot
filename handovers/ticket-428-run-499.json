@@ -1,0 +1,106 @@
+{
+  "header": {
+    "ticket": 428,
+    "project": "you-think-of-the-project-name",
+    "from_role": "architect",
+    "phase": "architecture",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "4acf784af3ed",
+    "tokens_left": 1824635
+  },
+  "goal": "Write or update docs/ARCHITECTURE.md and adapt the scaffold for the approved spec.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/ARCHITECTURE.md explains how every acceptance item will be met",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py architecture",
+    "passed": true,
+    "output_tail": "........................................................................ [ 46%]\n........................................................................ [ 92%]\n............                                                             [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 25 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n156 passed, 75 warnings in 102.71s (0:01:42)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Filter changes are plain GET navigations of the server-rendered page; one cached _view(d, filters) feeds page, charts API and both exports",
+      "why": "URL is the state, Back works natively, no-JS form works, KPI/chips/counts have one renderer; page's own API fetch becomes a cache hit",
+      "evidence": "docs/ARCHITECTURE.md 'Round 4: request flow', Decision 15; app/main.py:43-93"
+    },
+    {
+      "what": "Column types from unfiltered rows, rules on filtered rows",
+      "why": "Dropdowns and date column stay stable; charts whose rule no longer matches drop out (gate 175)",
+      "evidence": "Board gate 175; Decision 16"
+    },
+    {
+      "what": "Scores computed inside each rule on full pre-sampling data via new app/score.py; round(2), cut to 8 in rule order, stable sort, ids renumbered in display order",
+      "why": "PRD requires full filtered rows; chart dicts hold stride samples/bins; gate 175 says scoring only reorders",
+      "evidence": "app/rules.py:52-54,97,194,222-226; hand values via /tmp/probe428 python3 -c (line 0.89, hist 0.34, bar 0.23, donut 0.22)"
+    },
+    {
+      "what": "Query params f.<column>, from, to; non-categorical columns, empty values and invalid dates ignored",
+      "why": "Prefix avoids clashes with columns named from/to; >50-distinct columns are not categorical so cannot filter (gate 175)",
+      "evidence": "docs/ARCHITECTURE.md 'Round 4: filters'"
+    },
+    {
+      "what": "XLSX Summary sheet last; summary text built once and passed to both writers with default 'Filters: none'",
+      "why": "Data stays first (AC-18), chart sheetN.xml positions unchanged, unit tests calling writers directly still work",
+      "evidence": "app/xlsx.py:148-172; tests/test_export_xlsx.py:99"
+    },
+    {
+      "what": "Three required speed levers: per-dataset _base cache (types, typed rows, options), heatmap pairs once, Counter of distinct strings in classify",
+      "why": "Measured 200k rows: classify 20.9 s, charts 4.4 s raw/2.8 s typed, 50k filtered 0.7-1.0 s with heatmap 0.41 s due to computing both triangles",
+      "evidence": "/tmp/probe428/probe.py, probe2.py, probe3.py (cProfile: pearson called 6 times for 3 columns)"
+    },
+    {
+      "what": "Reworded AC-38 (chips) and AC-39 (second click removes) and moved C2 into PRD M13",
+      "why": "Gate 175 changed their meaning after the PRD; lesson: reword same id so check.py plan forces a ticket",
+      "evidence": "docs/acceptance.json AC-38, AC-39; LESSONS ticket 418/gate 171"
+    },
+    {
+      "what": "Added big_sales_csv fixture (200,000 rows, region North = 50,000)",
+      "why": "Shared fixture for AC-41 and the engineers' speed work",
+      "evidence": "tests/conftest.py big_sales_csv; full suite 156 passed"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Speeding classify only by skipping strptime for NUMBER-looking strings",
+      "why_it_failed": "Still 9.5 s on 200k rows: categorical text values also go through all six parsers; counting distinct strings once is the lever kept in the doc"
+    }
+  ],
+  "assumptions": [
+    "AC-41 is timed after one unfiltered warm-up request (owner opened the dashboard first); the timed filtered request is not a cache hit",
+    "Gini uses the plain (not small-sample corrected) formula and histogram skew the population g1; negative category totals score 0",
+    "The PPTX title slide keeps the dataset size line; only a 'Filters: \u2026' line is added",
+    "A filter value not among the dropdown options is still applied (stale shared link shows 0 rows and a removable chip)",
+    "The round 2 rule that made map3d/country_map/heatmap span both grid columns is dropped so AC-34's 'others two per row' holds; Designer owns the look"
+  ],
+  "open_questions": [
+    "First load of a 200,000-row CSV takes over 20 s today (classify); the Counter fix should cut it a lot, but no AC sets a first-load target. Does the Board want one?",
+    "Should the PPTX title slide's rows count show the filtered row count instead of the dataset size when filters are active?"
+  ],
+  "lessons": [
+    {
+      "lesson": "Before promising a server-side time target, time each stage (load, classify, each chart rule) on a full-size file with cProfile; the slow parts were classify and a symmetric heatmap computed twice, not the filter",
+      "when": "An AC sets a response time on large data",
+      "evidence": "/tmp/probe428 probes, ticket 428"
+    },
+    {
+      "lesson": "When a change reorders charts or adds a sheet, grep tests for chart-1/sheet lists/[0] and list each test line to update in ARCHITECTURE.md, assigned to the ticket that changes the behaviour",
+      "when": "Ordering or export layout changes",
+      "evidence": "tests/test_export_xlsx.py:39,130; tests/test_rules.py:16-22"
+    },
+    {
+      "lesson": "test_AC_17 forbids <p> in main and test_AC_21 forbids unseparated 4+ digit numbers in main text: new page widgets (KPIs, filters) must use dl/label/ul and the num filter",
+      "when": "Adding UI to the dashboard page",
+      "evidence": "tests/test_acceptance.py:392-394, 457-458"
+    }
+  ],
+  "problems": []
+}

@@ -119,6 +119,23 @@ def big_csv(tmp_path):
 
 
 @pytest.fixture
+def big_sales_csv(tmp_path):
+    """Folder with sales.csv of 200,000 rows (the DATABOOT_MAX_ROWS default) for the 1 s filter target (AC-41).
+
+    Columns date, region, product, amount, qty: temporal, categorical (4 and 20 values), numerical. region "North" is
+    every 4th row (50,000 rows).
+    """
+    root = tmp_path / "bigsales"
+    root.mkdir()
+    with open(root / "sales.csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(("date", "region", "product", "amount", "qty"))
+        w.writerows((f"2024-{i % 12 + 1:02d}-{i % 28 + 1:02d}", ("North", "South", "East", "West")[i % 4],
+                     f"p{i % 20}", i % 997, i % 9 + 1) for i in range(200_000))
+    return root
+
+
+@pytest.fixture
 def make_client(monkeypatch, tmp_path):
     """make_client(folder) -> TestClient for the app scanning `folder`, writing outputs to tmp_path/'out'.
 

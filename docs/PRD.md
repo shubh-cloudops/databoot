@@ -61,7 +61,8 @@ should be able to slice by category or date and take that slice away as XLSX/PPT
   the browser Back button returns to the previous filter state, and "Clear filters" returns to the unfiltered
   view (AC-38).
 - M13. Cross-filter. Clicking a bar or a donut slice sets that category as the filter on its column and redraws
-  every chart and the KPI strip (AC-39).
+  every chart and the KPI strip; clicking the active bar or slice again removes that filter (AC-39, gate 175).
+  Each active filter shows as a removable chip next to "Clear filters" (AC-38, gate 175).
 - M14. Filtered exports. XLSX and PPTX downloads hold only the filtered rows; the PPTX title slide and a "Summary"
   sheet in the XLSX list the active filters, or say "Filters: none" (AC-40).
 - M15. No network. Filters, scores and layout add no request to another host (AC-9 stays valid).
@@ -75,7 +76,7 @@ should be able to slice by category or date and take that slice away as XLSX/PPT
 
 ### Could
 - C1. Pick a different folder from the home page without restarting.
-- C2. Clicking the active bar or slice again removes that filter.
+- C2. Moved to M13 by gate 175 (build now).
 
 ## Out of scope
 - Any AI or learned recommender, any new dependency (scores use the standard library or the installed pyarrow /

@@ -1,13 +1,130 @@
-# Architecture: DataBoot (round 3)
+# Architecture: DataBoot (round 4)
 
 DataBoot scans one mounted folder or drive letter, profiles every dataset with fixed rules and draws the
-charts those rules pick, fully offline. Sources: docs/PRD.md (round 3), docs/acceptance.json (AC-1..AC-31),
-Board gates 160-171 (graphify-out/memory.md). Round 3 keeps everything rounds 1 and 2 built and changes only
-the four things below. No page, route, template, CSS, JS, chart or export changes, so no sitemap or NAV change.
+charts those rules pick, fully offline. Sources: docs/PRD.md (round 4), docs/acceptance.json (AC-1..AC-41),
+Board gates 160-175 (graphify-out/memory.md). Round 4 keeps everything rounds 1 to 3 built and adds: an interest
+score per chart that sets the order, a KPI strip, server-side filters kept in the URL, click cross-filter and
+filtered exports. No new dependency, no new page or route path, so no sitemap or NAV change.
 
-No docs/TRENDS.md this round (docs/team.json: trends off), so I used no trend advice.
+No docs/TRENDS.md this round (docs/team.json: trends off, gate 175), so I used no trend advice.
 
-## Round 3 changes at a glance
+**Gate 175 overrides the PRD on AC-38 and AC-39.** The PRD had C2 (second click removes the filter) as a Could and
+no chips; the Board said "build C2 now" and "each active filter shows as a removable chip, plus Clear filters". I
+reworded AC-38 (chips) and AC-39 (second click removes) in acceptance.json and moved C2 into PRD M13. Ids unchanged.
+
+## Round 4 changes at a glance
+| # | Change | Files | AC |
+|---|---|---|---|
+| S1 | Interest score per chart, computed on the full filtered rows inside each rule | `app/score.py` (new), `app/rules.py` | AC-32 |
+| S2 | Charts sorted by score after the 8-chart cut (stable), ids renumbered in display order | `app/rules.py` `charts` | AC-33 |
+| D1 | Data access: per-dataset cache of raw rows, column types, typed rows and dropdown options; per-filter cache of the view | `app/main.py`, `app/rules.py` `typed`, `app/profile.py` (speed only) | AC-41 |
+| F1 | Filters: parse query params, apply, labels, canonical query string | `app/filters.py` (new), `app/main.py` | AC-37, AC-38 |
+| K1 | KPI figures of the filtered rows | `app/rules.py` `kpis` | AC-36 |
+| P1 | Page: KPI strip, filter form, chips, Clear filters, score in caption, first chart full width, filtered export links | `dataset.html`, `databoot.css` (Designer) | AC-34..AC-38 |
+| J1 | dashboard.js: fetch with the page's query string, tidy form submit, Plotly click cross-filter with toggle | `app/static/js/dashboard.js` | AC-38, AC-39 |
+| E1 | Exports take the same query params; XLSX `Summary` sheet (last), PPTX title slide filter line | `app/main.py`, `app/xlsx.py`, `app/export.py` | AC-40 |
+| T1 | `big_sales_csv` fixture (200,000 rows), done by the architect | `tests/conftest.py` | AC-41 |
+
+## Round 4: request flow (one function for page, API and exports)
+```python
+@lru_cache(maxsize=4)
+def _base(d):                     # once per dataset: the slow part (classify is seconds on 200,000 rows)
+    rows = catalog.load(d, config.get().max_rows)
+    mapping = profile.classify(d.columns, rows)          # types from the UNFILTERED rows
+    return rows, mapping, rules.typed(d.columns, rows, mapping), filters.options(d.columns, rows, mapping)
+
+@lru_cache(maxsize=8)
+def _view(d, f):                  # f = filters.parse(...) result: a hashable tuple
+    rows, mapping, typed, options = _base(d)
+    keep = filters.apply(f, d.columns, mapping, typed)   # list of row indexes, or None when f == ()
+    rows_f = rows if keep is None else [rows[i] for i in keep]
+    typed_f = typed if keep is None else [typed[i] for i in keep]
+    return {"rows": rows_f, "mapping": mapping, "options": options, "filters": f,
+            "labels": filters.labels(f, d.columns, mapping),
+            "charts": rules.charts(d.columns, typed_f, mapping, settings),
+            "kpis": rules.kpis(d.columns, rows_f, typed_f, mapping)}
+```
+- Every route that shows data calls `_view(d, filters.parse(request.query_params, d.columns, mapping))`: the
+  dashboard page, `/api/datasets/{id}/charts` and both exports. With no (or only ignored) params `f == ()` and
+  every route answers as before, plus the new keys (`score`, `kpis`, `filters`, Summary sheet, filter line).
+- Column types come from the unfiltered rows, so a filter never changes a column's type, the dropdowns or which
+  rules can run. The rules then run on the filtered rows, so a chart whose rule no longer matches (for example a
+  donut on the filtered column, now 1 value) is simply not generated and not shown (gate 175).
+- `rules.typed(columns, rows, mapping)`: a copy of the rows with numerical and geospatial cells as `_num(v)` and
+  temporal cells as `_time(v)`, others as they are. `_num`/`_time` return typed values unchanged, so the rules
+  keep calling them and still work on raw rows (unit tests pass raw rows). Raw rows stay for the First rows
+  table, the XLSX Data sheet and % missing, so what the owner sees is what the file holds.
+- The page and the API share the `_view` cache, so the dashboard's own fetch is a cache hit. `tests/conftest.py`
+  `make_client` must call `main._base.cache_clear()` and `main._view.cache_clear()` (the ticket that adds them).
+- `/api/datasets/{id}/profile` keeps calling `classify` and writing the JSON (AC-2); it may use `_base(d)[1]`.
+
+## Round 4: filters (`app/filters.py`)
+Query parameters (the same on `/datasets/{id}`, `/api/datasets/{id}/charts`, `export.xlsx`, `export.pptx`):
+
+| Param | Meaning | Ignored when |
+|---|---|---|
+| `f.<column>=<value>` | rows where `str(cell) == value` in that column (the same `str()` key bars and donuts use) | column is not categorical in the mapping (so >50-distinct columns never filter, gate 175), value empty |
+| `from=YYYY-MM-DD` | rows whose first temporal column is on or after that day (`_time(cell).date() >= from`) | no temporal column, not a valid `date.fromisoformat` |
+| `to=YYYY-MM-DD` | on or before that day, inclusive | same |
+
+- One value per column (gate 175): a repeated `f.region` keeps the last (`query_params[key]`). Filters on
+  different columns and the date range combine with AND. A row with an empty or unparseable time is dropped as
+  soon as `from` or `to` is set. A value not among the options is still applied (a stale shared link shows 0 rows
+  and its chip, which removes it).
+- `parse(params, columns, mapping) -> tuple`: canonical `((name, value), ...)` pairs, categorical params in column
+  order, then `from`, then `to`; value strings as given (dates re-printed ISO). Hashable for `_view`'s cache, and
+  `urllib.parse.urlencode(f)` is the canonical query string.
+- `apply(f, columns, mapping, typed) -> list[int] | None`: `None` for `f == ()`, else the kept row indexes.
+- `labels(f, columns, mapping) -> [str]`: `region = North`, `date from 2024-01-01`, `date to 2024-03-31` (the
+  temporal column's real name). Used by the chips, the PPTX title slide and the XLSX Summary sheet.
+- `summary(labels) -> str`: `"Filters: " + "; ".join(labels)`, or `"Filters: none"` (gate 175 wording).
+- `options(columns, rows, mapping) -> {column: [values]}`: every categorical column, `sorted` distinct
+  non-empty `str(cell)` of the unfiltered rows (at most 50 each, AC-3).
+- Chip remove link: `"?" + urlencode([p for p in f if p != chip])`, or the bare page path when nothing is left.
+
+## Round 4: interest score (`app/score.py`, used inside `app/rules.py`)
+Each rule computes its chart's score from the full data it has before stride sampling, and passes it to
+`_chart(..., score=...)`. `charts()` rounds every score with `round(s, 2)`, cuts to `MAX_CHARTS` in rule order
+(unchanged selection), then `sorted(found, key=lambda c: -c["score"])` (stable: ties keep the rule order 3D map,
+country map, line, bar, donut, histogram, scatter, heatmap), then sets `id = chart-1..N` in that display order.
+Every score helper returns a float in 0..1 and returns 0 for fewer than 2 usable values, constant values or any
+undefined result (`StatisticsError`, `ZeroDivisionError`, overflow).
+
+| kind | Score | Input (full, before sampling) |
+|---|---|---|
+| line | `abs(spearman(range(n), sums))`: Pearson of average ranks (ties share the mean rank) | the per-time sums sorted by time (`sums` dict in `_lines`), value column = that line's own column |
+| bar, donut | Gini: x sorted ascending, `2 * sum(i * x_i) / (n * sum(x)) - (n + 1) / n`, i = 1..n | the category totals drawn; any negative total or `sum(x) == 0` gives 0 |
+| scatter | `abs(pearson(xs, ys))` | all point pairs (not the sample) |
+| histogram | `min(1, abs(g1) / 3)`, `g1 = m3 / m2 ** 1.5` with population moments (divide by n) | all values |
+| heatmap | largest `abs(z[i][j])`, `i != j`, `None` skipped | the matrix the chart draws |
+| map3d, country_map | `0.6` | 0 when the chart has fewer than 2 points / countries |
+
+Hand-checked on `data_dir` sales.csv (date, region, amount; script in /tmp, ticket 428): line 0.89 (rho -0.886),
+histogram 0.34 (g1 1.024), bar 0.23 (Gini of 16, 23, 7 = 0.2319), donut 0.22 (Gini of 3, 2, 1 = 0.2222).
+So sales.csv now shows line, histogram, bar, donut (was line, bar, donut, histogram). `pearson` is
+`statistics.correlation` clamped to [-1, 1] (as the heatmap does now); Python 3.11 has no `method="ranked"`, so
+`spearman` ranks by hand. Scores add no network request and no dependency (stdlib only).
+
+## Round 4: KPIs (`rules.kpis(columns, rows, typed, mapping)`)
+`{"rows": len(rows), "columns": len(columns), "missing_pct": round(100 * empty / (rows * columns), 1) (0 when no
+cells), "sums": [{"column": name, "sum": s}, ...]}` for the first 3 numerical columns. `empty` counts raw cells
+that are `None` or `""`. A sum is over the typed non-`None` values, printed as an `int` when whole, else
+`round(s, 2)`; an all-empty column sums to 0. Page labels: `Rows`, `Columns`, `Missing`, `<column> (sum)`; every
+figure through the `num` filter (`Missing` as `0.0%`).
+
+## Round 4: speed (AC-41)
+Measured in this image (16 cores, Python 3.11) on a 200,000-row CSV like `big_sales_csv` (/tmp probe, ticket 428):
+`catalog.load` 0.41 s; `profile.classify` **20.9 s**; `rules.charts` on raw rows 4.4 s, on typed rows 2.8 s;
+casting to typed rows once 1.3 s; a region filter (1 of 4) 0.01 s; charts on those 50,000 typed rows 0.7-1.0 s,
+of which the heatmap is 0.41 s because it computes `pearson` for both triangles. Levers, all required:
+1. `_base` cache (types and typed rows once per dataset), so a filter request pays only filter + rules + KPIs.
+2. Heatmap: compute each pair once (`j > i`) and mirror it; z is symmetric, the result is identical.
+3. `profile._kind`: count each distinct string once (`collections.Counter(strs)`, then `_parses` per key times its
+   count): same result, and the 20 s first load drops a lot (categorical and number columns repeat values).
+The AC-41 test first requests the charts API without filters (warm-up: load, classify, typed rows), then times one
+request with `f.region=North` (not cached yet) and asserts `< 1.0` s.
+
+## Round 3 changes at a glance (built, kept)
 | # | Change | Files | AC |
 |---|---|---|---|
 | L1 | Launcher picks the newest Python 3.11-3.13 (`py -3.13`, `-3.12`, `-3.11`, then `python` with a version check) | `Start-DataBoot.ps1` | AC-28, AC-30 |
@@ -149,20 +266,26 @@ the "Round 2" column below is what round 2 changed.
 | `app/templates/home.html`, `dataset.html` | pages | h2 inside each caption |
 | `app/static/js/dashboard.js`, `app/static/css/databoot.css` | drawing, style | modebar; no uppercase `th` |
 
+Round 4: new `app/filters.py` (`parse`, `apply`, `labels`, `summary`, `options`) and `app/score.py`
+(`spearman`, `pearson`, `gini`, `skew`, each giving the 0..1 score); `app/rules.py` gains `typed`, `kpis`, a
+`score` per chart and the sort; `app/main.py` replaces `_charts` with `_base` and `_view`; `xlsx.write` and
+`export.pptx` gain a `summary` argument; `profile._kind` counts distinct strings once; `dataset.html`,
+`databoot.css`, `dashboard.js` as in "Pages". Readers, catalog, launcher and config are unchanged.
+
 ## Routes (sitemap: two pages, no nav beyond a "DataBoot" home link; unchanged)
 | Method, path | Returns |
 |---|---|
 | GET `/` | Home: datasets table, "Could not be read" table, "Other files" table |
-| GET `/datasets/{id}` | Dashboard page; 404 for unknown id |
+| GET `/datasets/{id}` | Dashboard page; 404 for unknown id; round 4: filter query params (see "Round 4: filters") |
 | GET `/api/datasets` | `[{"id","path","sheet","kind","rows","columns"}]` (columns = count) |
 | GET `/api/datasets/{id}/profile` | `{column: type}` (AC-2), also writes `<out>/profiles/{id}.json` |
-| GET `/api/datasets/{id}/charts` | chart contract below; fetched once by dashboard.js on load (no polling) |
-| GET `/datasets/{id}/export.pptx` | PPTX download |
-| GET `/datasets/{id}/export.xlsx` | XLSX download |
+| GET `/api/datasets/{id}/charts` | chart contract below; fetched once by dashboard.js on load with the page's query string (no polling) |
+| GET `/datasets/{id}/export.pptx` | PPTX download (same filter params) |
+| GET `/datasets/{id}/export.xlsx` | XLSX download (same filter params) |
 | GET `/health` | `{"ok": true}` |
 | `/static/...` | StaticFiles mount |
 
-No page or route is added this round, so no sitemap or NAV change.
+No page or route is added in round 4 (only query params), so no sitemap or NAV change.
 
 ## Data access
 - `scan(folder)`: `os.walk` (no symlink follow), skip names starting with `.`; sorted by relative path. Missing
@@ -238,16 +361,23 @@ Built by `rules.charts` in this order, then cut to the first 8 (`MAX_CHARTS`):
 No rule matches -> `[]` (AC-7). Stride sampling: `step = ceil(n / cap)`, keep `points[::step]`, so shown ≤ cap.
 `# ponytail: stride can miss peaks; use LTTB if owners ask.`
 
-## Chart contract (`GET /api/datasets/{id}/charts`)
+## Chart contract (`GET /api/datasets/{id}/charts[?f.<column>=v&from=YYYY-MM-DD&to=YYYY-MM-DD]`)
 ```json
 {"dataset": "3f2a9c01b7de",
+ "filters": ["region = North"],
+ "kpis": {"rows": 3, "columns": 3, "missing_pct": 0.0, "sums": [{"column": "amount", "sum": 16}]},
  "charts": [
   {"id": "chart-1", "kind": "line", "title": "amount by date",
    "x_label": "date", "y_label": "amount (sum)",
    "rule": "temporal date + numerical amount: line, sum per date",
-   "shown": 6, "total": 6,
+   "shown": 3, "total": 3, "score": 1.0,
    "data": {"x": ["2024-01-01", "..."], "y": [10, "..."]}}]}
 ```
+**Round 4 additions**: `filters` (the labels, `[]` when none), `kpis` (see "Round 4: KPIs"), and `score` (float,
+2 decimals) on every chart; `charts` is in score order and `id` follows that order. `rule` is unchanged (the page
+appends the score). For `bar` and `donut`, `x_label` is the categorical column's name: dashboard.js uses it as
+the cross-filter column. The page reads nothing from `filters`/`kpis` in JS (both are server-rendered); they are
+there for tests and for the AC-37 "API matches the page" check.
 `data` per kind: line/scatter `{"x": [], "y": []}`; bar `{"x": [categories], "y": [values]}`;
 donut `{"labels": [], "values": []}`; histogram `{"edges": [n+1 floats], "counts": [n ints]}`;
 heatmap `{"labels": [], "z": [[r or null]]}`; map3d `{"lon": [], "lat": [], "z": []}`;
@@ -277,12 +407,51 @@ Dates are ISO strings; `NaN`/`inf` become `null`. `shown`/`total` count points (
   redraw on theme or breakpoint change), set `tabindex="0"` and `role="button"` on every `.modebar-btn` in that
   figure, copy `data-title` into `aria-label`, and on `keydown` Enter or Space call `btn.click()` and
   `preventDefault()`. The existing `.modebar-btn:focus-visible` ring (databoot.css L57) then shows.
+- **Round 4 dashboard order** (top to bottom): crumb, page head (h1, export links), KPI strip, filter form,
+  chips + Clear filters, charts grid, Columns table, First rows table (AC-34: the First rows table stays last;
+  no score, no caption, gate 175). All of it is server-rendered from `_view`; a filter change is a normal GET
+  navigation to the new URL, so every chart, count, KPI, chip and control comes from the server and the browser's
+  Back button restores the previous filter state with no `pushState` code (AC-38).
+  - **KPI strip**: `<dl class="kpis">` with one `<div><dt>Rows</dt><dd>3</dd></div>` per figure. No `<p>`:
+    test_AC_17 rejects any `<p>` in main except the folder path.
+  - **Filter form**: `<form class="filters" method="get" action="/datasets/{id}">`; one `<label>` + `<select
+    name="f.<column>">` per key of `options` (first option `All`, value `""`; the active value `selected`); when
+    a temporal column exists, `<input type="date" name="from">` and `name="to"` labelled `<column> from` /
+    `<column> to`, preset from `f`; a submit button `Apply` (works with no JS). Only categorical columns get a
+    dropdown (gate 175: >50 distinct values is not categorical).
+  - **Chips**: `<ul class="chips">`, one `<li><a href="{remove link}" aria-label="Remove filter region =
+    North">region = North</a></li>` per label (the Designer adds the ×), then `<a class="btn" href="/datasets/{id}">
+    Clear filters</a>`; the whole list only when a filter is active.
+  - **Caption**: `<span class="chart-rule">{{ c.rule }} · score {{ "%.2f"|format(c.score) }}</span>` (AC-35;
+    test_AC_17 still finds `c["rule"]` in the figure and one `.chart-rule`).
+  - **Grid (AC-34)**: `.charts > .chart:first-child { grid-column: 1 / -1 }`; the round 2 rule that makes
+    map3d, country_map and heatmap span both columns is removed, so the others sit two per row from 900px and one
+    per row below (the existing breakpoints; phone = the 599px narrow breakpoint, gate 175). The Designer owns
+    the look.
+  - **Export links** carry the canonical query: `href="/datasets/{id}/export.pptx{{ qs }}"`, `qs` = `"?" +
+    urlencode(f)` or `""`.
+- **Round 4 dashboard.js** (J1):
+  - fetch `"/api/datasets/" + id + "/charts" + location.search` (same params, so the same cached `_view`).
+  - Form tidy-up: on `change` of a select or date input, submit the form; on `submit`, set `disabled = true` on
+    empty fields first so the URL holds only active filters (disabled fields are not sent).
+  - Cross-filter (AC-39, C2): after `newPlot` of a `bar` or `donut`, `plot.on("plotly_click", ...)`: category =
+    `pt.label` for donut, `pt.y` for a horizontal bar, else `pt.x`; key = `"f." + c.x_label`;
+    `p = new URLSearchParams(location.search)`; if `p.get(key) === category` delete it (second click removes,
+    gate 175) else `p.set(key, category)`; `location.assign(location.pathname + (p.toString() ? "?" + p : ""))`.
+    `newPlot` replaces handlers on redraw (theme or breakpoint change), so attach after each draw.
 - **Text rule (gate 160)**: only titles, axis labels, column names/types, `N of M` counts and the one-line rule
   caption. Fixed table headings and notes are labels.
 - Style: plain, neutral, system sans, no logo, blank SVG favicon (gates 160, 165). The Designer owns the rest.
 
 ## Exports
-Layout is unchanged from round 1 (PRD constraint); only the writers change.
+Layout is unchanged from round 1 except the round 4 filter additions (AC-40):
+- Both routes call `_view(d, f)` with the request's params: the Data sheet gets the filtered raw rows, every
+  chart the filtered data, in score order (sheet `chart-1 …` = the top chart, as on the page).
+- `xlsx.write(dataset, rows, charts, summary="Filters: none")`: after the chart sheets, a last sheet `Summary`
+  with A1 = `summary`. Last, not second, so `Data` stays first (AC-18) and chart sheets keep `sheet2.xml…`.
+- `export.pptx(dataset, charts, summary="Filters: none")`: the title slide gets a third text box with `summary`
+  (14 pt) under the rows/columns line. The rows/columns line keeps the dataset size.
+- main passes `filters.summary(view["labels"])`. Defaults keep direct calls in the unit tests working.
 
 ### XLSX: `app/xlsx.write(dataset, rows, charts) -> bytes` on xlsxwriter
 - `xlsxwriter.Workbook(buf, {"in_memory": True, "strings_to_formulas": False, "strings_to_urls": False,
@@ -373,6 +542,16 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
 | AC-29 | L2: `Fail` function; `$LASTEXITCODE -ne 0` check after venv and after each pip install; no-Python message | text checks: `function Fail` contains `Remove-Item -Recurse -Force .venv`, `Read-Host` and `exit 1`, in that order; the exact gate 171 message `DataBoot needs Python 3.12. Install it with: winget install -e --id Python.Python.3.12`; split the script at `-m venv .venv`, `--find-links wheels` and the online `pip install -r requirements.txt`: each piece after them holds `$LASTEXITCODE` before the next native command; every `Fail` call comes before the final `-m app.launch` line |
 | AC-30 | L1 keeps all versions in one list | a test fails if `re.search(r"py -3\.1\d+ -m venv", ps1)` matches, or if `$Candidates` lacks any of 3.13/3.12/3.11 or holds them out of order (same parser as AC-28) |
 | AC-31 | X1: `_load(path, keep)` blanks the other worksheet parts in an in-memory copy | `write_xlsx(data_dir / "book3.xlsx", {"Good": [("a","b"),(1,2)], "Bad": b"<<not xml", "Also": [("a","b"),(3,4)]})` and a second file whose `Bad` is a truncated sheet XML (e.g. `b'<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>a'`): home "Could not be read" has `book3.xlsx - Bad` with `not a valid xlsx`; Good and Also are in `/api/datasets` and their pages and `/charts` return 200; `book3.xlsx` alone (no sheet) is not in the unreadable table |
+| AC-32 | S1: `app/score.py` helpers called inside each rule on the full (filtered) data; `score` on every chart | `data_dir` sales.csv API: line 0.89, histogram 0.34, bar 0.23, donut 0.22 (hand values in "Round 4: interest score"); points.tsv map3d 0.6; unit tests of `score.gini([16, 23, 7])` ≈ 0.2319, `score.skew` of 10, 20, 5, 7, 3, 1 ≈ 0.3415, constant or 1-value inputs give 0, a scatter on y = 2x gives 1.0 |
+| AC-33 | S2: round, cut to 8 in rule order, stable sort by `-score`, renumber ids | sales.csv kinds `["line", "histogram", "bar", "donut"]`, ids `chart-1..4`; a tie case keeps rule order (file `k\na\nb\na\nb\n`: bar and donut both score 0, so `["bar", "donut"]`); two requests give equal JSON; page `data-kind` order equals the API order |
+| AC-34 | P1 grid CSS (`:first-child` spans `1 / -1`); First rows table after `.charts` in the template | Playwright at 1280 px: first figure width ≈ `.charts` width, figures 2 and 3 share a `top` and are each about half; at 390 px every figure is full width; in the HTML the `data-table` comes after the last `</figure>` |
+| AC-35 | P1 caption `rule · score 0.NN` | per figure: `.chart-rule` text ends with `f" · score {c['score']:.2f}"` for the API chart at the same position |
+| AC-36 | K1 `rules.kpis`; `<dl class="kpis">` | sales.csv: Rows 6, Columns 3, Missing 0.0%, amount (sum) 46; with `?f.region=North`: 3 and 16; `big_csv`: figures with separators (`60,000`) and test_AC_21 still green |
+| AC-37 | F1 `filters.parse/apply/options`; form in the template | sales.csv page has `<select name="f.region">` with North/South/East and `type="date"` inputs `from`/`to`; notes.csv has no select; API with `f.region=North`: every `total` smaller than unfiltered, `kpis.rows == 3`; `from=2024-01-03&to=2024-01-05`: `kpis.rows == 3`; the page with the same params shows the same counts as the API |
+| AC-38 | server-rendered filtered page; GET navigation; chips; Clear filters link | `/datasets/{id}?f.region=North`: `<option value="North" selected>`, chip `region = North`, KPI 3 rows; Playwright: pick South in the select, URL gains `f.region=South`, `page.go_back()` returns to the North URL and its KPI 3; click the chip's link, then `Clear filters`: URL has no `f.`, KPI 6 |
+| AC-39 | J1 `plotly_click` on bar/donut; toggle | Playwright on sales.csv: `page.evaluate` emits a click via `document.getElementById(barId).querySelector('.plot').emit('plotly_click', {points: [{x: 'South', label: 'South', data: {}}]})` (Plotly's own handler path) or a real mouse click on the bar; URL has `f.region=South`, select shows South, KPI rows 2; same click again: no `f.region`, rows 6 |
+| AC-40 | E1 `_view` in both export routes; Summary sheet last; title slide line | XLSX with `?f.region=North`: Data has 3 rows, first sheet `Data`, last `Summary` A1 `Filters: region = North`, bar sheet total 16; without params Summary A1 `Filters: none`; PPTX: slide 1 texts contain `Filters: region = North` / `Filters: none`, a chart's series values sum to the filtered total |
+| AC-41 | D1 caches + heatmap pairs once + Counter in classify | `big_sales_csv`: GET charts (warm-up), then `time.perf_counter()` around GET charts `?f.region=North`: 200 and `< 1.0` s; `kpis.rows == 50000` |
 
 ## Work items without AC ids: explicit checks
 - **W-1 Unreadable.sheet (gate 162)**: a workbook where one sheet fails lists `book.xlsx - <sheet>` in "Could not
@@ -388,6 +567,19 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
   requirements.txt. QA may add a text test for these lines.
 
 ## Tests that must change with the code (name them in the tickets)
+Round 4 (put each edit in the ticket that changes the behaviour; sales.csv order becomes line, histogram, bar,
+donut; every XLSX gains a last `Summary` sheet):
+- S1/S2 ticket: `tests/test_rules.py::test_sales_bar_and_line` L16 kinds order, L17 `line, bar = cs[:2]` (pick
+  by kind), L22 the key set gains `"score"`. `test_export_xlsx.py::test_sales_download` L39 sheet list (`chart-2
+  histogram`, `chart-3 bar`, `chart-4 donut`), L42 `chart_kinds` order, L49 `chart-4 histogram` -> `chart-2
+  histogram`. `test_export_xlsx.py::test_scatter_and_heatmap_from_numeric_file` L130 order and L133 `sheet4.xml`
+  if the heatmap moves (re-run, do not guess). `test_rules.py::test_big_map_is_sampled` and
+  `test_pages.py::test_big_csv_counts_have_separators` L81 use `charts[0]` as the map3d: big.csv also has a
+  histogram of `value` (score = its skew), so select the map by kind if it is no longer first.
+- E1 ticket: `test_export_xlsx.py` L39 and L130 sheet lists end with `"Summary"`, L114 `["Data"]` ->
+  `["Data", "Summary"]`; `test_export_pptx.py` checks on slide 0 texts, if any, gain `Filters: none`.
+- Any test with a hard-coded chart order on the page (grep `data-kind`, `"chart-1"`, `[0]["kind"]`) is re-run.
+
 Round 3:
 - `tests/test_launcher_files.py:17` looks for the needle `"py -3.11"`, which L1 removes (the list holds
   `"py", "-3.11"`). Replace that needle with `"-3.11"` (or move the version checks to the AC-28/30 tests); keep
@@ -424,6 +616,10 @@ with Excel date cells, `Lookup`). `write_xlsx` stays hand-written: openpyxl read
 default style" warning, which AC-23 only checks on exports). `big_csv` holds 60,000 lat/lng rows.
 `make_client(folder)` sets the env and returns a TestClient. Parquet fixtures in `tests/fixtures/` (written once
 by pyarrow) with CSV twins `flat.csv`, `optional.csv`. Playwright fixtures are function-scoped.
+Round 4 (added by the architect): `big_sales_csv` -> folder with `sales.csv`, 200,000 rows of `date, region,
+product, amount, qty` (region North/South/East/West by `i % 4`, so `f.region=North` keeps 50,000 rows; 12 x 28
+dates; product 20 values; amount `i % 997`; qty 1..9), for AC-41. The hand-checked score values use `data_dir`
+sales.csv. `make_client` must also clear `main._base` and `main._view` once they exist (D1 ticket).
 
 ## Decisions
 1. Office files on xlsxwriter (write), python-pptx (write) and openpyxl `read_only=True` (read), Parquet on
@@ -455,3 +651,20 @@ by pyarrow) with CSV twins `flat.csv`, `optional.csv`. Playwright fixtures are f
     ticket 417), so the real run is the Board's on Windows.
 14. (Round 3) AC-31 reworded rather than adding AC-32: gate 171 replaced the "log the gap" item with "build it",
     and a doc-only AC would describe behaviour that is no longer true.
+15. (Round 4) Filter changes are plain GET navigations of a server-rendered page, not `pushState` + client
+    re-render: the URL is the state, Back works natively, the page works without JS, and the KPI strip, chips,
+    counts and dropdowns have one renderer (Jinja). Cost: a page load per change; the `_view` cache makes the
+    dashboard's own API fetch a hit, and Plotly is served from the browser cache.
+16. (Round 4) Column types come from the unfiltered rows; rules run on the filtered rows. Types, dropdowns and the
+    date column stay put while filtering, and charts that no longer apply drop out (gate 175).
+17. (Round 4) Scores are computed inside each rule, where the full pre-sampling data is, not from the chart dict:
+    the dict holds a stride sample for line and scatter and bins for the histogram (PRD: full filtered rows).
+18. (Round 4) Ids are renumbered after the sort, so `chart-1` is the top chart on the page, in the API, on the
+    second PPTX slide and in the first XLSX chart sheet. Tests that named sheets by rule order change (listed).
+19. (Round 4) Query params `f.<column>` with a prefix, not bare column names: a column named `from` or `to`
+    cannot clash with the date range, and unknown params are ignored safely. Readable in a shared link.
+20. (Round 4) The XLSX `Summary` sheet goes last: `Data` stays first (AC-18) and existing `sheetN.xml` positions
+    of chart sheets do not move. The summary text is built once (`filters.summary`) and passed to both writers.
+21. (Round 4) Speed by caching and two exact-result fixes (heatmap pairs once, distinct strings classified once),
+    not by sampling for scores: the PRD fixes scores on the full filtered rows, and the measured budget fits.
+    `# ponytail:` mark the `_view` cache (8 entries, memory = filtered row lists) and the typed-rows copy.
