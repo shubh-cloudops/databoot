@@ -1,263 +1,82 @@
 [
- {
-  "goal": "Verify AC-13 as reworded (Start-DataBoot.ps1, gate 161/165): no code change expected, only a check that the launcher files still match the new text",
-  "layer": "backend",
-  "criteria": [
-   "Start-DataBoot.ps1 exists and Start-DataOS.ps1 does not; the script checks `docker info`, mounts the folder with `:/data:ro`, runs `docker run` and opens the browser",
-   "Start-DataBoot.ps1 runs `pip install -r requirements.txt`, which now installs xlsxwriter, python-pptx, openpyxl and pyarrow",
-   "`python3 -m pytest -q tests/test_launcher_files.py tests/test_launch.py` passes; nothing is changed if it does"
-  ],
-  "acceptance": [
-   "AC-13"
-  ],
-  "files": [
-   "Start-DataBoot.ps1",
-   "DataBoot.bat",
-   "Dockerfile",
-   "tests/test_launcher_files.py"
-  ]
- },
- {
-  "goal": "Parquet on pyarrow only (R4, gate 162): delete the standard-library reader; a corrupt file is 'not a valid parquet file'",
-  "layer": "backend",
-  "criteria": [
-   "app/parquet.py reads with pyarrow only; the thrift/snappy fallback, OK_CODECS and the codec table are deleted",
-   "ZSTD, LZ4 and BROTLI files now read; the nine tests/fixtures/*.parquet files give 40 rows x 6 columns and the same values as flat.csv/optional.csv",
-   "A file with the PAR1 magic but a bad footer, or any pyarrow read error, raises ReadError('not a valid parquet file'); a nested schema keeps ReadError('unsupported parquet encoding'); a 0-byte file keeps 'empty file'",
-   "Home page lists a corrupt .parquet in 'Could not be read' with the reason 'not a valid parquet file' while other datasets still list and open",
-   "tests/test_parquet.py: drop the `stdlib` fixture param and test_snappy_copies; test_unsupported_codec becomes 'zstd reads and equals flat.csv'; not-parquet bytes expect 'not a valid parquet file'; test_catalog_scan_lists_parquet expects 3 datasets and none unreadable"
-  ],
-  "acceptance": [
-   "AC-14",
-   "AC-20"
-  ],
-  "files": [
-   "app/parquet.py",
-   "tests/test_parquet.py"
-  ]
- },
- {
-  "goal": "xlsx reading on openpyxl read_only=True (R3, gate 162): replace the zipfile reader half of app/xlsx.py, keep the writer half untouched",
-  "layer": "backend",
-  "criteria": [
-   "sheet_names(path) and read_sheet(path, sheet) use openpyxl.load_workbook(read_only=True, data_only=True), call reset_dimensions() and close the workbook in finally",
-   "Values equal round 1: ints/floats as numbers, date cells as ISO strings, empty cells None, booleans as 'TRUE'/'FALSE'; a file that is not a zip/xlsx raises ReadError('not a valid xlsx'); no sheets raises the same note",
-   "book.xlsx in data_dir still lists the Revenue and Lookup sheets with their row and column counts; broken.xlsx is still listed 'not a valid xlsx'",
-   "The writer functions (write, _chart, _table, _rels and the constants export.py imports) are not touched in this ticket, so exports still work",
-   "tests/test_xlsx_read.py::test_shared_booleans_formats_and_gaps uses inlineStr cells instead of a hand-added sharedStrings part"
-  ],
-  "acceptance": [
-   "AC-1",
-   "AC-12"
-  ],
-  "files": [
-   "app/xlsx.py",
-   "tests/test_xlsx_read.py"
-  ]
- },
- {
-  "goal": "Fixed notes (gate 166 W-1, W-2): 'invalid JSON' for broken .json/.jsonl, and Unreadable.sheet so a failed Excel sheet is listed as 'book.xlsx - Sheet'",
-  "layer": "backend",
-  "criteria": [
-   "app/readers.py: `{oops` in a .json file and a bad line in a .jsonl file raise ReadError('invalid JSON') (new INVALID_JSON constant next to the other notes); `{\"a\": 1}` and `[1, 2]` keep 'not a list of records'",
-   "app/catalog.py: Unreadable gains `sheet: str | None = None`; the per-sheet except in scan() passes the sheet name; a file-level failure leaves it None, so `Unreadable('x.csv', 'empty file').sheet is None`",
-   "app/templates/home.html shows `path - sheet` in the 'Could not be read' File cell when sheet is set, plain path otherwise",
-   "A workbook where one sheet fails lists `book.xlsx - <sheet>` as unreadable and its other sheets as datasets (test monkeypatches xlsx.read_sheet to fail for one sheet)",
-   "tests/test_readers.py L84-85 expect 'invalid JSON'; tests/test_catalog.py gets the sheet case"
-  ],
-  "acceptance": [
-   "AC-12",
-   "AC-25",
-   "AC-26"
-  ],
-  "files": [
-   "app/readers.py",
-   "app/catalog.py",
-   "app/templates/home.html",
-   "tests/test_readers.py",
-   "tests/test_catalog.py"
-  ]
- },
- {
-  "goal": "Chart items (gate 166 W-3): country map sorted by value like bars, and map3d carries z_label for the z axis and colorbar title",
-  "layer": "backend",
-  "criteria": [
-   "app/rules.py _country_map sorts locations by (-value, name) as the bar rule does; records.json gives locations ['Brazil','Japan','France'] with values [203,125,68]; the ISO-3 case gives ['FRA','JPN'] with [8,4]",
-   "_map3d adds `z_label` to the chart dict: the numerical column name used for z, or null when z is the constant 0 (points.tsv with a value column gives 'value'; a lat/lon-only file gives null)",
-   "/api/datasets/{id}/charts carries z_label and both exports still build (no exporter reads whole chart dicts)",
-   "tests/test_rules_extra.py::test_country_map_iso3_and_names and tests/test_rules.py are updated for the new order and key; the 8-chart cap and chart ids are unchanged"
-  ],
-  "acceptance": [
-   "AC-16",
-   "AC-27"
-  ],
-  "files": [
-   "app/rules.py",
-   "tests/test_rules.py",
-   "tests/test_rules_extra.py"
-  ]
- },
- {
-  "goal": "PPTX export on python-pptx (R2, gates 162/164): rewrite app/export.py so it no longer imports app.xlsx internals",
-  "layer": "backend",
-  "criteria": [
-   "app/export.pptx(dataset, charts) builds with Presentation() at 16:9 (12192000 x 6858000) on the Blank layout: slide 1 holds the display name and 'N rows, M columns' with thousands separators, then one slide per chart",
-   "Chart slides use add_chart: line LINE, bar/country_map/histogram COLUMN_CLUSTERED, donut DOUGHNUT, scatter/map3d XY_SCATTER; axis titles x_label/y_label, value axis number format '#,##0'; the rule caption and 'N of M points|rows' are the last text boxes",
-   "The heatmap slide is a native table of r values with the blue-white-red fill; XML-illegal control characters are stripped from every string",
-   "len(prs.slides) == 1 + len(charts) when read back by python-pptx and at least one shape.has_chart; the download route and filename `<stem>[-<sheet>].pptx` are unchanged",
-   "export.py no longer imports from app.xlsx; tests/test_export_pptx.py replaces the L64-71 embedded-workbook internals with python-pptx reopen checks (chart type, categories, texts per slide) and keeps check_package"
-  ],
-  "acceptance": [
-   "AC-18"
-  ],
-  "files": [
-   "app/export.py",
-   "app/main.py",
-   "tests/test_export_pptx.py"
-  ]
- },
- {
-  "goal": "XLSX export on xlsxwriter (R1, gates 162/164): replace the hand-written OOXML writer half of app/xlsx.py with Workbook(in_memory) and native charts",
-  "layer": "backend",
-  "criteria": [
-   "write(dataset, rows, charts) uses xlsxwriter with strings_to_formulas, strings_to_urls and strings_to_numbers False and nan_inf_to_errors True; a cell '=HYPERLINK(...)' stays text",
-   "First sheet is 'Data' with the column names as header; one sheet per chart named '<id> <kind>' (31 chars max) holds the chart table and a native chart (line, column, doughnut, scatter); the heatmap sheet has a 3_color_scale and no chart; a chart with 0 rows gets no chart",
-   "openpyxl reopens an export with sum(len(ws._charts)) > 0 and, inside warnings.catch_warnings(record=True), without any message containing 'no default style' (AC-23)",
-   "requirements.txt pins xlsxwriter==3.3.0, python-pptx==1.0.2, openpyxl==3.1.5, pyarrow==26.0.0 and no package of those four is vendored in the repository",
-   "All hand-written writer code and constants are deleted from app/xlsx.py (only the openpyxl reader and write() remain); tests/test_export_xlsx.py chart-kind and heatmap checks are re-checked against xlsxwriter's part names"
-  ],
-  "acceptance": [
-   "AC-18",
-   "AC-23"
-  ],
-  "files": [
-   "app/xlsx.py",
-   "requirements.txt",
-   "tests/test_export_xlsx.py"
-  ]
- },
- {
-  "goal": "Table captions as <caption><h2>\u2026</h2></caption> and real-case column headers (R5, gate 165); AC-15, AC-17, AC-19 and AC-21 must keep holding",
-  "layer": "frontend",
-  "criteria": [
-   "home.html: 'Datasets', 'Could not be read' and 'Other files', and dataset.html: 'Columns' and 'First N rows', each render as `<caption><h2>NAME</h2></caption>`",
-   "app/static/css/databoot.css: the caption h2 matches the old caption look (size, weight, margin), and `th` has no text-transform (no `uppercase` anywhere in the file); a header such as `Latitude` or `LON` shows in its original case",
-   "Unchanged and still tested: Other files rows have no link (AC-15), each figcaption has one .chart-rule and one .chart-count and no other prose (AC-17), title/h1 read DataBoot (AC-19), counts of 1,000 or more use the num filter (AC-21)",
-   "Page checked at 1280px and 375px in light and dark: no layout shift in the tables",
-   "tests/test_pages.py literals `<caption>X</caption>` are updated to the h2 form; tests/test_acceptance.py is QA's file and is not edited here (its `<caption>` literals and _rows_of are QA's rename ticket)"
-  ],
-  "acceptance": [
-   "AC-15",
-   "AC-17",
-   "AC-19",
-   "AC-21",
-   "AC-22"
-  ],
-  "files": [
-   "app/templates/home.html",
-   "app/templates/dataset.html",
-   "app/static/css/databoot.css",
-   "tests/test_pages.py"
-  ]
- },
- {
-  "goal": "Plotly modebar always visible and reachable with Tab (R6, gate 165), and the 3D map z axis and colorbar titled from z_label (gate 166 W-3)",
-  "layer": "frontend",
-  "criteria": [
-   "dashboard.js CONFIG uses displayModeBar: true and databoot.css sets the modebar opacity to 1, so the first .modebar is visible without hover",
-   "After each draw (and each redraw) every .modebar-btn gets tabindex=0 and role=button, and Enter/Space triggers a click; pressing Tab from the page top reaches an element with class modebar-btn; the existing focus ring is shown",
-   "map3d scene zaxis title and colorbar title are the chart's z_label; when z_label is null the z axis stays hidden and points use --c1 as before; no external requests (AC-9)",
-   "Layout checked at 1280px and 375px in light and dark: the always-visible bar does not cover the chart title or the axis labels",
-   "tests/test_browser.py: a no-hover opacity/visibility check and a Tab-reaches-modebar-btn check; a z-title check on points.tsv. Browser tests stay function-scoped"
-  ],
-  "acceptance": [
-   "AC-6",
-   "AC-24",
-   "AC-27"
-  ],
-  "files": [
-   "app/static/js/dashboard.js",
-   "app/static/css/databoot.css",
-   "tests/test_browser.py"
-  ]
- },
- {
-  "goal": "3D map: fix the clipped 'lat' axis label at 1280px (Board gate 167) by increasing the map3d layout bottom margin",
-  "layer": "frontend",
-  "criteria": [
-   "dashboard.js map3d layout: the bottom margin (l.margin b, now 0) is raised until the 'lat' axis title is fully inside the chart box; top/left/right stay as they are so the always-visible modebar and z title still fit",
-   "tests/test_browser.py: on points.tsv at 1280px wide, the bounding box of the lat axis title text lies inside the .js-plotly-plot box (bottom edge <= plot bottom); the same check at 375px does not regress",
-   "Checked at 1280px and 375px in light and dark: no other label or the modebar is clipped; no external requests (AC-9)"
-  ],
-  "acceptance": [
-   "AC-6"
-  ],
-  "files": [
-   "app/static/js/dashboard.js",
-   "tests/test_browser.py"
-  ]
- },
- {
-  "goal": "Table caption h2 size is --t-md (Board gate 167); designer updates DESIGN.md L57 and L76 to match",
-  "layer": "frontend",
-  "criteria": [
-   "app/static/css/databoot.css: `caption h2` uses font-size var(--t-md) (weight 650, margin 0, line-height kept); the global h2 and .brand stay --t-lg",
-   "docs/DESIGN.md Type scale (L57): `--t-lg` row no longer lists table titles; `--t-md` row lists body, chart title and table titles (`caption h2`)",
-   "docs/DESIGN.md Components (L76): the `.table-wrap > table` row says `caption h2` has margin 0 and `--t-md`",
-   "tests/test_acceptance.py: the 5 caption literals (L186, 198, 274, 308, 349) are already `<caption><h2>X</h2></caption>`; this ticket makes no other edit to that file and does not list it in files; AC-22 holds and the full suite is green",
-   "Page checked at 1280px and 375px in light and dark: captions read as table titles, no layout shift"
-  ],
-  "acceptance": [
-   "AC-22"
-  ],
-  "files": [
-   "app/static/css/databoot.css",
-   "docs/DESIGN.md"
-  ]
- },
- {
-  "goal": "ARCHITECTURE.md notes (Board gate 167): 'invalid JSON' row in the notes table (also for GeoJSON broken syntax) and histogram labels documented as 'a to b' (code wins); confirm requirements.txt pins for AC-23",
-  "layer": "backend",
-  "criteria": [
-   "docs/ARCHITECTURE.md notes table (L91) has a row `invalid JSON` for json.JSONDecodeError in .json, .jsonl (any line) and .geojson; the '**new**' marker is dropped; no other row changes",
-   "docs/ARCHITECTURE.md Exports table (L211) documents histogram bin labels as `\"a to b\"` (6 significant digits), matching app/xlsx.py and app/export.py; no code changes",
-   "requirements.txt is unchanged and still pins xlsxwriter==3.3.0, python-pptx==1.0.2, openpyxl==3.1.5 and pyarrow==26.0.0 (AC-23); checked by grep, no library is vendored in the repo",
-   "No test file is edited; AC-26 and AC-18 behaviour is unchanged and their existing tests pass"
-  ],
-  "acceptance": [
-   "AC-18",
-   "AC-23",
-   "AC-26"
-  ],
-  "files": [
-   "docs/ARCHITECTURE.md",
-   "requirements.txt"
-  ]
- },
- {
-  "goal": "Redo ticket 403 in full (Board gate 168, supersedes gate 167's wording on the test file): table captions as <caption><h2>X</h2></caption> sized --t-md, column headers in real case, and the 5 caption literals in tests/test_acceptance.py updated to the h2 form",
-  "layer": "frontend",
-  "criteria": [
-   "home.html renders 'Datasets', 'Could not be read' and 'Other files', and dataset.html renders 'Columns' and 'First N rows', each exactly as `<caption><h2>NAME</h2></caption>`",
-   "app/static/css/databoot.css: `caption h2` uses font-size var(--t-md); no `text-transform` rule on th (the word `uppercase` appears nowhere in the file); a header such as `Latitude` or `LON` shows in its original case (check with a computed-style probe of th text-transform = none)",
-   "tests/test_acceptance.py: only the 5 caption literals at L186, L198, L274, L308 and L349 are changed to `<caption><h2>X</h2></caption>` (git diff of that file shows only those lines); no other edit to that file",
-   "AC-15, AC-17, AC-19, AC-21 still hold: Other files rows have no link, each figcaption has one .chart-rule and one .chart-count and no other prose, title/h1 read DataBoot, counts of 1,000 or more use the num filter",
-   "Checked at 1280px and 375px in light and dark: no layout shift or horizontal scroll in the tables; background stays transparent",
-   "Done = the full pytest suite is green (python3 -m pytest -q), run once at the end"
-  ],
-  "acceptance": [
-   "AC-15",
-   "AC-17",
-   "AC-19",
-   "AC-21",
-   "AC-22"
-  ],
-  "files": [
-   "app/templates/home.html",
-   "app/templates/dataset.html",
-   "app/static/css/databoot.css",
-   "tests/test_pages.py",
-   "tests/test_acceptance.py"
-  ]
- }
+  {
+    "goal": "Per-sheet isolation for a corrupt Excel sheet (Board gate 171: BUILD AC-25 per-sheet isolation this round): a workbook with one corrupt sheet still lists and opens its other sheets, and the corrupt one goes to Unreadable with its sheet name",
+    "layer": "backend",
+    "criteria": [
+      "app/xlsx.py `_load(path, keep=None)` copies the zip into a BytesIO and writes every xl/worksheets/*.xml part (not _rels) as an empty `<worksheet ...><sheetData/></worksheet>`, except the part named by `keep`, then calls openpyxl load_workbook(read_only=True, data_only=True); not a zip, no workbook part or any open error still raises ReadError('not a valid xlsx')",
+      "`sheet_names(path)` loads with every sheet blanked, so a workbook whose sheet 'Bad' is b'<<not xml' or truncated XML returns all sheet names in order (e.g. Good, Bad, Also); an empty list still raises 'not a valid xlsx'",
+      "`read_sheet(path, sheet)` finds the sheet's part, reloads with keep=that part and reads as before: Good and Also return their header and rows (a date cell stays a datetime) and Bad raises ReadError('not a valid xlsx')",
+      "`path` may be a path or a BytesIO (a BytesIO is seeked back to 0 before each copy); `_worksheet_path` use carries a `ponytail:` comment naming the private attribute and the openpyxl 3.1.5 pin, and a second one names the N+1 zip copies",
+      "New test in tests/test_xlsx_read.py using conftest.write_xlsx with a bytes sheet: for both b'<<not xml' and a truncated sheet XML, sheet_names lists all three sheets, Good and Also read, Bad raises 'not a valid xlsx'",
+      "A catalog scan of a folder holding that workbook lists Good and Also as datasets and one Unreadable 'book3.xlsx - Bad' with reason 'not a valid xlsx' (sheet field 'Bad'); the workbook alone is not in the unreadable list (test in tests/test_catalog.py)",
+      "Existing tests/test_xlsx_read.py::test_broken (not a zip -> 'not a valid xlsx'), tests/test_catalog.py::test_failed_sheet_is_listed_with_its_name and the header-less sheet case of test_AC_25 still pass unchanged; no edit to tests/test_acceptance.py (QA owns it)"
+    ],
+    "acceptance": [
+      "AC-25",
+      "AC-31"
+    ],
+    "files": [
+      "app/xlsx.py",
+      "tests/test_xlsx_read.py",
+      "tests/test_catalog.py"
+    ]
+  },
+  {
+    "goal": "Launcher picks the newest Python 3.11-3.13 and fails cleanly when there is none (Board gate 171: accept 3.11-3.13 only, 3.14 rejected; message 'DataBoot needs Python 3.12. Install it with: winget install -e --id Python.Python.3.12', pause, exit 1)",
+    "layer": "backend",
+    "criteria": [
+      "Start-DataBoot.ps1 defines `function Fail($Message)` that does Write-Host $Message, then `if (Test-Path .venv) { Remove-Item -Recurse -Force .venv }`, then Read-Host (to pause), then `exit 1`, in that order",
+      "One line `$Candidates = @(@(\"py\", \"-3.13\"), @(\"py\", \"-3.12\"), @(\"py\", \"-3.11\"), @(\"python\"))` holds the versions in that order; the script has no literal `py -3.1x -m venv` line",
+      "The script holds `$Check` = `import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] <= (3, 13) else 1)`; a loop skips a candidate when Get-Command (with -ErrorAction SilentlyContinue) finds nothing, runs the check on every candidate including py ones (so 3.14 is rejected), with `$ErrorActionPreference = \"Continue\"` set locally and restored (or try/catch) so py's stderr 'No suitable Python runtime' does not throw in Windows PowerShell 5.1; the first candidate with $LASTEXITCODE -eq 0 is used",
+      "The venv is created with `& $py[0] @rest -m venv .venv` on the chosen candidate; when none matches the script calls `Fail \"DataBoot needs Python 3.12. Install it with: winget install -e --id Python.Python.3.12\"` (exact text)",
+      "The folder dialog, folder check, -Docker branch, wheels install and final `.venv\\Scripts\\python.exe -m app.launch $Folder` lines are unchanged",
+      "tests/test_launcher_files.py: replace the needle \"py -3.11\" with \"-3.11\" (every other needle stays) and add text tests: -3.13, -3.12, -3.11 appear in that order inside the `$Candidates` line followed by \"python\"; the script contains `(3, 11) <= sys.version_info[:2] <= (3, 13)`; `re.search(r\"py -3\\.1\\d+ -m venv\", ps1)` does not match; the exact no-Python message is present; `function Fail` holds Remove-Item -Recurse -Force .venv, Read-Host and exit 1 in that order",
+      "There is no PowerShell in the image, so the tests are text checks only; the Board runs the script on Windows with 3.12 + 3.14 and with no suitable Python"
+    ],
+    "acceptance": [
+      "AC-28",
+      "AC-30"
+    ],
+    "files": [
+      "Start-DataBoot.ps1",
+      "tests/test_launcher_files.py"
+    ]
+  },
+  {
+    "goal": "Launcher checks the exit code after venv creation and after BOTH pip installs, wheels and online (Board gate 171), with the same Fail path: message naming the step, delete partial .venv, pause, exit 1",
+    "layer": "backend",
+    "criteria": [
+      "In Start-DataBoot.ps1 directly after `-m venv .venv`: `if ($LASTEXITCODE -ne 0) { Fail \"Could not create the Python environment (.venv).\" }`",
+      "Directly after the `--no-index --find-links wheels` pip install: `if ($LASTEXITCODE -ne 0) { Fail \"Could not install the packages from wheels.\" }`",
+      "Directly after the online `pip install -r requirements.txt`: `if ($LASTEXITCODE -ne 0) { Fail \"Could not install the packages (pip install -r requirements.txt).\" }`",
+      "Every Fail call comes before the final `.venv\\Scripts\\python.exe -m app.launch $Folder` line, so a failed step never reaches it; each message names its step",
+      "The pip install lines keep working when wheels\\ exists or not, and nothing in the -Docker branch changes",
+      "tests/test_launcher_files.py text tests: splitting the script at `-m venv .venv`, at `--find-links wheels` and at the online `pip install -r requirements.txt`, the text after each (up to the next native command) contains `$LASTEXITCODE -ne 0` and `Fail`; the last `Fail` position is before the `-m app.launch` position"
+    ],
+    "acceptance": [
+      "AC-29"
+    ],
+    "files": [
+      "Start-DataBoot.ps1",
+      "tests/test_launcher_files.py"
+    ]
+  },
+  {
+    "goal": "Test-only packages stay out of the client install (Board gate 171): text test that requirements.txt holds runtime pins only and requirements-dev.txt adds pytest and httpx; README names both",
+    "layer": "backend",
+    "criteria": [
+      "New tests/test_requirements_split.py: requirements.txt has no line starting with pytest or httpx and still pins fastapi, jinja2, uvicorn, pyarrow==26.0.0, openpyxl==3.1.5, python-pptx==1.0.2, xlsxwriter==3.3.0",
+      "requirements-dev.txt starts with `-r requirements.txt` and pins `pytest==9.1.1` and `httpx==0.28.1`",
+      "README.md names requirements-dev.txt for the test install; Dockerfile and Start-DataBoot.ps1 still install requirements.txt only",
+      "No file under app/ imports httpx or pytest (the test greps app/*.py)",
+      "Existing test_AC_23 (four library pins in requirements.txt, none vendored) still passes; no edit to tests/test_acceptance.py"
+    ],
+    "acceptance": [
+      "AC-23"
+    ],
+    "files": [
+      "tests/test_requirements_split.py",
+      "README.md"
+    ]
+  }
 ]

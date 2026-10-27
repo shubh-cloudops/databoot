@@ -1,0 +1,63 @@
+{
+  "header": {
+    "ticket": 419,
+    "project": "you-think-of-the-project-name",
+    "from_role": "techlead",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "38d349eb1f24",
+    "tokens_left": 1944809
+  },
+  "goal": "Write plan/tickets.json: the build tickets for the approved architecture and design.",
+  "acceptance_criteria": [
+    {
+      "text": "Every acceptance item is covered by a ticket",
+      "passes": true
+    },
+    {
+      "text": "Each ticket is small, testable and has a layer",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py plan",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Four backend tickets: per-sheet isolation, launcher Python search with Fail, exit-code checks, requirements split test",
+      "why": "AC-28..31 are new this round; gate 171 requires building per-sheet isolation and the exit-code checks; each ticket is under about 200 lines and testable alone",
+      "evidence": "script diff of docs/acceptance.json against 80f08bc: AC-28..AC-31 new; docs/ARCHITECTURE.md 'Round 3' sections; python3 /opt/prodagents/check.py plan: check passed"
+    },
+    {
+      "what": "Put the tests/test_launcher_files.py needle edit in the launcher ticket (ticket 2) and kept tests/test_acceptance.py out of every files list",
+      "why": "Lessons: put an existing-test edit in the ticket that changes the behaviour; QA owns test_acceptance.py",
+      "evidence": "tests/test_launcher_files.py:17; ARCHITECTURE.md 'Tests that must change with the code'"
+    },
+    {
+      "what": "Defined Fail in ticket 2 (used for no Python) and added the venv and pip exit-code checks in ticket 3",
+      "why": "Keeps each ticket small and runnable on its own while the Fail path is shared",
+      "evidence": "docs/ARCHITECTURE.md 'Round 3: launcher design'"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "All round 3 tickets are layer backend (PowerShell launcher, xlsx reader, tests); no front-end work, matching docs/team.json",
+    "AC-23 is the id for the requirements-split ticket, since the pins live there and test_AC_23 must keep passing"
+  ],
+  "open_questions": [
+    "The orchestrator's verify step (outside the repo) should install requirements-dev.txt; the image already has pytest and httpx, so nothing fails today",
+    "The launcher cannot be run here (no PowerShell); the Board must try it on Windows with Python 3.12 + 3.14 and with no suitable Python"
+  ],
+  "lessons": [
+    {
+      "lesson": "In a round whose only new AC items are a PowerShell launcher and a reader fix, plan the launcher as a Fail-path ticket followed by an exit-code-check ticket, and put the old-needle test edit in the first launcher ticket",
+      "when": "Planning a round with text-only tests for a script that cannot be run in the image",
+      "evidence": "plan/tickets.json tickets 2 and 3; tests/test_launcher_files.py:17"
+    }
+  ],
+  "problems": []
+}
