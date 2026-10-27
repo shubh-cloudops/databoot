@@ -29,5 +29,5 @@
   {"id": "AC-28", "text": "Start-DataBoot.ps1 creates the venv with the newest Python from 3.11 to 3.13 it finds: it tries py -3.13, py -3.12 and py -3.11 in that order, then python only when that python reports a version from 3.11 to 3.13, so a machine with Python 3.12 and 3.14 and no 3.11 gets a 3.12 venv."},
   {"id": "AC-29", "text": "When no Python 3.11 to 3.13 is found, or venv creation or a pip install returns a non-zero exit code, Start-DataBoot.ps1 prints a message naming the failed step, deletes the partial .venv folder, waits for a key press so the window stays open, and exits with code 1 instead of running .venv\\Scripts\\python.exe."},
   {"id": "AC-30", "text": "A test fails if Start-DataBoot.ps1 creates the venv with one hardcoded Python version (for example only py -3.11) instead of trying 3.13, 3.12 and 3.11."},
-  {"id": "AC-31", "text": "docs/ARCHITECTURE.md lists AC-25 per-sheet isolation as a known gap: a workbook in which one sheet's XML is corrupt is listed whole as not a valid xlsx and its other sheets do not list."}
+  {"id": "AC-31", "text": "When one sheet's XML in an Excel workbook is corrupt (truncated or not XML), the other sheets of that workbook still list and open as datasets, and the corrupt sheet is listed under \"Could not be read\" with its sheet name (for example book.xlsx - Bad) and the note \"not a valid xlsx\"."}
 ]

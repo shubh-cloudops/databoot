@@ -1,14 +1,102 @@
-# Architecture: DataBoot (round 2)
+# Architecture: DataBoot (round 3)
 
 DataBoot scans one mounted folder or drive letter, profiles every dataset with fixed rules and draws the
-charts those rules pick, fully offline. Sources: docs/PRD.md (round 2), docs/acceptance.json (AC-1..AC-24),
-Board gates 160-165 (graphify-out/memory.md). Round 2 keeps everything round 1 built. It moves the Office
-exports and the xlsx reader to real libraries, moves Parquet to pyarrow only, makes three accessibility fixes
-and gives G-1..G-7 their AC ids (AC-14..AC-20, plus AC-21 for thousands separators).
+charts those rules pick, fully offline. Sources: docs/PRD.md (round 3), docs/acceptance.json (AC-1..AC-31),
+Board gates 160-171 (graphify-out/memory.md). Round 3 keeps everything rounds 1 and 2 built and changes only
+the four things below. No page, route, template, CSS, JS, chart or export changes, so no sitemap or NAV change.
 
-No docs/TRENDS.md this round (gate 160: `team: -trends`), so I used no trend advice.
+No docs/TRENDS.md this round (docs/team.json: trends off), so I used no trend advice.
 
-## Round 2 changes at a glance
+## Round 3 changes at a glance
+| # | Change | Files | AC |
+|---|---|---|---|
+| L1 | Launcher picks the newest Python 3.11-3.13 (`py -3.13`, `-3.12`, `-3.11`, then `python` with a version check) | `Start-DataBoot.ps1` | AC-28, AC-30 |
+| L2 | `$LASTEXITCODE` checked after venv creation and both pip installs; one `Fail` path: message, delete `.venv`, pause, `exit 1` | `Start-DataBoot.ps1` | AC-29 |
+| X1 | Per-sheet isolation: a corrupt sheet XML no longer fails the whole workbook (gate 171: build it) | `app/xlsx.py` (reader half only) | AC-25, AC-31 |
+| D1 | Test-only packages move to `requirements-dev.txt` (gate 171) | `requirements.txt`, `requirements-dev.txt`, `README.md` | W-5 |
+| T1 | Launcher text tests and the corrupt-sheet test | `tests/test_launcher_files.py`, `tests/test_acceptance.py` | AC-28..AC-31 |
+
+**Gate 171 overrides the PRD on AC-31.** The PRD (ticket 417) read "log AC-25 per-sheet isolation" as "write the
+gap down"; the Board answered "BUILD per-sheet isolation this round". I reworded AC-31 in acceptance.json to the
+built behaviour (other sheets list and open; the corrupt one shows as `book.xlsx - <sheet>`, `not a valid xlsx`)
+and changed PRD S4/C2 to match. Ids are unchanged.
+
+Done by the architect (ticket 418), so engineers need not redo it:
+- `requirements.txt` holds only runtime pins (fastapi, jinja2, uvicorn, pyarrow, openpyxl, python-pptx,
+  xlsxwriter); new `requirements-dev.txt` = `-r requirements.txt` + `httpx==0.28.1`, `pytest==9.1.1`. README
+  says `pip install -r requirements-dev.txt`. Nothing under `app/` imports httpx or pytest (grep), and the
+  Dockerfile, launcher and `wheels\` download keep using `requirements.txt`, so clients no longer get test tools.
+  The orchestrator's verify step lives in /opt/prodagents (not in this repo); it must install
+  `requirements-dev.txt` (open question for the Board; the image already has both today).
+- `tests/conftest.write_xlsx` accepts a sheet given as `bytes` and writes it verbatim as that sheet's XML, so a
+  test can build `{"Good": [...], "Bad": b"<<not xml", "Also": [...]}`.
+
+## Round 3: launcher design (L1, L2)
+DataBoot.bat runs `powershell` (Windows PowerShell 5.1), not pwsh. The venv branch of `Start-DataBoot.ps1`
+becomes the shape below. Folder dialog, folder check, the `-Docker` branch, the `wheels` offline install and the
+final `.venv\Scripts\python.exe -m app.launch $Folder` stay as they are.
+
+```powershell
+function Fail($Message) {
+    Write-Host $Message
+    if (Test-Path .venv) { Remove-Item -Recurse -Force .venv }
+    Read-Host "Press Enter to close" | Out-Null
+    exit 1
+}
+
+# Newest Python 3.11-3.13 first; 3.14 is rejected until every pinned dependency ships wheels for it (gate 171).
+$Candidates = @(@("py", "-3.13"), @("py", "-3.12"), @("py", "-3.11"), @("python"))
+$Check = "import sys; sys.exit(0 if (3, 11) <= sys.version_info[:2] <= (3, 13) else 1)"
+```
+- **Search** (AC-28): for each candidate, skip it if `Get-Command $c[0]` finds nothing; run
+  `$rest = @($c | Select-Object -Skip 1); & $c[0] @rest -c $Check` with output to `$null`; the first with `$LASTEXITCODE -eq 0` is used for
+  `-m venv .venv`. The version check runs for the `py` candidates too (one loop, and a broken `py` entry
+  is skipped rather than trusted). None found: `Fail "DataBoot needs Python 3.12. Install it with: winget
+  install -e --id Python.Python.3.12"` (exact text, gate 171).
+- **Checks** (AC-29): after `-m venv .venv`: `if ($LASTEXITCODE -ne 0) { Fail "Could not create the Python
+  environment (.venv)." }`; after the wheels pip install: `Fail "Could not install the packages from wheels."`;
+  after the online pip install: `Fail "Could not install the packages (pip install -r requirements.txt)."`.
+  Each message names its step. `exit 1` inside a function ends the script.
+- **PowerShell 5.1 pitfall**: with `$ErrorActionPreference = "Stop"`, redirecting a native command's stderr
+  (`2>$null`, `*>$null`) turns its first stderr line into a terminating NativeCommandError in 5.1. `py -3.13`
+  prints "No suitable Python runtime found" to stderr when 3.13 is missing, so the probe would throw instead of
+  moving on. Run the probe with `$ErrorActionPreference = "Continue"` set locally (inside a small function or a
+  `try/finally` that restores it), or wrap the probe in `try { ... } catch { }`. Same for `Get-Command`: use
+  `-ErrorAction SilentlyContinue`. There is no PowerShell in the image, so this cannot be run here; the
+  engineer writes it carefully and the Board runs it on Windows.
+- The venv is created with the same `$c[0] @rest -m venv .venv`. Keep the version list in one place
+  (`$Candidates`) so AC-30's test can read it; do not leave a literal `py -3.11 -m venv` line.
+
+## Round 3: per-sheet isolation design (X1)
+Root cause, probed in /tmp (ticket 418): openpyxl 3.1.5 `load_workbook(read_only=True)` builds a
+`ReadOnlyWorksheet` per sheet, and its `__init__` calls `_get_size()`, which parses the sheet XML until it meets
+`<dimension>`. A sheet with no `<dimension>` (every `conftest.write_xlsx` workbook) or a sheet that is not XML is
+parsed at load time, so one bad sheet makes `load_workbook` raise and `sheet_names` returns `not a valid xlsx`
+for the whole file. (An xlsxwriter workbook truncated after its `<dimension>` already isolates today.)
+
+Fix in `app/xlsx.py` only; `catalog.scan` already catches per sheet and builds `Unreadable(rel, reason, sheet)`
+(catalog.py L95-99), so no catalog, template or route change:
+- `_load(path, keep=None)`: copy the zip into a `BytesIO`, writing every worksheet part
+  (`xl/worksheets/*.xml`, not `_rels`) as an empty sheet
+  `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>`, except
+  the part named `keep`; then `load_workbook(copy, read_only=True, data_only=True)`. Styles, shared strings and
+  workbook.xml are copied as they are, so dates and sheet order are unchanged. Not a zip / no workbook part /
+  any open error: `ReadError("not a valid xlsx")` as today.
+- `sheet_names(path)`: `_load(path)` (all blanked), so the list never parses a sheet; returns
+  `book.sheetnames`; empty list still raises `not a valid xlsx`.
+- `read_sheet(path, sheet)`: find the part of `sheet` (`book[sheet]._worksheet_path` on the all-blanked load,
+  e.g. `xl/worksheets/sheet2.xml`), then `_load(path, keep=part)` and read as today. A parse error of that one
+  sheet raises `not a valid xlsx`, which scan records with the sheet name.
+- `path` may be a path or `BytesIO` (tests pass both); seek a `BytesIO` back to 0 before each copy.
+- The /tmp probe gave, for `{"Good": [[a, d], [1, date]], "Bad": <truncated or b"<<x">, "Also": [...]}`:
+  names `Good, Bad, Also`; Good and Also rows read (date as `datetime`); Bad raised `ParseError`.
+- `_worksheet_path` is a private openpyxl attribute; openpyxl is pinned at 3.1.5 and the tests catch a change.
+  Mark it with a `ponytail:` comment, and one for the copy cost: each sheet read rewrites the zip in memory
+  (uncompressed `ZIP_STORED` is fine), so a workbook with N sheets is copied N + 1 times at scan.
+- Known limit, not in scope: a sheet whose part is missing from the zip is dropped by openpyxl without an error,
+  so it is neither listed nor in "Could not be read" (probe: names `Good, Also`).
+
+## Round 2 changes (built, kept)
 | # | Change | Files | AC |
 |---|---|---|---|
 | R1 | XLSX export on **xlsxwriter** | `app/xlsx.py` (writer half replaced) | AC-18, AC-23 |
@@ -29,7 +117,8 @@ a corrupt `.parquet` (gate 165) so the suite passes with pyarrow installed.
 ## Stack and constraints
 - FastAPI + Jinja server-rendered pages; one vanilla JS module `app/static/js/dashboard.js` draws charts with
   Plotly. No framework, no build step.
-- Python 3.11 plus pinned libraries in requirements.txt: fastapi, jinja2, uvicorn, httpx, pytest, and for data
+- Python 3.11-3.13 (the image runs 3.11) plus pinned libraries in requirements.txt: fastapi, jinja2, uvicorn (httpx
+  and pytest are in requirements-dev.txt since round 3), and for data
   formats **xlsxwriter==3.3.0, python-pptx==1.0.2, openpyxl==3.1.5, pyarrow==26.0.0** (gates 162/164/165). All
   four import in the agent image (`python3 -c "import xlsxwriter, pptx, openpyxl, pyarrow"` gave 3.3.0 / 1.0.2 /
   3.1.5 / 26.0.0). None is vendored: nothing under `app/` or the repo root may contain their sources (AC-23).
@@ -42,6 +131,9 @@ a corrupt `.parquet` (gate 165) so the suite passes with pyarrow installed.
   responsive: true, displayModeBar: true}` (was `"hover"`, AC-24). No request leaves the machine (AC-9).
 
 ## Modules
+Round 3 touches only `app/xlsx.py` (reader: `_load(path, keep=None)`, X1) and `Start-DataBoot.ps1` (L1, L2);
+the "Round 2" column below is what round 2 changed.
+
 | File | Owns | Round 2 |
 |---|---|---|
 | `app/config.py` | `get() -> Settings` from env: `DATABOOT_DATA`, `DATABOOT_OUT`, `DATABOOT_MAX_ROWS` (200,000), `DATABOOT_MAP_CAP` (50,000), `DATABOOT_CHART_CAP` (5,000) | unchanged |
@@ -239,10 +331,11 @@ Layout is unchanged from round 1 (PRD constraint); only the writers change.
   python-pptx (lxml raises on them); keep one `_clean_text` helper in export.py.
 - Filenames: `<file stem>[-<sheet>].pptx` (unchanged).
 
-## Launcher (AC-11, AC-13; unchanged)
+## Launcher (AC-11, AC-13; venv branch changed in round 3, AC-28..AC-30)
 `python -m app.launch <folder> [--port 8765] [--no-browser]`; `DataBoot.bat` calls `Start-DataBoot.ps1`
 (venv by default; `-Docker` checks `docker info`, mounts `${Folder}:/data:ro`, runs the container, opens the
-browser). `Start-DataBoot.ps1` runs `pip install -r requirements.txt`, which now brings the four libraries.
+browser). The venv branch picks its Python and checks exit codes as in "Round 3: launcher design" above.
+`Start-DataBoot.ps1` runs `pip install -r requirements.txt` (runtime pins only since round 3).
 Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client machines: the `wheels\` folder
 (`pip download -r requirements.txt -d wheels` on a connected machine, Windows wheels) is used with `--no-index`.
 
@@ -273,6 +366,13 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
 | AC-22 | `<caption><h2>` (R5); no `text-transform` on `th` | each of the 5 captions matches `<caption>\s*<h2>NAME</h2>\s*</caption>` (First rows: `First \d+ rows`); `databoot.css` has no `uppercase`; a mixed-case header (`Latitude`, `LON`) appears verbatim in `<th>` |
 | AC-23 | requirements.txt pins; library writers | parse requirements.txt for the 4 exact pins; no file named `xlsxwriter`, `pptx`, `openpyxl`, `pyarrow` (dir or `.py`) under the repo outside `.venv`; `warnings.catch_warnings(record=True)` around `load_workbook` of an export: no message contains `no default style` |
 | AC-24 | `displayModeBar: true`, modebar CSS opacity 1, focusable buttons (R6) | Playwright, no hover: first `.modebar` computed `opacity` is `1` and visible; pressing Tab from the page top reaches an element with class `modebar-btn` |
+| AC-25 | per-sheet try/except in `scan` (round 2) plus X1 | existing `test_AC_25` (header-less `Lookup` sheet) stays; X1 adds the corrupt-XML case under AC-31 |
+| AC-26 | `INVALID_JSON` note (round 2) | existing `test_AC_26` |
+| AC-27 | `rules.py` country order, map3d `z_label` (round 2) | existing `test_AC_27` |
+| AC-28 | L1: `$Candidates` = `py -3.13`, `py -3.12`, `py -3.11`, `python`; each must pass `$Check` (3.11 <= version <= 3.13) | text checks on `Start-DataBoot.ps1` (no PowerShell in the image): `"-3.13"`, `"-3.12"`, `"-3.11"` appear in that order inside the `$Candidates` line, then `"python"`; the script contains `(3, 11) <= sys.version_info[:2] <= (3, 13)`; `-m venv .venv` is called on the chosen candidate, not on a literal version |
+| AC-29 | L2: `Fail` function; `$LASTEXITCODE -ne 0` check after venv and after each pip install; no-Python message | text checks: `function Fail` contains `Remove-Item -Recurse -Force .venv`, `Read-Host` and `exit 1`, in that order; the exact gate 171 message `DataBoot needs Python 3.12. Install it with: winget install -e --id Python.Python.3.12`; split the script at `-m venv .venv`, `--find-links wheels` and the online `pip install -r requirements.txt`: each piece after them holds `$LASTEXITCODE` before the next native command; every `Fail` call comes before the final `-m app.launch` line |
+| AC-30 | L1 keeps all versions in one list | a test fails if `re.search(r"py -3\.1\d+ -m venv", ps1)` matches, or if `$Candidates` lacks any of 3.13/3.12/3.11 or holds them out of order (same parser as AC-28) |
+| AC-31 | X1: `_load(path, keep)` blanks the other worksheet parts in an in-memory copy | `write_xlsx(data_dir / "book3.xlsx", {"Good": [("a","b"),(1,2)], "Bad": b"<<not xml", "Also": [("a","b"),(3,4)]})` and a second file whose `Bad` is a truncated sheet XML (e.g. `b'<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>a'`): home "Could not be read" has `book3.xlsx - Bad` with `not a valid xlsx`; Good and Also are in `/api/datasets` and their pages and `/charts` return 200; `book3.xlsx` alone (no sheet) is not in the unreadable table |
 
 ## Work items without AC ids: explicit checks
 - **W-1 Unreadable.sheet (gate 162)**: a workbook where one sheet fails lists `book.xlsx - <sheet>` in "Could not
@@ -282,8 +382,24 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
 - **W-3 chart items (gate 162)**: records.json country map `locations` = `["Brazil", "Japan", "France"]` (203,
   125, 68); points.tsv map3d `z_label` is `"value"` and `null` for a lat/lon-only file.
 - **W-4 line endings**: `git diff --stat tests/fixtures` empty; `.gitattributes` is exactly `* text=auto`.
+- **W-5 dev requirements (gate 171, done in ticket 418)**: `requirements.txt` has no `pytest` and no `httpx`
+  line; `requirements-dev.txt` starts with `-r requirements.txt` and pins `pytest==9.1.1`, `httpx==0.28.1`;
+  README's install line names `requirements-dev.txt`. `test_AC_23` still finds the four library pins in
+  requirements.txt. QA may add a text test for these lines.
 
 ## Tests that must change with the code (name them in the tickets)
+Round 3:
+- `tests/test_launcher_files.py:17` looks for the needle `"py -3.11"`, which L1 removes (the list holds
+  `"py", "-3.11"`). Replace that needle with `"-3.11"` (or move the version checks to the AC-28/30 tests); keep
+  every other needle (`FolderBrowserDialog`, `--no-index --find-links wheels`, `requirements.txt`,
+  `-m app.launch`, docker lines, `exit 1`, `[switch]$Docker`).
+- `tests/test_acceptance.py::test_AC_25`: its comment says a truncated sheet XML fails the whole workbook; after X1
+  that is false. Update the comment; the corrupt-XML assertions go in the new `test_AC_31`.
+- `tests/test_xlsx_read.py::test_broken` and `tests/test_catalog.py::test_failed_sheet_is_listed_with_its_name`
+  must still pass unchanged (not-a-zip stays `not a valid xlsx` for the whole file; the monkeypatched
+  `read_sheet` still gives `book.xlsx - Bad`).
+
+Round 2 (done):
 - `tests/test_parquet.py`: drop the `stdlib` fixture param and `test_snappy_copies` (fallback deleted, gate
   162); `test_unsupported_codec` (zstd) becomes "zstd reads, values equal flat.csv"; not-parquet bytes expect
   `not a valid parquet file`; nested schema keeps `unsupported parquet encoding`; `test_catalog_scan_lists_parquet`
@@ -301,7 +417,7 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
 - `tests/test_acceptance.py`, `tests/test_pages.py`: `<caption>Columns</caption>`-style literals and `_rows_of`
   must accept `<caption><h2>…</h2></caption>`; test_G_1 expects 9 parquet datasets; then the rename (R9).
 
-## Test fixtures (tests/conftest.py, unchanged)
+## Test fixtures (tests/conftest.py; round 3: `write_xlsx` takes raw sheet XML as `bytes`)
 `data_dir` builds: `sales.csv`, `points.tsv`, `notes.csv`, `empty.csv`, `broken.xlsx`, `manual.pdf`,
 `.hidden.csv`, `sub/records.json`, `sub/events.jsonl`, `sub/cities.geojson`, `sub/book.xlsx` (sheets `Revenue`
 with Excel date cells, `Lookup`). `write_xlsx` stays hand-written: openpyxl reads it (with the harmless "no
@@ -327,3 +443,15 @@ by pyarrow) with CSV twins `flat.csv`, `optional.csv`. Playwright fixtures are f
 8. Rows loaded on demand (LRU 4, 200,000-row cap), charts computed once server-side and shared by page, JSON and
    exports; server-rendered figures and captions (round 1, unchanged).
 9. Vendored Plotly 4.1.2 and sane-topojson 4.0.0 stay: they are browser assets, the only way to be offline (AC-9).
+10. (Round 3) Per-sheet isolation by blanking the other worksheet parts in an in-memory copy, not by calling
+    openpyxl's `ExcelReader` steps by hand: public `load_workbook` stays the only entry point, so styles, shared
+    strings and dates are read the way they are today, and the change stays inside `_load`. Cost: one in-memory
+    zip copy per sheet read.
+11. (Round 3) The version check runs on every candidate, `py` ones included: one loop, one rule (3.11-3.13), and a
+    `py` launcher that maps `-3.13` to something odd is still checked. 3.14 is rejected (gate 171).
+12. (Round 3) One `Fail` function for all four failure points (no Python, venv, wheels pip, online pip), so
+    the cleanup, pause and exit code cannot drift apart between them.
+13. (Round 3) Launcher tests are text checks: the image has no PowerShell (`which pwsh powershell` is empty,
+    ticket 417), so the real run is the Board's on Windows.
+14. (Round 3) AC-31 reworded rather than adding AC-32: gate 171 replaced the "log the gap" item with "build it",
+    and a doc-only AC would describe behaviour that is no longer true.

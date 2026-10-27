@@ -1,0 +1,84 @@
+{
+  "header": {
+    "ticket": 418,
+    "project": "you-think-of-the-project-name",
+    "from_role": "architect",
+    "phase": "architecture",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "4acf784af3ed",
+    "tokens_left": 1892262
+  },
+  "goal": "Write or update docs/ARCHITECTURE.md and adapt the scaffold for the approved spec.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/ARCHITECTURE.md explains how every acceptance item will be met",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py architecture",
+    "passed": true,
+    "output_tail": "........................................................................ [ 51%]\n...................................................................      [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 24 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 4 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_xlsx_read.py: 4 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n139 passed, 70 warnings in 102.67s (0:01:42)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Reworded AC-31 from 'ARCHITECTURE.md lists the gap' to the built behaviour (other sheets list and open, corrupt sheet listed as 'book.xlsx - <sheet>' with 'not a valid xlsx') and updated PRD S4/C2",
+      "why": "Board gate 171 (later than the PRD) says BUILD per-sheet isolation this round; a doc-only AC would describe behaviour that is no longer true",
+      "evidence": "gate 171; docs/acceptance.json AC-31; docs/PRD.md S4"
+    },
+    {
+      "what": "Per-sheet isolation by blanking the other worksheet parts in an in-memory zip copy before load_workbook (_load(path, keep=None)), only in app/xlsx.py",
+      "why": "openpyxl ReadOnlyWorksheet.__init__ -> _get_size parses sheet XML until <dimension> at load time, so one bad sheet fails the whole load; blanking keeps public load_workbook as the only entry point; catalog.scan already isolates per sheet",
+      "evidence": "openpyxl/worksheet/_read_only.py L42-52; /tmp/arch418/probe.py and probe2.py output; app/catalog.py:95-99"
+    },
+    {
+      "what": "Launcher: one $Candidates list (py -3.13, -3.12, -3.11, python), a version check on every candidate, and one Fail function (message, Remove-Item .venv, Read-Host, exit 1) for no Python, venv and both pip installs",
+      "why": "AC-28/29/30 and gate 171; one list makes the no-hardcoded-version test simple; one Fail stops the four failure paths from drifting apart",
+      "evidence": "docs/ARCHITECTURE.md 'Round 3: launcher design'; Start-DataBoot.ps1:34-42"
+    },
+    {
+      "what": "Split requirements: runtime pins in requirements.txt, requirements-dev.txt = -r requirements.txt + httpx, pytest; README install line",
+      "why": "Gate 171: clients should not get test tools; nothing in app/ imports httpx or pytest",
+      "evidence": "grep -rln 'httpx|pytest' app (no match); requirements-dev.txt; test_AC_23 still passes"
+    },
+    {
+      "what": "conftest.write_xlsx accepts a sheet given as bytes and writes it verbatim",
+      "why": "Lets QA build a corrupt-sheet workbook for AC-31 with one line",
+      "evidence": "tests/conftest.py write_xlsx"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First probe rewrote the zip with z.writestr(ZipInfo, data) while still reading the source",
+      "why_it_failed": "writestr mutates the shared ZipInfo (CRC, size), so the next read of the source raised 'Bad CRC-32'; read all parts into a dict first"
+    }
+  ],
+  "assumptions": [
+    "Reading 'log AC-25 per-sheet isolation' as building it follows gate 171, which overrides the PRD",
+    "DataBoot.bat runs Windows PowerShell 5.1 ('powershell'), so the 5.1 stderr/NativeCommandError pitfall applies",
+    "A sheet whose part is missing from the zip (silently dropped by openpyxl) is out of scope for AC-31"
+  ],
+  "open_questions": [
+    "The orchestrator's verify step (/opt/prodagents, outside the repo) should install requirements-dev.txt; the image already has pytest and httpx, so nothing fails today",
+    "The launcher cannot be run here (no PowerShell); the Board must try it on Windows with 3.12 + 3.14 and with no suitable Python"
+  ],
+  "lessons": [
+    {
+      "lesson": "Before designing a fix for an openpyxl read_only failure, check ReadOnlyWorksheet._get_size: read-only mode still parses each sheet's XML at load time until <dimension>, so hand-written fixtures without <dimension> behave differently from xlsxwriter files",
+      "when": "Any xlsx-reading bug that only shows with conftest.write_xlsx workbooks",
+      "evidence": "/tmp/arch418/probe.py: xlsxwriter truncated sheet isolates, hand-written one fails the whole load"
+    },
+    {
+      "lesson": "When a Board gate later than the PRD changes what an AC means, reword the AC in acceptance.json (same id) and note the override at the top of ARCHITECTURE.md, so check.py plan forces a ticket for it",
+      "when": "Architecture tickets that come after a spec gate with overrides",
+      "evidence": "gate 171 vs PRD AC-31; /opt/prodagents/check.py plan() 'due' set"
+    }
+  ],
+  "problems": []
+}

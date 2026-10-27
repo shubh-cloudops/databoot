@@ -26,6 +26,7 @@ def write_xlsx(path, sheets):
     """Minimal valid .xlsx (inline strings, no shared strings) from {sheet name: [rows]}.
 
     A cell given as ("date", serial) is written with built-in date format 14, as Excel stores dates.
+    A sheet given as bytes is written as its raw sheet XML, e.g. b"<<not xml" for a corrupt sheet (AC-31).
     """
     names = list(sheets)
     with zipfile.ZipFile(path, "w") as z:
@@ -59,6 +60,9 @@ def write_xlsx(path, sheets):
                    '<borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs>'
                    '<cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="14" applyNumberFormat="1"/></cellXfs></styleSheet>')
         for i, rows in enumerate(sheets.values(), 1):
+            if isinstance(rows, bytes):
+                z.writestr(f"xl/worksheets/sheet{i}.xml", rows)
+                continue
             out = []
             for r, row in enumerate(rows, 1):
                 cells = []

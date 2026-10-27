@@ -52,13 +52,12 @@ must say clearly what went wrong instead of crashing with a closed window.
   AC-25, AC-26).
 - S2. Other files are listed in an inventory with type, size and date (AC-15).
 - S3. Numbers use thousands separators (AC-21); the product is named DataBoot (AC-19).
-- S4. The AC-25 gap is logged: docs/ARCHITECTURE.md records that a workbook with one corrupt sheet XML is listed
-  whole as "not a valid xlsx" (its other sheets do not list), as a known gap for a later round (AC-31).
+- S4. A workbook with one corrupt sheet XML still lists its other sheets; the corrupt one is listed under "Could
+  not be read" with its sheet name (AC-31; Board gate 171 chose to build this, not only log it).
 
 ### Could
 - C1. Pick a different folder from the home page without restarting.
-- C2. Per-sheet isolation for corrupt sheet XML (round 3 candidate from gate 170; only if the Board confirms
-  that "log" means build it, see open questions).
+- C2. (Moved to S4 by gate 171.)
 
 ## Out of scope
 - Python 3.14 or older than 3.11; changes to DataBoot.bat, the Dockerfile, the `-Docker` path or other platforms.
