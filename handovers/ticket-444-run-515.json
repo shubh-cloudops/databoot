@@ -1,0 +1,84 @@
+{
+  "header": {
+    "ticket": 444,
+    "project": "you-think-of-the-project-name",
+    "from_role": "techlead",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "38d349eb1f24",
+    "tokens_left": 1887022
+  },
+  "goal": "Write plan/tickets.json: the build tickets for the approved architecture and design.",
+  "acceptance_criteria": [
+    {
+      "text": "Every acceptance item is covered by a ticket",
+      "passes": true
+    },
+    {
+      "text": "Each ticket is small, testable and has a layer",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py plan",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Replaced plan/tickets.json with this round's 13 tickets (7 backend, 6 frontend), above the preferred 3 to 8",
+      "why": "The round adds detection, two app layouts, global chart rules and exports; each ticket stays under about 200 lines. check.py plan allows up to 15",
+      "evidence": "check.py plan (1 to 15 tickets); docs/ARCHITECTURE.md 'Round 5 changes at a glance'"
+    },
+    {
+      "what": "Gate 180 answers placed in ticket goals: Explorer bar rule 1 in ticket 1; hex choropleth and doc fix in tickets 6 and 11; Map 3D by primary numeric in tickets 6 and 12; grey 'Other' trace with no pointer in tickets 10 and 12",
+      "why": "Board answers override the architecture text, which still says markers (L148) and first-numerical 3D (L155)",
+      "evidence": "gate 180 in the prompt; docs/ARCHITECTURE.md L144-157; docs/DESIGN.md L172-176, L184-189"
+    },
+    {
+      "what": "Explorer zero baseline is a new `baseline: 0` key on bar dicts from rules._bars, drawn by dashboard.js as rangemode tozero",
+      "why": "_bars already sorts descending, so the backend part is a test plus a data contract the frontend can follow",
+      "evidence": "app/rules.py:121-138"
+    },
+    {
+      "what": "Business and Map branches of _appview are wired in their own tickets; the A1 ticket wires only Explorer",
+      "why": "Each ticket leaves the app working and testable; the existing page and its tests stay unchanged until the page ticket",
+      "evidence": "docs/ARCHITECTURE.md 'Round 5: request flow'; app/business.py and app/geo.py are empty stubs"
+    },
+    {
+      "what": "The default-app test edits (`?app=explorer`) sit in the page-shell ticket and the export edits in the export ticket",
+      "why": "Lesson: put each existing-test edit in the ticket that changes the behaviour",
+      "evidence": "docs/ARCHITECTURE.md 'Tests that must change with the code', Round 5"
+    },
+    {
+      "what": "AC-57 is assigned to tickets 1 and 10 (they update DESIGN.md) and AC-58 to the offline test ticket",
+      "why": "Changed AC text needs a ticket under check.py plan",
+      "evidence": "check.py plan; docs/DESIGN.md 'Global chart rules' already exists"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First plan draft",
+      "why_it_failed": "check.py plan reported AC-39 and AC-40 uncovered (reworded, not new); added them to the cross-filter wording criterion in ticket 9 and the filtered-export criterion in ticket 7"
+    }
+  ],
+  "assumptions": [
+    "Build tickets may make mechanical `?app=explorer` edits to tests/test_acceptance.py, as docs/ARCHITECTURE.md lists; no other edit to that file is planned",
+    "Ticket 6 may edit docs/ARCHITECTURE.md and docs/PRD.md, and ticket 10 may edit docs/DESIGN.md",
+    "The grey 'Other' bar uses the `--muted` token (the Board said muted ink); DESIGN.md's `--line-strong` wording is changed to match in ticket 10",
+    "Suppressing the pointer cursor over one bar needs a hover/unhover class toggle, because Plotly sets the cursor per chart; the frontend engineer chooses the exact method"
+  ],
+  "open_questions": [
+    "If tests/test_acceptance.py is off limits to build tickets, tickets 7 and 8 fail verify and those mechanical edits need a QA-owned ticket instead"
+  ],
+  "lessons": [
+    {
+      "lesson": "Reworded ACs (same id) still count as changed in check.py plan. Diff acceptance.json by id against the New round commit and give each reworded id a verifying criterion in a ticket that touches that behaviour.",
+      "when": "Planning a round after a PM rewording gate",
+      "evidence": "check.py plan failed on AC-39 and AC-40 until covered"
+    }
+  ],
+  "problems": []
+}
