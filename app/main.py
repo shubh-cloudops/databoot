@@ -59,6 +59,7 @@ def dashboard(request: Request, id: str):
         "badge": f"App: {apps.NAMES[det['app']]} (rule {det['rule']})", "view_as": view_as, "appq": bool(appq),
         "charts": _appview(d, f, "explorer")["charts"] if shown == "explorer" else [],
         "biz": _appview(d, f, "business", shown if appq else None) if shown == "business" else {},
+        "geo": _appview(d, f, "map") if shown == "map" else {},
         "kpis": v["kpis"], "options": v["options"], "labels": v["labels"], "filters": f, "chips": chips,
         "clear": url(*appq), "query": urlencode(f + appq)})
 

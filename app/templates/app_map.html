@@ -1,2 +1,6 @@
-{% include "_filters.html" %}
+{% from "_figure.html" import figure %}{% include "_filters.html" %}
+<div class="map-layout">{% if geo.charts %}
+  {{ figure(geo.charts[0]) }}{% endif %}
+  <aside class="map-panel" aria-live="polite"></aside>
+</div>
 {% include "_tables.html" %}

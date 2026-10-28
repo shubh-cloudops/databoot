@@ -23,7 +23,7 @@
   function tokens() {
     var css = getComputedStyle(document.documentElement);
     var t = {};
-    ["--fg", "--bg", "--muted", "--line", "--line-strong", "--surface", "--font", "--seq-lo", "--seq-hi",
+    ["--fg", "--bg", "--muted", "--line", "--line-strong", "--surface", "--font", "--seq-lo", "--seq-hi", "--seq-pt-lo",
       "--div-neg", "--div-mid", "--div-pos"].forEach(function (n) { t[n] = css.getPropertyValue(n).trim(); });
     t.c = [];
     for (var i = 1; i <= 8; i++) t.c.push(css.getPropertyValue("--c" + i).trim());
@@ -152,6 +152,44 @@
       return [[{ type: "choropleth", locations: c.data.locations, z: c.data.values, locationmode: c.data.locationmode,
         colorscale: [[0, t["--seq-lo"]], [1, t["--seq-hi"]]], marker: { line: { color: t["--line-strong"], width: 0.5 } },
         colorbar: { outlinewidth: 0, thickness: 12, tickfont: { color: t["--fg"] } } }], l];
+    },
+    // Map app (DESIGN.md "map2d"): points on the point scale, or (hex mode) one choropleth of hexagons built from the server's centres.
+    map2d: function (c, t, l) {
+      var d = c.data, scale = [[0, t["--seq-pt-lo"]], [1, t["--seq-hi"]]];
+      var bar = function (title) {
+        return { outlinewidth: 0, thickness: 12, tickformat: ",", tickfont: { color: t["--fg"] }, title: { text: title || "", font: { color: t["--fg"] } } };
+      };
+      delete l.xaxis; delete l.yaxis;
+      l.margin = { l: 0, r: 0, t: 32, b: 0 };
+      l.dragmode = phone.matches ? false : "pan";  // a finger drag scrolls the page on the phone
+      l.geo = { projection: { type: "natural earth" }, fitbounds: "locations", showframe: false, showcoastlines: true,
+        coastlinecolor: t["--line-strong"], showcountries: true, countrycolor: t["--line-strong"], showland: true,
+        landcolor: t["--bg"], bgcolor: t["--surface"], showocean: false, showlakes: false };
+      if (d.mode === "hex") {
+        var ring = /* clockwise: d3-geo reads the other winding as the whole globe minus the cell */ [30, 330, 270, 210, 150, 90, 30].map(function (a) { return a * Math.PI / 180; });
+        var features = d.lon.map(function (x, i) {
+          return { type: "Feature", id: String(i), properties: {}, geometry: { type: "Polygon", coordinates: [ring.map(function (a) {
+            return [Math.max(-180, Math.min(180, x + d.size * Math.cos(a))), Math.max(-90, Math.min(90, d.lat[i] + d.size * Math.sin(a)))];  // edge cells must not cross the antimeridian or a pole
+          })] } };
+        });
+        return [[{ type: "choropleth", geojson: { type: "FeatureCollection", features: features }, featureidkey: "id",
+          locations: features.map(function (f) { return f.id; }), z: d.count, customdata: d.lon.map(function (x, i) { return [x, d.lat[i]]; }),
+          colorscale: scale, marker: { line: { color: t["--bg"], width: 0.5 } }, hovertemplate: "%{z:,} points<extra></extra>",
+          colorbar: bar("Points per cell") }], l];
+      }
+      var has = [], none = [];
+      d.color.forEach(function (v, i) { (v === null ? none : has).push(i); });
+      var pick = function (ix, k) { return ix.map(function (i) { return d[k][i]; }); };
+      var line = { color: t["--muted"], width: 0.5 };
+      var traces = [];
+      if (has.length) traces.push({ type: "scattergeo", mode: "markers", name: c.z_label, lon: pick(has, "lon"), lat: pick(has, "lat"), customdata: has,
+        hovertemplate: "%{marker.color:,}<extra></extra>",
+        marker: { size: 6, opacity: 0.8, line: line, color: pick(has, "color"), colorscale: scale, colorbar: bar(c.z_label) } });
+      if (none.length) traces.push({ type: "scattergeo", mode: "markers", name: "no value", lon: pick(none, "lon"), lat: pick(none, "lat"), customdata: none,
+        hovertemplate: "%{lat}, %{lon}<extra></extra>", marker: { size: 6, opacity: 0.8, line: line, color: t["--muted"] } });
+      l.showlegend = traces.length > 1;
+      l.legend = { orientation: "h", x: 0, y: 0, bgcolor: t["--surface"] };
+      return [traces, l];
     }
   };
 
@@ -164,7 +202,7 @@
     [l.xaxis, l.yaxis, sc.xaxis, sc.yaxis, sc.zaxis].forEach(function (a) {
       if (a && a.type !== "date" && a.type !== "category") a.hoverformat = ",";
     });
-    data.forEach(function (tr) { if (HOVER[tr.type]) tr.hovertemplate = HOVER[tr.type]; });
+    data.forEach(function (tr) { if (HOVER[tr.type] && !tr.hovertemplate) tr.hovertemplate = HOVER[tr.type]; });
   }
 
   // "View as table": [head, rows] from the traces handed to Plotly (plot.data).
@@ -180,6 +218,13 @@
         var z = tr.z[i][j]; rows.push([yl, xl, z === null ? "" : z.toFixed(2)]);
       }); });
       return [["Column", "Column", "Correlation"], rows];
+    }
+    if (tr.type === "scattergeo") {
+      var col = tr.marker.color;  // the no-value trace has one colour, not an array
+      return [[c.x_label, c.y_label, c.z_label || "Value"], zip(tr.lon, tr.lat, tr.lon.map(function (_, i) { return Array.isArray(col) ? col[i] : null; }))];
+    }
+    if (tr.type === "choropleth" && tr.geojson) {  // hexagon cells: centre and count
+      return [[c.x_label, c.y_label, "Points per cell"], zip(tr.customdata.map(function (p) { return p[0]; }), tr.customdata.map(function (p) { return p[1]; }), tr.z)];
     }
     if (tr.type === "choropleth") return [[c.x_label || "Location", c.y_label || "Value"], zip(tr.locations, tr.z)];
     if (tr.type === "scatter3d") {
@@ -302,7 +347,7 @@
       try {
         var made = build[c.kind](c, t, layout(t, c));
         globalRules(made[0], made[1]);
-        Plotly.newPlot(plot, made[0], made[1], CONFIG).then(function () { keyboardBar(plot); barCursor(plot, c); crossFilter(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });
+        Plotly.newPlot(plot, made[0], made[1], c.kind === "map2d" ? Object.assign({}, CONFIG, { scrollZoom: false }) : CONFIG).then(function () { keyboardBar(plot); barCursor(plot, c); crossFilter(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });
       } catch (e) { fail(plot); }
     });
   }

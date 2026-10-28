@@ -1,0 +1,105 @@
+{
+  "header": {
+    "ticket": 455,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1895616
+  },
+  "goal": "Map page part 1: 70vh scattergeo with sequential point colours and hexagon choropleth cells (M2a; Board gate 180: hex cells are choropleth polygons per DESIGN.md, not markers)",
+  "acceptance_criteria": [
+    {
+      "text": "app_map.html: filters and chips, `<div class=\"map-layout\">` with the map2d figure (data-kind=map2d, via the figure macro) and `<aside class=\"map-panel\" aria-live=\"polite\">` (empty for now), Columns, First rows; no <p> in main; `N of M rows` in .chart-count (the template's `points` set does not include map2d)",
+      "passes": true
+    },
+    {
+      "text": "dashboard.js map2d builder, points mode: one `scattergeo` (natural earth projection, fitbounds locations, outline from the bundled topojson, no external request), markers size 6, opacity 0.8, 0.5px --muted outline, colour = primary numeric on the --seq-pt-lo to --seq-hi scale, colour bar titled with z_label; rows with no value form a second trace in --muted; each trace sets customdata = the point's position in the chart's rows; hover shows value with separators",
+      "passes": true
+    },
+    {
+      "text": "Hex mode: the browser builds one GeoJSON of hexagons from the server's centres and size (vertices at 30, 90, 150, 210, 270, 330 degrees times size from the centre) and draws one `choropleth` with z = count on the same sequential scale, colour bar titled `Points per cell`, 0.5px --bg cell edges, hover `1,234 points`; no hexagon markers",
+      "passes": true
+    },
+    {
+      "text": "Plot height is 65 to 75% of the viewport height at 1280x900 and at 390x844 (CSS .map-layout / .plot rule, 70vh); phone width (<= 599px) sets dragmode false; no sideways scroll",
+      "passes": true
+    },
+    {
+      "text": "tests/test_map_page.py (Playwright): places.csv has a scattergeo trace with 20 marks, colour data equal to pop, colour bar title `pop`, colorscale of two stops; plot height / viewport height in 0.65..0.75 at both widths; big_csv draws a choropleth trace whose z sums to 60,000 and fewer than 60,000 cells, hover label has `points` with a separator (`1,234`-style); no console errors; test_AC_6 / test_AC_9 (offline, local topojson) still pass",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-51, AC-52 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 25%]\n........................................................................ [ 50%]\n........................................................................ [ 76%]\n....................................................................     [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 2 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n284 passed, 107 warnings in 235.21s (0:03:55)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Hexagon rings are written clockwise (30, 330, 270, 210, 150, 90, 30 degrees) and vertices clamped to lon +-180 and lat +-90",
+      "why": "Plotly geo (d3-geo) treats counter-clockwise rings, and cells crossing the antimeridian or a pole, as the whole globe minus the cell; the first screenshot filled the whole map",
+      "evidence": "app/static/js/dashboard.js map2d builder; /tmp/shots/map_big_1280.png"
+    },
+    {
+      "what": "globalRules only sets HOVER[tr.type] when the trace has no hovertemplate",
+      "why": "The generic choropleth template would overwrite the hex hover '%{z:,} points'",
+      "evidence": "app/static/js/dashboard.js globalRules"
+    },
+    {
+      "what": "main.py dashboard passes geo = _appview(d, f, 'map') when the Map app is shown",
+      "why": "The template needs chart-1 (shown, total, rule) to render the figure macro; the lru_cache makes the later /app call reuse it",
+      "evidence": "app/main.py dashboard"
+    },
+    {
+      "what": "scrollZoom false for map2d via a per-chart copy of CONFIG",
+      "why": "DESIGN.md: wheel zoom stays off on the map; other figures (3D) keep Plotly defaults",
+      "evidence": "app/static/js/dashboard.js draw"
+    },
+    {
+      "what": "tableOf handles scattergeo (lon, lat, z_label) and the hex choropleth (centre lon, lat, Points per cell)",
+      "why": "The table toggle runs on every figure and would throw on these trace types",
+      "evidence": "app/static/js/dashboard.js tableOf"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Hex ring in the order 30, 90, ..., 330 degrees",
+      "why_it_failed": "Counter-clockwise winding makes Plotly fill the whole globe for every cell"
+    },
+    {
+      "what": "Hovering the first .choroplethlayer path in the hover test",
+      "why_it_failed": "It was off-screen or an edge cell; the test now hovers the middle cell after scrolling into view"
+    }
+  ],
+  "assumptions": [
+    "Hover on a coloured point shows only the value (marker.color with separators); the data has no place name to show",
+    "The legend appears only when the muted no-value trace exists, named 'no value'",
+    "Hex cell ids are the cell index as a string (featureidkey id)"
+  ],
+  "open_questions": [
+    "Hover for hex cells with count 1 reads '1 points'; the ticket gives the 'N points' form, so I left it",
+    "The side panel and regions figure are still empty (next ticket); no click handler on points or cells yet"
+  ],
+  "lessons": [
+    {
+      "lesson": "Plotly choropleth with an inline GeoJSON needs clockwise exterior rings and vertices inside +-180/+-90, or each polygon covers the whole globe; screenshot a sparse fixture to catch it",
+      "when": "Building polygons for a Plotly geo choropleth in the browser",
+      "evidence": "tickets 455: map_big_1280.png before and after"
+    },
+    {
+      "what": "",
+      "lesson": "SVG hover labels (.hovertext) need text_content(), not inner_text(); scroll a chosen cell into view before moving the mouse over it",
+      "when": "Testing Plotly hover labels in Playwright",
+      "evidence": "tests/test_map_page.py::test_hex_hover_label_has_a_separator"
+    }
+  ],
+  "problems": []
+}
