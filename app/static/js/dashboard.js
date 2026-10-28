@@ -2,6 +2,15 @@
 // Spec: docs/DESIGN.md "Charts". Colours come from the CSS tokens at draw time; the OS decides light or dark.
 (function () {
   "use strict";
+  // Keep the address clean: empty fields are not sent (re-enabled when Back restores the page from cache).
+  var form = document.querySelector("form.filters");
+  if (form) {
+    form.addEventListener("submit", function () {
+      form.querySelectorAll("select, input").forEach(function (f) { if (!f.value) f.disabled = true; });
+    });
+    window.addEventListener("pageshow", function () { form.querySelectorAll(":disabled").forEach(function (f) { f.disabled = false; }); });
+  }
+
   var plots = document.querySelectorAll(".chart .plot");
   var id = (location.pathname.match(/\/datasets\/([^/]+)/) || [])[1];
   if (!plots.length || !id) return;
@@ -164,6 +173,22 @@
     fix();
   }
 
+  // Click on a bar or donut slice of a categorical column sets f.<column> to that category (AND with the other
+  // filters); clicking the active value again removes it. Only columns with a dropdown (<= 50 values) filter.
+  function crossFilter(plot, c) {
+    if (c.kind !== "bar" && c.kind !== "donut") return;
+    var key = "f." + c.x_label;
+    if (![].some.call(document.querySelectorAll("form.filters select"), function (s) { return s.name === key; })) return;
+    plot.on("plotly_click", function (ev) {
+      var pt = ev.points && ev.points[0];
+      if (!pt) return;
+      var value = String(c.kind === "donut" ? pt.label : pt.data && pt.data.orientation === "h" ? pt.y : pt.x);
+      var p = new URLSearchParams(location.search);
+      if (p.get(key) === value) p.delete(key); else p.set(key, value);
+      location.assign(location.pathname + (p.toString() ? "?" + p : ""));
+    });
+  }
+
   function draw() {
     var t = tokens();
     charts.forEach(function (c) {
@@ -172,13 +197,13 @@
       if (!plot) return;
       try {
         var made = build[c.kind](c, t, layout(t, c));
-        Plotly.newPlot(plot, made[0], made[1], CONFIG).then(function () { keyboardBar(plot); }).catch(function () { fail(plot); });
+        Plotly.newPlot(plot, made[0], made[1], CONFIG).then(function () { keyboardBar(plot); crossFilter(plot, c); }).catch(function () { fail(plot); });
       } catch (e) { fail(plot); }
     });
   }
 
   plots.forEach(function (p) { p.classList.add("is-loading"); });
-  fetch("/api/datasets/" + id + "/charts")
+  fetch("/api/datasets/" + id + "/charts" + location.search)
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function (body) {
       charts = body.charts;
