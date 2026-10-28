@@ -1,0 +1,87 @@
+{
+  "header": {
+    "ticket": 449,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1940508
+  },
+  "goal": "Map figures part 1: valid coordinates, points mode, hexbin mode as a GeoJSON choropleth source (M1a; Board gate 180: hex cells are choropleth polygons per DESIGN.md, so the server sends centres and size, not marker data)",
+  "acceptance_criteria": [
+    {
+      "text": "app/geo.py view(columns, rows, typed, mapping, settings) returns {\"charts\": [map2d], \"map3d\": None} (map3d and regions come in the next Map ticket); wired into main._appview for app == \"map\"; primary numeric = apps.measures(...)[0] or None",
+      "passes": true
+    },
+    {
+      "text": "valid points = rows with lat in -90..90 and lon in -180..180; points.tsv / places.csv: 20 rows give mode \"points\" with data lon, lat, color (primary numeric or None) and row (view row index), z_label = primary name (places.csv: pop), columns and rows holding the drawn rows as strings (at most 5000)",
+      "passes": true
+    },
+    {
+      "text": "more than 5000 valid points (big_csv, 60,000) give mode \"hex\" with data lon, lat, count, size: cell size s = lon span / 40 (1.0 when the span is 0), pointy-top axial rounding as in ARCHITECTURE.md 'Round 5: Map app' (hex cell centres), sorted by (q, r); sum(count) == number of valid points and len(count) < 60000",
+      "passes": true
+    },
+    {
+      "text": "shown = valid points, total = view rows, in both modes; the chart dict uses the existing _chart shape plus the keys above (kind \"map2d\")",
+      "passes": true
+    },
+    {
+      "text": "A hex test with a hand-checkable file (three points in one cell, one in another, size fixed by the lon span) checks the counts; the unit test for points mode checks colour data equals pop and the None-colour rows",
+      "passes": true
+    },
+    {
+      "text": "The hex test file is built inline in tests/test_geo.py (a 5,001-row file is enough: set the module constant HEX_AT via monkeypatch for the small cases)",
+      "passes": true
+    },
+    {
+      "text": "/app for places.csv returns shown map and charts[0].kind map2d; for big_csv mode hex",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-51, AC-52 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 29%]\n........................................................................ [ 58%]\n........................................................................ [ 87%]\n..............................                                           [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n246 passed, 100 warnings in 159.86s (0:02:39)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Valid points are found with apps.roles (lat/lon indexes) and a range test on typed rows",
+      "why": "Same lat/lon detection as the app rule, no second implementation",
+      "evidence": "app/geo.py view; app/apps.py roles"
+    },
+    {
+      "what": "mode lives in chart['data']['mode'] ('points' or 'hex'); columns/rows only in points mode; z_label in both",
+      "why": "ARCHITECTURE.md Map app puts mode in data; rows are only needed for the side panel in points mode",
+      "evidence": "docs/ARCHITECTURE.md L138-148; tests/test_geo.py"
+    },
+    {
+      "what": "Hex centres are returned as lon = s*sqrt(3)*(q + r/2), lat = s*1.5*r, sorted by (q, r), using cube rounding",
+      "why": "As in the ARCHITECTURE.md formulas; the choropleth polygons are built by the frontend from centre and size (gate 180)",
+      "evidence": "app/geo.py _hex; tests/test_geo.py::test_hex_counts_by_hand"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The chart carries id 'chart-1' (regions chart will be chart-2 in the next ticket)",
+    "Score is 0.6 for 2+ points, else 0, as for the Explorer map3d",
+    "Missing cells in the drawn rows are the empty string"
+  ],
+  "open_questions": [
+    "docs/ARCHITECTURE.md L147-148 still says hexagon markers; gate 180 says the architect updates it (not done here, outside this ticket)"
+  ],
+  "lessons": [
+    {
+      "lesson": "Run tests with python3; `python` is not on PATH in this sandbox",
+      "when": "running pytest or check.py",
+      "evidence": "bash: python: command not found"
+    }
+  ],
+  "problems": []
+}

@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import apps, business, catalog, config, export, filters, profile, rules, xlsx
+from app import apps, business, catalog, config, export, filters, geo, profile, rules, xlsx
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -100,13 +100,16 @@ def _shown(d, params):
 
 @lru_cache(maxsize=8)
 def _appview(d, f, app, app_param=None):
-    """Figures of one app under filters f; the Map branch is added by its own ticket."""
+    """Figures of one app under filters f."""
     if app == "explorer":
         v = _view(d, f)
         return {"charts": rules.charts(d.columns, v["typed"], v["mapping"], config.get())}
     if app == "business":
         v = _view(d, f)
         return business.view(d.columns, v["rows"], v["typed"], v["mapping"], f, v["options"], app_param)
+    if app == "map":
+        v = _view(d, f)
+        return geo.view(d.columns, v["rows"], v["typed"], v["mapping"], config.get())
     return {}
 
 
