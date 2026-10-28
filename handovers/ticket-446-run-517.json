@@ -1,0 +1,88 @@
+{
+  "header": {
+    "ticket": 446,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1947862
+  },
+  "goal": "Archetype detection and the /app route (A1; Board gate 179: roles from the existing profiler, primary amount by name rule, View-as hidden when only Explorer qualifies)",
+  "acceptance_criteria": [
+    {
+      "text": "app/apps.py holds roles(columns, mapping, typed), RULES = ordered list of (rule id, app, condition) for R1 map, R2 business, R3 explorer, NAMES, detect(...) -> {\"app\", \"rule\", \"qualifies\"} (qualifies in RULES order) and measures(columns, mapping) as in ARCHITECTURE.md 'Round 5: detection'",
+      "passes": true
+    },
+    {
+      "text": "measures: numerical columns whose name matches amount|revenue|sales|total|price|value|cost|qty|quantity (case-insensitive) first, then the other numerical columns, each group in column order, first 3; element 0 is the primary amount; no match falls back to the first numerical; unit tests: shop.csv gives [revenue, units], measures.csv gives [a, b, c], and a file with columns `a, Total, qty` gives [Total, qty, a]",
+      "passes": true
+    },
+    {
+      "text": "detect on the archetypes_dir fixtures: shop.csv business/R2 qualifies [business, explorer]; places.csv map/R1 qualifies [map, explorer]; measures.csv explorer/R3 qualifies [explorer]; sparse.csv (lat/lon in 4 of 10 rows, 3 numericals) is not map (explorer/R3)",
+      "passes": true
+    },
+    {
+      "text": "app/main.py: `_detected(d)` (lru_cache, computed on the unfiltered _base rows), `_shown(d, params)` (valid `app` param only when it is in qualifies, else the detected app), `_appview(d, f, app)` (lru_cache) where only the explorer branch is wired now (business and map branches are added by the Business and Map tickets and return {} until then), and `_view` no longer computes \"charts\" but returns the filtered typed rows under \"typed\"",
+      "passes": true
+    },
+    {
+      "text": "Every current `v[\"charts\"]` use in app/main.py (charts API, dashboard route, both exports) reads `_appview(d, f, \"explorer\")[\"charts\"]`; /api/datasets/{id}/charts output and the pages are byte-for-byte unchanged (existing tests stay green without edits)",
+      "passes": true
+    },
+    {
+      "text": "New route GET /api/datasets/{id}/app returns {dataset, app, rule, qualifies, shown, filters, charts (shown app's charts with ids chart-1..N)}; app and rule are always the detected ones, so two requests, and a request with filters, give equal app, rule and qualifies; `?app=map` on shop.csv gives shown business; unknown id gives 404 like the charts route",
+      "passes": true
+    },
+    {
+      "text": "tests/conftest.py make_client already clears _detected and _appview; new tests in tests/test_apps.py use archetypes_dir and the existing 404 style",
+      "passes": true
+    },
+    {
+      "text": "Time check kept: tests/test_speed.py and test_AC_42 still pass (no Explorer rules run for the API when another app is shown is covered by the later tickets)",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-43, AC-45 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 33%]\n........................................................................ [ 66%]\n........................................................................ [ 99%]\n.                                                                        [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n217 passed, 99 warnings in 159.94s (0:02:39)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "R1 condition guards rows > 0 explicitly instead of coords >= 0.5*rows",
+      "why": "With 0 rows that comparison is true, but ARCHITECTURE says an empty dataset has share 0 and maps only with N <= 2",
+      "evidence": "app/apps.py RULES; docs/ARCHITECTURE.md L88"
+    },
+    {
+      "what": "_appview returns {} for any app other than explorer; the /app route reads charts with .get('charts', [])",
+      "why": "Business and Map branches belong to later tickets",
+      "evidence": "app/main.py _appview, dataset_app"
+    },
+    {
+      "what": "roles() returns coords as a count together with rows, and I as the leftover column indexes",
+      "why": "Lets RULES stay simple lambdas over one dict",
+      "evidence": "app/apps.py roles"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The /app 'filters' field is the filter labels (same as /charts 'filters')",
+    "Explorer charts from rules.charts already carry ids chart-1..N, so /app needs no re-numbering"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "The sandbox has python3 only; use `python3 -m pytest` when `python` is not found",
+      "when": "Running tests in this environment",
+      "evidence": "bash: python: command not found"
+    }
+  ],
+  "problems": []
+}

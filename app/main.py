@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import catalog, config, export, filters, profile, rules, xlsx
+from app import apps, catalog, config, export, filters, profile, rules, xlsx
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -46,10 +46,11 @@ def dashboard(request: Request, id: str):
     d = _dataset(id)
     v = _view(d, filters.parse(request.query_params, d.columns, _base(d)[1]))
     f = v["filters"]
+    charts = _appview(d, f, "explorer")["charts"]
     chips = [(label, f"/datasets/{d.id}" + ("?" + urlencode(f[:i] + f[i + 1:]) if len(f) > 1 else ""))
              for i, label in enumerate(v["labels"])]
     return templates.TemplateResponse(request, "dataset.html", {
-        "title": f"{d.path} - DataBoot", "d": d, "types": v["mapping"], "charts": v["charts"], "rows": v["rows"][:20],
+        "title": f"{d.path} - DataBoot", "d": d, "types": v["mapping"], "charts": charts, "rows": v["rows"][:20],
         "points": {"map3d", "line", "scatter"}, "kpis": v["kpis"], "options": v["options"], "labels": v["labels"],
         "filters": f, "chips": chips, "query": urlencode(f)})
 
@@ -74,22 +75,53 @@ def _base(d):
 
 @lru_cache(maxsize=8)
 def _view(d, f):
-    """Rows, charts and KPIs of one dataset under filters f (a filters.parse tuple); types stay those of all rows."""
+    """Rows, typed rows and KPIs of one dataset under filters f (a filters.parse tuple); types stay those of all rows."""
     rows, mapping, typed, options = _base(d)
     keep = filters.apply(f, d.columns, mapping, typed)
     if keep is not None:
         rows, typed = [rows[i] for i in keep], [typed[i] for i in keep]
     labels = filters.labels(f, d.columns, mapping)
     return {"rows": rows, "mapping": mapping, "options": options, "filters": f, "labels": labels,
-            "charts": rules.charts(d.columns, typed, mapping, config.get()),
-            "kpis": rules.kpis(d.columns, rows, typed, mapping)}
+            "typed": typed, "kpis": rules.kpis(d.columns, rows, typed, mapping)}
+
+
+@lru_cache(maxsize=4)
+def _detected(d):
+    """Detected app of one dataset, on the unfiltered rows so the same file gives the same app under any filter."""
+    _, mapping, typed, _ = _base(d)
+    return apps.detect(d.columns, mapping, typed)
+
+
+def _shown(d, params):
+    """The app drawn: the valid `app` param when the dataset qualifies for it, else the detected app."""
+    det = _detected(d)
+    return params.get("app") if params.get("app") in det["qualifies"] else det["app"]
+
+
+@lru_cache(maxsize=8)
+def _appview(d, f, app):
+    """Figures of one app under filters f; the Business and Map branches are added by their own tickets."""
+    if app == "explorer":
+        v = _view(d, f)
+        return {"charts": rules.charts(d.columns, v["typed"], v["mapping"], config.get())}
+    return {}
+
+
+@app.get("/api/datasets/{id}/app")
+def dataset_app(request: Request, id: str):
+    d = _dataset(id)
+    f = filters.parse(request.query_params, d.columns, _base(d)[1])
+    shown = _shown(d, request.query_params)
+    return {"dataset": d.id, **_detected(d), "shown": shown, "filters": _view(d, f)["labels"],
+            "charts": _appview(d, f, shown).get("charts", [])}
 
 
 @app.get("/api/datasets/{id}/charts")
 def dataset_charts(request: Request, id: str):
     d = _dataset(id)
-    v = _view(d, filters.parse(request.query_params, d.columns, _base(d)[1]))
-    return {"dataset": d.id, "charts": v["charts"], "kpis": v["kpis"], "filters": v["labels"]}
+    f = filters.parse(request.query_params, d.columns, _base(d)[1])
+    v = _view(d, f)
+    return {"dataset": d.id, "charts": _appview(d, f, "explorer")["charts"], "kpis": v["kpis"], "filters": v["labels"]}
 
 
 def _download(d, ext, body, media_type):
@@ -103,13 +135,15 @@ def _download(d, ext, body, media_type):
 @app.get("/datasets/{id}/export.xlsx")
 def export_xlsx(request: Request, id: str):
     d = _dataset(id)
-    v = _view(d, filters.parse(request.query_params, d.columns, _base(d)[1]))
-    return _download(d, "xlsx", xlsx.write(d, v["rows"], v["charts"], filters.summary(v["labels"])), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    f = filters.parse(request.query_params, d.columns, _base(d)[1])
+    v = _view(d, f)
+    return _download(d, "xlsx", xlsx.write(d, v["rows"], _appview(d, f, "explorer")["charts"], filters.summary(v["labels"])), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @app.get("/datasets/{id}/export.pptx")
 def export_pptx(request: Request, id: str):
     d = _dataset(id)
-    v = _view(d, filters.parse(request.query_params, d.columns, _base(d)[1]))
+    f = filters.parse(request.query_params, d.columns, _base(d)[1])
+    v = _view(d, f)
     shown = len(v["rows"]) if v["filters"] else None
-    return _download(d, "pptx", export.pptx(d, v["charts"], filters.summary(v["labels"]), shown), "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+    return _download(d, "pptx", export.pptx(d, _appview(d, f, "explorer")["charts"], filters.summary(v["labels"]), shown), "application/vnd.openxmlformats-officedocument.presentationml.presentation")
