@@ -3,13 +3,13 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import catalog, config, export, profile, rules, xlsx
+from app import catalog, config, export, filters, profile, rules, xlsx
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -44,11 +44,11 @@ def datasets():
 @app.get("/datasets/{id}")
 def dashboard(request: Request, id: str):
     d = _dataset(id)
-    rows, charts = _charts(d)
-    types = _base(d)[1]
+    v = _view(d, filters.parse(request.query_params, d.columns, _base(d)[1]))
     return templates.TemplateResponse(request, "dataset.html", {
-        "title": f"{d.path} - DataBoot", "d": d, "types": types, "charts": charts, "rows": rows[:20],
-        "points": {"map3d", "line", "scatter"}})
+        "title": f"{d.path} - DataBoot", "d": d, "types": v["mapping"], "charts": v["charts"], "rows": v["rows"][:20],
+        "points": {"map3d", "line", "scatter"}, "kpis": v["kpis"], "options": v["options"], "labels": v["labels"],
+        "filters": v["filters"], "query": urlencode(v["filters"])})
 
 
 @app.get("/api/datasets/{id}/profile")
@@ -63,22 +63,36 @@ def dataset_profile(id: str):
 
 @lru_cache(maxsize=4)
 def _base(d):
-    """(rows, mapping, typed_rows) of one dataset, computed once: types from the first 10,000 rows, cells cast once."""
+    """(rows, mapping, typed_rows, options) of one dataset, computed once: types from the first 10,000 rows."""
     rows = catalog.load(d, config.get().max_rows)
     mapping = profile.classify(d.columns, rows)
-    return rows, mapping, rules.typed(d.columns, rows, mapping)
+    return rows, mapping, rules.typed(d.columns, rows, mapping), filters.options(d.columns, rows, mapping)
+
+
+@lru_cache(maxsize=8)
+def _view(d, f):
+    """Rows, charts and KPIs of one dataset under filters f (a filters.parse tuple); types stay those of all rows."""
+    rows, mapping, typed, options = _base(d)
+    keep = filters.apply(f, d.columns, mapping, typed)
+    if keep is not None:
+        rows, typed = [rows[i] for i in keep], [typed[i] for i in keep]
+    labels = filters.labels(f, d.columns, mapping)
+    return {"rows": rows, "mapping": mapping, "options": options, "filters": f, "labels": labels,
+            "charts": rules.charts(d.columns, typed, mapping, config.get()),
+            "kpis": rules.kpis(d.columns, rows, typed, mapping)}
 
 
 def _charts(d):
-    """(rows, charts) of one dataset: the same dicts feed the page and the exports."""
-    rows, mapping, typed = _base(d)
-    return rows, rules.charts(d.columns, typed, mapping, config.get())
+    """(rows, charts) of the unfiltered view: the exports use it until they take filters."""
+    v = _view(d, ())
+    return v["rows"], v["charts"]
 
 
 @app.get("/api/datasets/{id}/charts")
-def dataset_charts(id: str):
+def dataset_charts(request: Request, id: str):
     d = _dataset(id)
-    return {"dataset": d.id, "charts": _charts(d)[1]}
+    v = _view(d, filters.parse(request.query_params, d.columns, _base(d)[1]))
+    return {"dataset": d.id, "charts": v["charts"], "kpis": v["kpis"], "filters": v["labels"]}
 
 
 def _download(d, ext, body, media_type):

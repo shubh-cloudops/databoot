@@ -1,0 +1,95 @@
+{
+  "header": {
+    "ticket": 433,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1941960
+  },
+  "goal": "Server-side filters, KPIs and the shared cached view (F1, K1, D1 part 2; Board gate 175: one value per column, filters AND, >50-distinct columns not categorical so no filter, KPIs follow the filters)",
+  "acceptance_criteria": [
+    {
+      "text": "New app/filters.py: parse(params, columns, mapping) -> hashable tuple of (name, value) pairs: f.<column>=value for categorical columns only (empty value, unknown or non-categorical column ignored; repeated key keeps the last), then from, then to (valid date.fromisoformat on a dataset with a temporal column, else ignored, re-printed ISO); apply(f, columns, mapping, typed) -> kept row indexes or None when f == (); rows with an empty or unparseable time are dropped as soon as from or to is set; labels (e.g. 'region = North', 'date from 2024-01-01'); summary(labels) -> 'Filters: a; b' or 'Filters: none'; options(columns, rows, mapping) -> {categorical column: sorted distinct non-empty str values, <= 50}",
+      "passes": true
+    },
+    {
+      "text": "_base also returns options; new @lru_cache(maxsize=8) _view(d, f) returns rows, mapping, options, filters, labels, charts (rules.charts on the filtered typed rows) and kpis; column types stay those of the unfiltered rows",
+      "passes": true
+    },
+    {
+      "text": "New rules.kpis(columns, rows, typed, mapping) -> {'rows', 'columns', 'missing_pct' (round(100*empty/(rows*columns), 1), 0 when no cells; empty = None or ''), 'sums': [{'column', 'sum'}] for the first 3 numerical columns, int when whole else round(s, 2)}",
+      "passes": true
+    },
+    {
+      "text": "GET /api/datasets/<id>/charts and the dashboard page call _view with filters.parse(request.query_params, ...); the charts API response gains 'kpis' and 'filters' (label list); with no params everything else answers as before; the page route passes view keys (kpis, options, labels, filters, a canonical query string) to the template without changing the template",
+      "passes": true
+    },
+    {
+      "text": "sales.csv: ?f.region=North gives kpis.rows 3 and amount sum 16 and every chart total smaller than unfiltered; ?from=2024-01-03&to=2024-01-05 gives kpis.rows 3; unfiltered kpis Rows 6, Columns 3, missing_pct 0.0, amount sum 46; a column with more than 50 distinct values or an unknown f.column is ignored; a donut on the filtered column is simply not generated",
+      "passes": true
+    },
+    {
+      "text": "On big_sales_csv, after one unfiltered warm-up request, GET charts?f.region=North answers 200 in < 1.0 s (time.perf_counter) with kpis.rows == 50000; tests in new tests/test_filters.py (unit tests of parse/apply/labels/summary/options plus the API checks)",
+      "passes": true
+    },
+    {
+      "text": "python3 -m pytest -q tests/test_filters.py tests/test_rules.py tests/test_pages.py tests/test_speed.py passes",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-36, AC-37, AC-41 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 39%]\n........................................................................ [ 79%]\n.....................................                                    [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 25 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_filters.py: 2 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n181 passed, 79 warnings in 92.20s (0:01:32)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Filter pair names are 'f.<column>', 'from', 'to'; labels strip the 'f.' prefix",
+      "why": "Matches the architecture's canonical query string (urlencode(f)) and avoids a clash with columns named from/to",
+      "evidence": "docs/ARCHITECTURE.md 'Round 4: filters'; app/filters.py parse/labels"
+    },
+    {
+      "what": "apply compares ISO date strings and uses rules._time on the temporal cell",
+      "why": "Works on typed or raw rows, and rows with a None time are dropped as soon as from or to is set",
+      "evidence": "app/filters.py apply"
+    },
+    {
+      "what": "options caps each list at 50 values (sorted()[:50])",
+      "why": "Classify looks at the first 10,000 rows only, so later rows could add more distinct values; the ticket says <= 50",
+      "evidence": "app/filters.py options; tests/test_filters.py test_options_capped_at_50"
+    },
+    {
+      "what": "Exports keep a _charts(d) helper that reads _view(d, ()); exports are not filtered yet",
+      "why": "The ticket covers only the charts API and the page; the exports ticket comes later",
+      "evidence": "app/main.py _charts"
+    },
+    {
+      "what": "kpis sums use _num on typed cells and _clean on the total; non-finite sums become None",
+      "why": "int(inf) would raise and inf is not JSON-safe",
+      "evidence": "app/rules.py kpis"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "A categorical cell that is None compares as the string 'None' in apply (same str() key the bars use), and is never listed in options",
+    "A filter value not among the options is still applied (stale link shows 0 rows)",
+    "missing_pct is a float (0.0) when there are cells and the int 0 only when there are none"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "When the 'read first' list names files that do not exist, check git status/ls once and create them; do not search for them",
+      "when": "A ticket lists new files as files to read",
+      "evidence": "app/filters.py and tests/test_filters.py were absent in ticket 433"
+    }
+  ],
+  "problems": []
+}

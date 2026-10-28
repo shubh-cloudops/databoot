@@ -245,6 +245,18 @@ def _heatmap(columns, rows, mapping, settings):
                        default=0))]
 
 
+def kpis(columns, rows, typed, mapping):
+    """Row and column counts, % empty cells and the sums of the first 3 numerical columns (docs "Round 4: KPIs")."""
+    cells = len(rows) * len(columns)
+    empty = sum(v is None or v == "" for r in rows for v in r)
+    sums = []
+    for i in _first(columns, mapping, "numerical", 3):
+        s = _clean(sum(v for v in (_num(r[i]) for r in typed) if v is not None))
+        sums.append({"column": columns[i], "sum": s if s is None else int(s) if s == int(s) else round(s, 2)})
+    return {"rows": len(rows), "columns": len(columns), "missing_pct": round(100 * empty / cells, 1) if cells else 0,
+            "sums": sums}
+
+
 def charts(columns, rows, mapping, settings):
     """Chart dicts for one dataset; mapping is profile.classify's {column: type}. [] when no rule matches (AC-7)."""
     rules = (_map3d, _country_map, _lines, _bars, _donut, _histogram, _scatter, _heatmap)
