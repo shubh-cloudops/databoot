@@ -338,18 +338,71 @@
     });
   }
 
+  // Map app side panel: the clicked point's row from the payload (no request), or a hex cell's count.
+  function sep(v) {
+    return /^-?[1-9]\d{3,}(\.\d+)?$/.test(v) ? Number(v).toLocaleString("en-US", { maximumFractionDigits: 20 }) : v;
+  }
+  function mapPanel(plot, c) {
+    if (c.kind !== "map2d") return;
+    var box = document.querySelector(".map-panel .panel-detail");
+    if (!box) return;
+    plot.on("plotly_click", function (ev) {
+      var pt = ev.points && ev.points[0];
+      if (!pt) return;
+      var n = pt.pointNumber, node;
+      if (c.data.mode === "hex") {
+        node = document.createElement("div");
+        node.textContent = "Points in cell: " + pt.data.z[n].toLocaleString("en-US");
+      } else {
+        var row = c.rows[pt.data.customdata[n]];
+        node = document.createElement("dl");
+        c.columns.forEach(function (name, i) {
+          node.appendChild(cell("dt", name));
+          node.appendChild(cell("dd", sep(row[i])));
+        });
+      }
+      box.textContent = "";
+      box.appendChild(node);
+    });
+  }
+
+  function render(c, el, t) {
+    var plot = el && el.querySelector(".plot");
+    if (!plot) return;
+    try {
+      var made = build[c.kind](c, t, layout(t, c));
+      globalRules(made[0], made[1]);
+      Plotly.newPlot(plot, made[0], made[1], c.kind === "map2d" ? Object.assign({}, CONFIG, { scrollZoom: false }) : CONFIG).then(function () { keyboardBar(plot); barCursor(plot, c); crossFilter(plot, c); mapPanel(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });
+    } catch (e) { fail(plot); }
+  }
+
+  // "3D view" swaps the 2D map for the hidden map3d figure; the 3D chart is drawn on first show (and redrawn on a scheme change only while shown).
+  var three = null;
+  function drawThree() {
+    var fig = document.querySelector('figure[data-kind="map3d"]');
+    if (!fig || fig.hidden || !three) return;
+    render(three.c, fig, tokens());
+    three.drawn = true;
+  }
+  function swapMaps(c3) {
+    var btn = document.getElementById("map3d-toggle"), flat = document.querySelector('figure[data-kind="map2d"]'), fig = document.querySelector('figure[data-kind="map3d"]');
+    if (!btn || !fig || !c3) return;
+    three = { c: c3, drawn: false };
+    btn.onclick = function () {
+      var on = btn.getAttribute("aria-pressed") !== "true";
+      btn.setAttribute("aria-pressed", String(on));
+      if (flat) flat.hidden = on;
+      fig.hidden = !on;
+      if (on && !three.drawn) drawThree();
+      var shown = on ? fig : flat, plot = shown && shown.querySelector(".js-plotly-plot");
+      if (plot) Plotly.Plots.resize(plot);  // laid out while hidden
+    };
+  }
+
   function draw() {
     var t = tokens();
-    charts.forEach(function (c) {
-      var el = document.getElementById(c.id);
-      var plot = el && el.querySelector(".plot");
-      if (!plot) return;
-      try {
-        var made = build[c.kind](c, t, layout(t, c));
-        globalRules(made[0], made[1]);
-        Plotly.newPlot(plot, made[0], made[1], c.kind === "map2d" ? Object.assign({}, CONFIG, { scrollZoom: false }) : CONFIG).then(function () { keyboardBar(plot); barCursor(plot, c); crossFilter(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });
-      } catch (e) { fail(plot); }
-    });
+    charts.forEach(function (c) { render(c, document.getElementById(c.id), t); });
+    if (three) { three.drawn = false; drawThree(); }
   }
 
   plots.forEach(function (p) { p.classList.add("is-loading"); });
@@ -357,6 +410,7 @@
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function (body) {
       charts = body.charts;
+      swapMaps(body.map3d);
       plots.forEach(function (p) { p.classList.remove("is-loading"); });
       draw();
       [phone, dark].forEach(function (m) { m.addEventListener("change", draw); });

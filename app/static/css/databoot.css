@@ -187,6 +187,7 @@ section.block { margin-top: var(--s6); }
 .delta-table td.delta.neg { background: color-mix(in srgb, var(--div-neg) calc(max(var(--t, 0), var(--t, 0) * -1) * var(--delta-max)), var(--div-mid)); }
 
 /* Map: figure + side panel, 70vh map */
+.map-head { margin: var(--s4) 0 0; }  /* holds 3D view outside both figures, so it stays reachable while the 2D one is hidden */
 .map-layout { display: grid; gap: var(--s4); margin: var(--s4) 0 0; }
 .map-layout > * { min-width: 0; }
 .map-layout .chart[data-kind="map2d"] .plot, .map-layout .chart[data-kind="map3d"] .plot { height: 70vh; min-height: 0; }

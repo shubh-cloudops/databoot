@@ -1,0 +1,110 @@
+{
+  "header": {
+    "ticket": 456,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1878036
+  },
+  "goal": "Map page part 2: click-to-details side panel, top regions figure, 3D view toggle coloured by the primary numeric (M2b; Board gate 180: Map app 3D colours by the primary numeric by name rule, Explorer map3d unchanged)",
+  "acceptance_criteria": [
+    {
+      "text": "Clicking a point fills `.map-panel` with a `<dl>` of the row's columns and values (numbers with thousands separators; `rows[customdata]` from the payload, no extra request); clicking a hex cell shows `Points in cell: N`",
+      "passes": true
+    },
+    {
+      "text": "The panel also holds the top-regions figure (a leaderboard with the same rules as the Business one: orientation h, value labels, Other in --muted as its own trace, no pointer, no click action since drill is False) when the payload has it; absent without a category column",
+      "passes": true
+    },
+    {
+      "text": "A hidden `<figure data-kind=\"map3d\" hidden>` and a `3D view` button (`aria-pressed`) in the Map head: pressing hides the 2D figure, shows and (first time) draws the map3d chart from the payload (Plotly scatter3d, colour and z title = the primary numeric's name), pressing again shows the 2D map again; 3D uses the same height rule and the camera that avoids clipped titles",
+      "passes": true
+    },
+    {
+      "text": "Table toggle (ticket G1 part 2) works on the map figure (lon/lat/colour or count columns) and on the regions figure; no yaxis2; every number >= 1,000 in the panel, tooltips and ticks has separators",
+      "passes": true
+    },
+    {
+      "text": "tests/test_map_page.py extends: click a point on places.csv -> .map-panel shows its country and pop; a regions bar chart exists with the countries ranked by pop sum; `3D view` -> [data-kind=map3d] visible with a WebGL canvas and the 2D figure hidden, press again -> back; an inline file `lat, lon, a, revenue` colours the 3D by revenue; the AC-21 regex finds no bare 4+ digit number in main on the Map page (places values `20,000`)",
+      "passes": true
+    },
+    {
+      "text": "Back on desktop and phone: no sideways scroll, no console errors",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-53, AC-55 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 24%]\n........................................................................ [ 48%]\n........................................................................ [ 73%]\n........................................................................ [ 97%]\n......                                                                   [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 2 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n294 passed, 107 warnings in 273.10s (0:04:33)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "3D view button lives in a .map-head row above .map-layout, outside both figures",
+      "why": "Inside the 2D figcaption it would be hidden together with the 2D figure and could not toggle back",
+      "evidence": "app/templates/app_map.html; app/static/css/databoot.css .map-head"
+    },
+    {
+      "what": "Panel and hex click read pt.data.customdata[pointNumber] and pt.data.z[pointNumber] from the trace, not event fields",
+      "why": "Same code path for scattergeo and the hex choropleth; rows come from the payload so no request is made",
+      "evidence": "app/static/js/dashboard.js mapPanel; tests/test_map_page.py::test_click_a_point_fills_the_panel_without_a_request"
+    },
+    {
+      "what": "Extracted render(c, el, t) from draw(); 3D drawn lazily via swapMaps/drawThree, redrawn on scheme/phone change only while shown; Plotly.Plots.resize after each swap",
+      "why": "Plotly lays out at zero size inside a hidden figure",
+      "evidence": "app/static/js/dashboard.js"
+    },
+    {
+      "what": "Numerical First rows cells get thousands separators through a new sep filter (numerical columns only, integers of 4+ digits without leading zero)",
+      "why": "AC-21: no bare 4+ digit number in main on the Map page (places pop 20,000); identifier columns stay untouched",
+      "evidence": "app/main.py sep; app/templates/_tables.html; tests/test_map_page.py::test_no_bare_four_digit_number_in_main_on_the_map_page"
+    },
+    {
+      "what": "settle() in tests/test_business_page.py ignores plots inside [hidden]",
+      "why": "The hidden 3D figure's plot is not drawn until the button is pressed",
+      "evidence": "tests/test_business_page.py:74"
+    },
+    {
+      "what": "Regions figure rendered directly in the aside after the 'Selected point' panel-box, no extra wrapper",
+      "why": "figure.chart is already a card; DESIGN.md sizes it with .map-panel .chart .plot",
+      "evidence": "app/templates/app_map.html; app/static/css/databoot.css:200"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Clicking a point with mouse.click on its bounding box",
+      "why_it_failed": "The point was below the fold (y=940 in a 900px viewport), so the click never reached the page; scroll_into_view_if_needed first"
+    }
+  ],
+  "assumptions": [
+    "The panel's empty text and heading change to 'cell' in hex mode",
+    "Numeric cell strings are formatted client-side by regex (4+ digits, no leading zero); a numeric id or year column would also get separators in the panel",
+    "The 3D figure id chart-3 is added in the template; the payload's map3d has no id"
+  ],
+  "open_questions": [
+    "The First rows table on the Explorer and Business pages now also shows separators for numerical columns; confirm that is acceptable",
+    "The map figure caption still shows 'score 0.60' and the regions figure 'score 0.00'; DESIGN.md does not say whether the Map app should print scores",
+    "DESIGN.md says the 3D view button sits in the figcaption; it is in a separate row above so it stays reachable"
+  ],
+  "lessons": [
+    {
+      "lesson": "Scroll an element into view before mouse.click on its bounding box, and do not treat console errors from page.screenshot(full_page=True) as app bugs: re-run without the screenshot to tell them apart",
+      "when": "Playwright clicks on Plotly points; console error checks during screenshot scripts",
+      "evidence": "tests/test_map_page.py click_point; /tmp/dbg/noshot.py showed no error"
+    },
+    {
+      "lesson": "Test helpers that wait for every .plot to be drawn must skip plots inside [hidden] figures",
+      "when": "Adding a lazily drawn hidden figure",
+      "evidence": "tests/test_business_page.py settle"
+    }
+  ],
+  "problems": []
+}

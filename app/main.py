@@ -1,5 +1,6 @@
 """Web app entry point. Run locally: uvicorn app.main:app --port 8000"""
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -15,6 +16,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.filters["num"] = "{:,}".format  # the one thousands-separator filter for every count (gate 161)
+templates.env.filters["sep"] = lambda v: (lambda t: f"{int(t.partition('.')[0]):,}" + t[len(t.partition('.')[0]):] if re.fullmatch(r"-?[1-9]\d{3,}(\.\d+)?", t) else t)(str(v))  # cell text of a numerical column
 templates.env.filters.update(fmt=business.fmt, signed=business.signed, spark=business.spark)  # Business page: floats, deltas, sparkline
 
 

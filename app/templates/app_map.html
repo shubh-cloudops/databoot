@@ -1,6 +1,11 @@
 {% from "_figure.html" import figure %}{% include "_filters.html" %}
+{% if geo.map3d %}<div class="map-head"><button type="button" class="btn" id="map3d-toggle" aria-pressed="false">3D view</button></div>{% endif %}
 <div class="map-layout">{% if geo.charts %}
-  {{ figure(geo.charts[0]) }}{% endif %}
-  <aside class="map-panel" aria-live="polite"></aside>
+  {{ figure(geo.charts[0]) }}{% endif %}{% if geo.map3d %}
+  {{ figure(dict(geo.map3d, id="chart-3"), true) }}{% endif %}
+  <aside class="map-panel" aria-live="polite">
+    <div class="panel-box"><h2>Selected {{ "cell" if geo.charts and geo.charts[0].data.mode == "hex" else "point" }}</h2><div class="panel-detail"><div class="panel-empty">Click a {{ "cell" if geo.charts and geo.charts[0].data.mode == "hex" else "point" }} on the map to see {{ "its point count" if geo.charts and geo.charts[0].data.mode == "hex" else "its row" }}.</div></div></div>{% if geo.charts|length > 1 %}
+    {{ figure(geo.charts[1]) }}{% endif %}
+  </aside>
 </div>
 {% include "_tables.html" %}

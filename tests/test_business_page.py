@@ -73,7 +73,7 @@ def open_(browser, url, width=1280, plots=True):
 
 def settle(page):
     page.wait_for_load_state("networkidle")
-    page.wait_for_function("""() => { const p = [...document.querySelectorAll('.plot')];
+    page.wait_for_function("""() => { const p = [...document.querySelectorAll('.plot')].filter(e => !e.closest('[hidden]'));
         return p.length > 0 && p.every(e => e.classList.contains('js-plotly-plot')); }""")
 
 
