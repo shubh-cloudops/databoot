@@ -181,7 +181,8 @@ the one source of truth, and passes a shared layout:
     `--bg`, `bgcolor` `--surface`, `countrycolor` and `coastlinecolor` `--line-strong`, `showframe` off, no tiles. Plot
     height is 70vh (AC-51: 65 to 75% at desktop and phone). Points = markers size 6, opacity 0.8, 0.5px `--muted`
     outline so the palest still reads on the land, colour on the `--seq-pt-lo` to `--seq-hi` scale, colour bar titled
-    with the primary numeric's column name; rows with no value form a second trace in `--muted` and the legend shows.
+    with the primary numeric's column name (at <= 599px the colour bar is horizontal under the map, 72px bottom margin, because a
+    vertical one took half of the 375px and shrank the map to a patch); rows with no value form a second trace in `--muted` and the legend shows.
     Hovering a point shows its place and value with separators; click fills the panel.
   - **Hexbin** (more than 5,000 points) = cells at **true geographic size**, so neighbours touch at every zoom. Draw
     them as one `choropleth` of an inline GeoJSON of hexagons built in `dashboard.js` from the server's centres and
@@ -189,7 +190,8 @@ the one source of truth, and passes a shared layout:
     scale, colour bar titled `Points per cell`, 0.5px `--bg` cell edges, tooltip `1,234 points`. Fixed-pixel markers are
     not allowed: they would overlap or leave gaps and so show a density that is not in the data. A click shows
     `Points in cell: N` in the panel.
-  - **Top regions** = a leaderboard (same rules, plot 360px, `drill` false, so no pointer). The 3D view is the
+  - **Top regions** = a leaderboard (same rules, plot 360px, `drill` false, so no pointer; in the 340px panel the value axis has
+    3 flat ticks, because 8-digit sums rotated and overlapped). The 3D view is the
     round 2 `map3d` figure, 70vh, in the same place.
   - **Phone map**: `dragmode: false` at <= 599px so a finger drag scrolls the page instead of panning the map; the mode
     bar's zoom and reset buttons still work. Desktop uses `pan`; wheel zoom stays off (`scrollZoom: false`).
@@ -313,8 +315,8 @@ row (240px), leaderboard (420px), change table (scrolls inside its box), Columns
 title, rule, count, then the `View as table` button full height 44px at the start.
 
 **Map, 1280px**: shell, filters and chips, then `.map-layout` with two columns: the map figure left (card with title,
-rule, `N of M rows`, a `3D view` button and the `View as table` button on the right of the caption, then the 70vh
-plot) and `aside.map-panel` right, 340px wide and sticky at 16px: a `.panel-box` `Selected point` (a `dl` of column
+rule, `N of M rows` and the `View as table` button on the right of the caption, then the 70vh
+plot; the `3D view` button is in its own `.map-head` row above the layout so it stays reachable while the 2D figure is hidden) and `aside.map-panel` right, 340px wide and sticky at 16px: a `.panel-box` `Selected point` (a `dl` of column
 and value, label column 40%, or the empty text) and a `.panel-box` with the top-regions figure. A hidden
 `figure[data-kind="map3d"]` shares the map's place: `3D view` hides the 2D figure and shows it, pressed again swaps
 back; both have the same height so the page does not jump. Then Columns and First rows.
@@ -334,6 +336,13 @@ regions), then the tables. The caption buttons stack under the count. No horizon
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
+Design review (ticket 458, round 5), 1280 and 375 px, light and dark, a demo folder (shop.csv Business, places.csv Map,
+60,000-point hexbin map, measures.csv Explorer, long-named TSV, unreadable file, notes.txt, a 404): scrollWidth equals the
+viewport everywhere (no sideways scroll at 375), all drawn plots without `.plot-error`, no console error except the expected 404,
+no tap target under 44px outside the Plotly mode bar. Fixed in `dashboard.js`: (1) Business trend lines start at y = 0 as the
+spec says (they auto-ranged, so 14,000 to 16,000 looked like a swing); (2) phone map colour bar is horizontal under the map;
+(3) top-regions bar has 3 flat ticks in the narrow panel. The `3D view` row is now documented as built. No token change.
+
 Round 4 (ticket 429, architecture phase, Board gate 175): `databoot.css` gains `.kpis`, `.filters`/`.field`,
 `.chips-row`/`.chips`, drops the map3d/country_map/heatmap grid span and adds `.charts > .chart:first-child` (full
 width), and the phone rule gets two-column KPIs and full-width fields. The templates and `dashboard.js` do not use

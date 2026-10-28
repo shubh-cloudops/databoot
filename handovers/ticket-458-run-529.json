@@ -1,0 +1,78 @@
+{
+  "header": {
+    "ticket": 458,
+    "project": "you-think-of-the-project-name",
+    "from_role": "designer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "1c53b4636107",
+    "tokens_left": 1903508
+  },
+  "goal": "Design review: open every page with the Playwright browser tools at desktop and phone width, compare with docs/DESIGN.md, and fix templates, CSS and front-end scripts directly where they fall short.",
+  "acceptance_criteria": [
+    {
+      "text": "Every page matches docs/DESIGN.md at desktop and phone width",
+      "passes": true
+    },
+    {
+      "text": "No page scrolls sideways at 375px",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 24%]\n........................................................................ [ 48%]\n........................................................................ [ 72%]\n........................................................................ [ 97%]\n........                                                                 [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 2 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n296 passed, 107 warnings in 284.67s (0:04:44)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Business trend lines get yaxis.rangemode tozero in render(), only when the figure is inside .trends",
+      "why": "DESIGN.md says trends start at 0. They auto-ranged, so a 14,000 to 16,000 range looked like a large swing. Explorer lines are unchanged.",
+      "evidence": "app/static/js/dashboard.js render(); screenshot /tmp/shots/shop2.png"
+    },
+    {
+      "what": "Phone map colour bar is horizontal under the map (orientation h, 72px bottom margin, legend moved up)",
+      "why": "The vertical bar took about half of 375px and shrank the hexagon map to a small patch",
+      "evidence": "app/static/js/dashboard.js map2d bar(); before /tmp/shots/big_375_dark.png, after /tmp/shots/big2_375.png"
+    },
+    {
+      "what": "Top-regions bar in .map-panel uses nticks 3 and tickangle 0",
+      "why": "8-digit sums rotated and overlapped in the 340px panel",
+      "evidence": "app/static/js/dashboard.js render()"
+    },
+    {
+      "what": "DESIGN.md corrected to what the code does: 3D view sits in a .map-head row above the layout",
+      "why": "Ticket 456 built it there so the button stays reachable while the 2D figure is hidden",
+      "evidence": "docs/DESIGN.md Map 1280 paragraph; app/templates/app_map.html:2"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Looking at the 60,000-row hexbin dataset stands in for the AC-52 hexbin case",
+    "The sparkline keeps its min..max scale; DESIGN.md does not say it must start at 0"
+  ],
+  "open_questions": [
+    "Explorer bars still show no pointer cursor, while DESIGN.md Cross-filter says Plotly's own pointer is the only hint. Should Explorer bars get the bar-click class?",
+    "The map and regions captions print 'score 0.60' and 'score 0.00'. DESIGN.md does not say whether Map and Business figures should show a score.",
+    "I did not tab through the pages for focus rings or look at 800px this round."
+  ],
+  "lessons": [
+    {
+      "lesson": "On the phone, check every figure with a vertical colour bar at 375px; a Plotly colour bar can eat half the width. Put it horizontal under the plot.",
+      "when": "Design review of maps, heatmaps or any chart with a colour bar",
+      "evidence": "/tmp/shots/big_375_dark.png before the fix"
+    },
+    {
+      "lesson": "Python Playwright with PLAYWRIGHT_BROWSERS_PATH=/opt/playwright works for a scripted sweep. The Read tool returns an image only on the second identical call, and a long screenshot loop should run in the background.",
+      "when": "Design review without the mcp__playwright tools",
+      "evidence": "/tmp/scripts/shots.py ran 36 page loads in about 3 minutes"
+    }
+  ],
+  "problems": []
+}

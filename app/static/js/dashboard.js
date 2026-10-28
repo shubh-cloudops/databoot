@@ -157,10 +157,13 @@
     map2d: function (c, t, l) {
       var d = c.data, scale = [[0, t["--seq-pt-lo"]], [1, t["--seq-hi"]]];
       var bar = function (title) {
-        return { outlinewidth: 0, thickness: 12, tickformat: ",", tickfont: { color: t["--fg"] }, title: { text: title || "", font: { color: t["--fg"] } } };
+        var b = { outlinewidth: 0, thickness: 12, tickformat: ",", tickfont: { color: t["--fg"] }, title: { text: title || "", font: { color: t["--fg"] } } };
+        // phone: a vertical bar would take half the 375px; lay it under the map instead
+        if (phone.matches) Object.assign(b, { orientation: "h", x: 0.5, xanchor: "center", y: -0.02, yanchor: "top", len: 0.9, nticks: 4, title: { text: title || "", side: "top", font: { color: t["--fg"] } } });
+        return b;
       };
       delete l.xaxis; delete l.yaxis;
-      l.margin = { l: 0, r: 0, t: 32, b: 0 };
+      l.margin = { l: 0, r: 0, t: 32, b: phone.matches ? 72 : 0 };
       l.dragmode = phone.matches ? false : "pan";  // a finger drag scrolls the page on the phone
       l.geo = { projection: { type: "natural earth" }, fitbounds: "locations", showframe: false, showcoastlines: true,
         coastlinecolor: t["--line-strong"], showcountries: true, countrycolor: t["--line-strong"], showland: true,
@@ -188,7 +191,7 @@
       if (none.length) traces.push({ type: "scattergeo", mode: "markers", name: "no value", lon: pick(none, "lon"), lat: pick(none, "lat"), customdata: none,
         hovertemplate: "%{lat}, %{lon}<extra></extra>", marker: { size: 6, opacity: 0.8, line: line, color: t["--muted"] } });
       l.showlegend = traces.length > 1;
-      l.legend = { orientation: "h", x: 0, y: 0, bgcolor: t["--surface"] };
+      l.legend = { orientation: "h", x: 0, y: phone.matches ? 0.06 : 0, bgcolor: t["--surface"] };
       return [traces, l];
     }
   };
@@ -371,6 +374,8 @@
     if (!plot) return;
     try {
       var made = build[c.kind](c, t, layout(t, c));
+      if (c.kind === "line" && el.closest(".trends")) made[1].yaxis.rangemode = "tozero";  // DESIGN.md: Business trends start at 0
+      if (c.kind === "bar" && el.closest(".map-panel")) { made[1].xaxis.nticks = 3; made[1].xaxis.tickangle = 0; }  // 340px box: three ticks fit flat
       globalRules(made[0], made[1]);
       Plotly.newPlot(plot, made[0], made[1], c.kind === "map2d" ? Object.assign({}, CONFIG, { scrollZoom: false }) : CONFIG).then(function () { keyboardBar(plot); barCursor(plot, c); crossFilter(plot, c); mapPanel(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });
     } catch (e) { fail(plot); }
