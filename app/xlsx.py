@@ -145,8 +145,8 @@ def _chart(book, c, name, head, cols):
     return ch
 
 
-def write(dataset, rows, charts):
-    """Workbook bytes: sheet Data, then one sheet per chart (its table at A1 plus a native chart that references it).
+def write(dataset, rows, charts, summary="Filters: none"):
+    """Workbook bytes: sheet Data, then one sheet per chart (its table at A1 plus a native chart that references it), then Summary (A1 = summary).
 
     A heatmap gets its matrix with a 3-colour scale and no chart; Office has no heatmap chart type.
     A chart with no rows keeps its sheet and table but gets no chart.
@@ -168,5 +168,6 @@ def write(dataset, rows, charts):
         _grid(ws, head, zip(*cols))
         if cols[0]:
             ws.insert_chart(1, len(head) + 1, _chart(book, c, name, head, cols))
+    book.add_worksheet("Summary").write_string(0, 0, summary)
     book.close()
     return out.getvalue()

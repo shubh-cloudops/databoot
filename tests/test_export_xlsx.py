@@ -36,7 +36,7 @@ def test_sales_download(make_client, data_dir):
     assert r.headers["content-type"] == TYPE
     assert r.headers["content-disposition"] == 'attachment; filename="sales.xlsx"'
     # Data sheet round-trips through the reader; one chart sheet per chart, each with a drawing and a chart part.
-    assert xlsx.sheet_names(io.BytesIO(r.content)) == ["Data", "chart-1 line", "chart-2 histogram", "chart-3 bar", "chart-4 donut"]
+    assert xlsx.sheet_names(io.BytesIO(r.content)) == ["Data", "chart-1 line", "chart-2 histogram", "chart-3 bar", "chart-4 donut", "Summary"]
     cols, rows = xlsx.read_sheet(io.BytesIO(r.content), "Data")
     assert cols == ["date", "region", "amount"] and len(rows) == 6 and rows[0][1] == "North"
     assert chart_kinds(z) == ["lineChart", "barChart", "barChart", "doughnutChart"]
@@ -111,7 +111,7 @@ def test_odd_values_stay_valid_xml():
     data = xlsx.write(d, rows, [])
     parsed(zipfile.ZipFile(io.BytesIO(data)))
     assert xlsx.read_sheet(io.BytesIO(data), "Data")[0] == ['a<&>"', "b"]
-    assert xlsx.sheet_names(io.BytesIO(data)) == ["Data"]
+    assert xlsx.sheet_names(io.BytesIO(data)) == ["Data", "Summary"]
 
 
 def test_filename_with_sheet_and_404(make_client, data_dir):
@@ -127,7 +127,21 @@ def test_scatter_and_heatmap_from_numeric_file(make_client, tmp_path):
     (folder / "n.csv").write_text("a,b,c\n" + "".join(f"{i},{i * i % 7},{10 - i}\n" for i in range(8)))
     r, z = download(make_client(folder), "n.csv")
     names = xlsx.sheet_names(io.BytesIO(r.content))
-    assert names == ["Data", "chart-1 heatmap", "chart-2 histogram", "chart-3 scatter"]
+    assert names == ["Data", "chart-1 heatmap", "chart-2 histogram", "chart-3 scatter", "Summary"]
     assert chart_kinds(z) == ["barChart", "scatterChart"]
     parsed(z)
     assert b"colorScale" in z.read("xl/worksheets/sheet2.xml")
+
+
+def test_filtered_export_has_filtered_rows_and_summary(make_client, data_dir):
+    client = make_client(data_dir)
+    d = next(d for d in client.get("/api/datasets").json() if d["path"] == "sales.csv")
+    r = client.get(f"/datasets/{d['id']}/export.xlsx?f.region=North")
+    names = xlsx.sheet_names(io.BytesIO(r.content))
+    assert names[0] == "Data" and names[-1] == "Summary"
+    assert len(xlsx.read_sheet(io.BytesIO(r.content), "Data")[1]) == 3
+    assert xlsx.read_sheet(io.BytesIO(r.content), "Summary")[0] == ["Filters: region = North"]
+    bar = next(n for n in names if n.endswith(" bar"))
+    assert sum(row[1] for row in xlsx.read_sheet(io.BytesIO(r.content), bar)[1]) == 16
+    plain = client.get(f"/datasets/{d['id']}/export.xlsx")
+    assert xlsx.read_sheet(io.BytesIO(plain.content), "Summary")[0] == ["Filters: none"]

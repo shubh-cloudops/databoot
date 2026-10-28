@@ -92,8 +92,8 @@ def _chart(slide, c):
         chart.value_axis.tick_labels.number_format_is_linked = False
 
 
-def pptx(dataset, charts):
-    """Presentation bytes: a title slide, then one slide per chart.
+def pptx(dataset, charts, summary="Filters: none", rows_shown=None):
+    """Presentation bytes: a title slide (name, "Rows: M" or "Rows: N of M" when filtered, filter summary), then one slide per chart.
 
     Each chart slide has the title, a native chart (python-pptx embeds the workbook, so Edit Data works) and two last
     text boxes: the rule caption and "N of M". A heatmap slide holds a native table instead of a chart.
@@ -104,7 +104,9 @@ def pptx(dataset, charts):
     name = Path(dataset.path).name + (f" - {dataset.sheet}" if dataset.sheet else "")
     slide = prs.slides.add_slide(blank)
     _box(slide, 2286000, 1000000, name, 40, True)
-    _box(slide, 3429000, 600000, f"{dataset.rows:,} rows, {len(dataset.columns):,} columns", 20)
+    of = "" if rows_shown is None else f"{rows_shown:,} of "
+    _box(slide, 3429000, 600000, f"Rows: {of}{dataset.rows:,}, {len(dataset.columns):,} columns", 20)
+    _box(slide, 4100000, 600000, summary, 20)
     for c in charts:
         slide = prs.slides.add_slide(blank)
         _box(slide, 228600, 685800, c["title"], 28, True)

@@ -82,12 +82,6 @@ def _view(d, f):
             "kpis": rules.kpis(d.columns, rows, typed, mapping)}
 
 
-def _charts(d):
-    """(rows, charts) of the unfiltered view: the exports use it until they take filters."""
-    v = _view(d, ())
-    return v["rows"], v["charts"]
-
-
 @app.get("/api/datasets/{id}/charts")
 def dataset_charts(request: Request, id: str):
     d = _dataset(id)
@@ -104,12 +98,15 @@ def _download(d, ext, body, media_type):
 
 
 @app.get("/datasets/{id}/export.xlsx")
-def export_xlsx(id: str):
+def export_xlsx(request: Request, id: str):
     d = _dataset(id)
-    return _download(d, "xlsx", xlsx.write(d, *_charts(d)), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    v = _view(d, filters.parse(request.query_params, d.columns, _base(d)[1]))
+    return _download(d, "xlsx", xlsx.write(d, v["rows"], v["charts"], filters.summary(v["labels"])), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @app.get("/datasets/{id}/export.pptx")
-def export_pptx(id: str):
+def export_pptx(request: Request, id: str):
     d = _dataset(id)
-    return _download(d, "pptx", export.pptx(d, _charts(d)[1]), "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+    v = _view(d, filters.parse(request.query_params, d.columns, _base(d)[1]))
+    shown = len(v["rows"]) if v["filters"] else None
+    return _download(d, "pptx", export.pptx(d, v["charts"], filters.summary(v["labels"]), shown), "application/vnd.openxmlformats-officedocument.presentationml.presentation")
