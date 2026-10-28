@@ -1,0 +1,91 @@
+{
+  "header": {
+    "ticket": 435,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1936667
+  },
+  "goal": "Dashboard page: score caption, KPI strip, filter form, chips and filtered export links (P1; Board gate 175: removable chip per active filter plus Clear filters, 'table last' = First rows table stays below all charts, no score on it)",
+  "acceptance_criteria": [
+    {
+      "text": "app/templates/dataset.html: after the page head a <dl class=\"kpis\"> of <div><dt>/<dd> items Rows, Columns, Missing (as '0.0%'), '<column> (sum)' for up to three columns, every figure through the num filter, from the view's kpis (filtered rows when a filter is active)",
+      "passes": true
+    },
+    {
+      "text": "A <form class=\"filters\" method=\"get\"> with one <div class=\"field\"><label>\u2026</label><select name=\"f.<column>\"> per categorical column (empty first option, options from the view, the active value selected) and <input type=\"date\" name=\"from\">/<input type=\"date\" name=\"to\"> only when a temporal column exists, plus an Apply button; a dataset with no categorical or temporal column (notes.csv) shows no form",
+      "passes": true
+    },
+    {
+      "text": "While a filter is active a <div class=\"chips-row\"><ul class=\"chips\"> shows one chip per filter with the label (e.g. 'region = North') and a remove link to the current URL without that filter (bare path when none is left), then a 'Clear filters' link to the bare dataset path; none of this is rendered with no filters",
+      "passes": true
+    },
+    {
+      "text": "Each figure's .chart-rule text ends ' \u00b7 score 0.NN' using the chart's score (2 decimals, same as the API); there is still exactly one .chart-rule and one .chart-count per figure; the Columns and First rows tables stay after the last </figure>, and Export PPTX/XLSX links carry the page's canonical filter query string",
+      "passes": true
+    },
+    {
+      "text": "Markup matches docs/DESIGN.md Components so the existing databoot.css rules (.kpis, .filters, .field, .chips-row, .chips, first chart full width) apply; CSS is edited only if a measured problem is found at 1280 px and 390 px",
+      "passes": true
+    },
+    {
+      "text": "Tests in new tests/test_filter_ui.py and edited tests/test_pages.py: sales.csv page has <select name=\"f.region\"> with North/South/East and from/to date inputs, notes.csv none; ?f.region=North shows '<option value=\"North\" selected>', chip 'region = North', KPI Rows 3 and amount (sum) 16; KPI Rows 6 unfiltered; caption score text equals the API's at the same position; big_csv KPI shows 60,000; export hrefs carry f.region=North; Playwright at 1280 px: first figure about the full .charts width and figures 2 and 3 share a top and are each about half; at 390 px every figure is full width",
+      "passes": true
+    },
+    {
+      "text": "test_pages.py and test_browser.py still pass with the new caption text and chart order; python3 -m pytest -q tests/test_filter_ui.py tests/test_pages.py tests/test_browser.py passes",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-34, AC-35, AC-36, AC-37, AC-38 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 37%]\n........................................................................ [ 75%]\n..............................................                           [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 25 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n190 passed, 87 warnings in 98.77s (0:01:38)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Chip hrefs are built in dashboard() with urlencode of the remaining filter tuple; the template just loops over (label, href)",
+      "why": "Same encoding as the canonical export query, and no URL-building logic in Jinja",
+      "evidence": "app/main.py dashboard"
+    },
+    {
+      "what": "Filter selects and date inputs get ids (f1.., from, to) with label for=",
+      "why": "DESIGN.md Components: id on the control, for on the label",
+      "evidence": "docs/DESIGN.md Components form.filters; app/templates/dataset.html"
+    },
+    {
+      "what": "Missing shown with '%.1f' format, a sum of None renders an empty dd",
+      "why": "missing_pct can be int 0 when there are no cells; num filter would raise on None",
+      "evidence": "app/rules.py kpis; app/templates/dataset.html"
+    },
+    {
+      "what": "No CSS change",
+      "why": "No measured problem at 1280 or 390 px (scrollWidth equals viewport; grid test passes)",
+      "evidence": "/tmp/shots/f435-1280.png, f435-390.png; tests/test_filter_ui.py test_grid_first_full_width_then_two_per_row"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Chips show only when the parsed filters are non-empty; a stale filter value not in the options still shows a chip and selects nothing",
+    "KPI strip sits before the form and chips, in the order the ticket lists them"
+  ],
+  "open_questions": [
+    "Plots on a filtered page still draw unfiltered data until dashboard.js forwards the query string to the charts API (the later JS ticket); the screenshot shows 6 points under '3 of 3'"
+  ],
+  "lessons": [
+    {
+      "lesson": "Importing the browser fixtures (base, browser, open_page, dataset_path) from tests.test_browser into a new test file is enough for Playwright tests; no conftest change needed",
+      "when": "adding a Playwright test in a new test file",
+      "evidence": "tests/test_filter_ui.py"
+    }
+  ],
+  "problems": []
+}

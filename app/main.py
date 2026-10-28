@@ -45,10 +45,13 @@ def datasets():
 def dashboard(request: Request, id: str):
     d = _dataset(id)
     v = _view(d, filters.parse(request.query_params, d.columns, _base(d)[1]))
+    f = v["filters"]
+    chips = [(label, f"/datasets/{d.id}" + ("?" + urlencode(f[:i] + f[i + 1:]) if len(f) > 1 else ""))
+             for i, label in enumerate(v["labels"])]
     return templates.TemplateResponse(request, "dataset.html", {
         "title": f"{d.path} - DataBoot", "d": d, "types": v["mapping"], "charts": v["charts"], "rows": v["rows"][:20],
         "points": {"map3d", "line", "scatter"}, "kpis": v["kpis"], "options": v["options"], "labels": v["labels"],
-        "filters": v["filters"], "query": urlencode(v["filters"])})
+        "filters": f, "chips": chips, "query": urlencode(f)})
 
 
 @app.get("/api/datasets/{id}/profile")

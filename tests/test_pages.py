@@ -63,7 +63,7 @@ def test_sheet_in_heading_and_figure_captions(make_client, data_dir):
     assert figs == [(c["id"], c["kind"]) for c in api] and {"line", "bar"} <= {k for _, k in figs}
     assert "6 of 6 points" in html and "6 of 6 rows" in html and html.count("<figcaption>") == len(api)
     for c in api:
-        assert f'<span class="chart-title">{c["title"]}</span>' in html and c["rule"] in html
+        assert f'<span class="chart-title">{c["title"]}</span>' in html and f'{c["rule"]} · score {c["score"]:.2f}</span>' in html
 
 
 def test_no_rule_dataset_has_no_figure(make_client, data_dir):
