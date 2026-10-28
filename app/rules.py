@@ -42,8 +42,21 @@ def _time(v):
         else:
             return None
     if isinstance(v, datetime):
-        return v.replace(tzinfo=None)
+        return v if v.tzinfo is None else v.replace(tzinfo=None)
     return datetime(v.year, v.month, v.day) if isinstance(v, date) else None
+
+
+def typed(columns, rows, mapping):
+    """Copy of rows with numerical and geospatial cells as _num(v), temporal cells as _time(v); rules accept both."""
+    cast = [(i, _num if mapping.get(c) in ("numerical", "geospatial") else _time)
+            for i, c in enumerate(columns) if mapping.get(c) in ("numerical", "geospatial", "temporal")]
+    out = []
+    for r in rows:
+        r = list(r)
+        for i, f in cast:
+            r[i] = f(r[i])
+        out.append(r)
+    return out
 
 
 def _iso(t):
@@ -219,7 +232,10 @@ def _heatmap(columns, rows, mapping, settings):
         except (statistics.StatisticsError, OverflowError, ZeroDivisionError, TypeError):
             return None  # fewer than 2 pairs or a constant column: undefined
 
-    z = [[1 if i == j else pearson(a, b) for j, b in enumerate(cols)] for i, a in enumerate(cols)]
+    z = [[1 if i == j else None for j in range(len(cols))] for i in range(len(cols))]
+    for i, a in enumerate(cols):
+        for j in range(i + 1, len(cols)):
+            z[i][j] = z[j][i] = pearson(a, cols[j])
     used = sum(sum(v is not None for v in vs) >= 2 for vs in zip(*cols))
     names = [columns[i] for i in ix]
     return [_chart("heatmap", "correlation of numerical columns", "column", "column",

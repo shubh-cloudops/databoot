@@ -1,0 +1,84 @@
+{
+  "header": {
+    "ticket": 432,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1943088
+  },
+  "goal": "First load and filter speed levers (D1 part 1; Board gate 176: classify on the first 10,000 rows only, a 200,000-row CSV reaches the dashboard in <= 5 s cold)",
+  "acceptance_criteria": [
+    {
+      "text": "profile.classify takes types from rows[:10000] only (deterministic; the 50%-of-total categorical rule uses the sample size); profile._kind counts each distinct string once with collections.Counter and calls _parses once per key (same result as before on every fixture)",
+      "passes": true
+    },
+    {
+      "text": "rules heatmap computes pearson once per pair (j > i) and mirrors it; the z matrix equals the old one (test compares to a brute-force matrix on a small numeric file)",
+      "passes": true
+    },
+    {
+      "text": "New rules.typed(columns, rows, mapping): copy of the rows with numerical and geospatial cells as _num(v) and temporal cells as _time(v); _num/_time return already-typed values unchanged; rules still work on raw rows (existing unit tests stay green)",
+      "passes": true
+    },
+    {
+      "text": "app/main.py: @lru_cache(maxsize=4) _base(d) returns (rows, mapping, typed_rows) once per dataset; _charts and /api/datasets/<id>/profile use it; the page, charts API and both exports still give the same output as before this ticket; charts and KPIs use all loaded rows, only classification is sampled",
+      "passes": true
+    },
+    {
+      "text": "tests/conftest.py make_client calls main._base.cache_clear() (and main._view.cache_clear() when it exists) so tests do not share caches",
+      "passes": true
+    },
+    {
+      "text": "New tests/test_speed.py with big_sales_csv: cold GET /datasets/<id> (caches cleared, after the file is on disk) answers 200 in <= 5.0 s by time.perf_counter, and so does a cold GET charts API; a classify test with a column whose first 10,000 rows are numeric but a later row is text still returns numerical, and the sampled result equals the full result for every existing fixture; if the 5 s bound is missed, profile (cProfile in /tmp) and trim the next biggest cost before finishing",
+      "passes": true
+    },
+    {
+      "text": "python3 -m pytest -q tests/test_speed.py tests/test_profile.py tests/test_rules.py tests/test_pages.py passes",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-42 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 41%]\n........................................................................ [ 83%]\n............................                                             [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 25 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 2 warnings\ntests/test_export_xlsx.py: 5 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n172 passed, 77 warnings in 88.38s (0:01:28)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "typed() builds a list copy of each row and casts only numerical/geospatial/temporal columns",
+      "why": "Rules accept both raw and typed rows; _num already returns typed floats unchanged, _time needed a naive-datetime shortcut",
+      "evidence": "app/rules.py typed, _time"
+    },
+    {
+      "what": "Page and exports keep using raw rows for the first-rows table; _base returns raw rows, mapping and typed rows",
+      "why": "Template shows the original cell text; only the rules get typed rows",
+      "evidence": "app/main.py _base, dashboard"
+    },
+    {
+      "what": "Cold timing in tests starts after /api/datasets (scan) and measures one request",
+      "why": "AC-42: caches cleared, file already on disk",
+      "evidence": "tests/test_speed.py _cold"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Rows are full-length (as rules already assumed), so typed() indexes r[i] without a length guard",
+    "Fixtures compared for sampled==full are data_dir datasets plus tests/fixtures/*.csv"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "Cold 200k-row requests measured about 2.4-2.7 s here after the three levers, so no extra profiling was needed",
+      "when": "A later ticket changes the first-load path and must stay under the 5 s bound",
+      "evidence": "pytest --durations on tests/test_speed.py"
+    }
+  ],
+  "problems": []
+}

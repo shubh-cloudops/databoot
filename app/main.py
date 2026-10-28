@@ -1,5 +1,6 @@
 """Web app entry point. Run locally: uvicorn app.main:app --port 8000"""
 import json
+from functools import lru_cache
 from pathlib import Path
 
 from urllib.parse import quote
@@ -44,7 +45,7 @@ def datasets():
 def dashboard(request: Request, id: str):
     d = _dataset(id)
     rows, charts = _charts(d)
-    types = profile.classify(d.columns, rows)
+    types = _base(d)[1]
     return templates.TemplateResponse(request, "dataset.html", {
         "title": f"{d.path} - DataBoot", "d": d, "types": types, "charts": charts, "rows": rows[:20],
         "points": {"map3d", "line", "scatter"}})
@@ -53,18 +54,25 @@ def dashboard(request: Request, id: str):
 @app.get("/api/datasets/{id}/profile")
 def dataset_profile(id: str):
     d = _dataset(id)
-    types = profile.classify(d.columns, catalog.load(d, config.get().max_rows))
+    types = _base(d)[1]
     folder = config.get().out / "profiles"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / f"{d.id}.json").write_text(json.dumps(types))
     return types
 
 
+@lru_cache(maxsize=4)
+def _base(d):
+    """(rows, mapping, typed_rows) of one dataset, computed once: types from the first 10,000 rows, cells cast once."""
+    rows = catalog.load(d, config.get().max_rows)
+    mapping = profile.classify(d.columns, rows)
+    return rows, mapping, rules.typed(d.columns, rows, mapping)
+
+
 def _charts(d):
     """(rows, charts) of one dataset: the same dicts feed the page and the exports."""
-    settings = config.get()
-    rows = catalog.load(d, settings.max_rows)
-    return rows, rules.charts(d.columns, rows, profile.classify(d.columns, rows), settings)
+    rows, mapping, typed = _base(d)
+    return rows, rules.charts(d.columns, typed, mapping, config.get())
 
 
 @app.get("/api/datasets/{id}/charts")

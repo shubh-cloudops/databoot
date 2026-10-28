@@ -147,6 +147,10 @@ def make_client(monkeypatch, tmp_path):
         from app import catalog
         catalog.scan.cache_clear()
         catalog.load.cache_clear()
-        from app.main import app
+        from app import main
+        main._base.cache_clear()
+        if hasattr(main, "_view"):
+            main._view.cache_clear()
+        app = main.app
         return TestClient(app)
     return make
