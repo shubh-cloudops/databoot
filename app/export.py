@@ -39,19 +39,24 @@ def _heat(r):
 
 
 def _table(slide, c):
-    """The heatmap as a native table: a header row and column of labels around the coloured r values."""
-    labels, z = c["data"]["labels"], c["data"]["z"]
-    n = len(labels) + 1
+    """A native table: the heatmap (header row and column of labels around the coloured r values) or a "table" chart."""
+    heat = c["kind"] == "heatmap"
+    if heat:
+        labels = c["data"]["labels"]
+        rows = [[c["x_label"], *labels]] + [[lab, *r] for lab, r in zip(labels, c["data"]["z"])]
+    else:
+        rows = [c["data"]["head"], *c["data"]["rows"]]
+    n = len(rows)
     row_h, size = min(370840, 4800600 // n), Pt(12 if n <= 9 else 9)
-    table = slide.shapes.add_table(n, n, Emu(_X), Emu(1005840), Emu(_CW), Emu(row_h * n)).table
-    rows = [[c["x_label"], *labels]] + [[lab, *r] for lab, r in zip(labels, z)]
+    table = slide.shapes.add_table(n, len(rows[0]), Emu(_X), Emu(1005840), Emu(_CW), Emu(row_h * n)).table
     for i, row in enumerate(rows):
         for j, v in enumerate(row):
             cell = table.cell(i, j)
-            cell.text_frame.text = _clean_text(v) if isinstance(v, str) else "" if v is None else f"{v:.2f}"
+            cell.text_frame.text = (_clean_text(v) if isinstance(v, str) else "" if v is None else f"{v:.2f}" if heat
+                                    else f"{v:,.2f}" if isinstance(v, float) else f"{v:,}")
             for run in cell.text_frame.paragraphs[0].runs:
                 run.font.size = size
-            if i and j and v is not None:
+            if heat and i and j and v is not None:
                 cell.fill.solid()
                 cell.fill.fore_color.rgb = RGBColor.from_string(_heat(v))
 
@@ -92,25 +97,26 @@ def _chart(slide, c):
         chart.value_axis.tick_labels.number_format_is_linked = False
 
 
-def pptx(dataset, charts, summary="Filters: none", rows_shown=None):
+def pptx(dataset, charts, summary="Filters: none", rows_shown=None, title=None):
     """Presentation bytes: a title slide (name, "Rows: M" or "Rows: N of M" when filtered, filter summary), then one slide per chart.
 
     Each chart slide has the title, a native chart (python-pptx embeds the workbook, so Edit Data works) and two last
-    text boxes: the rule caption and "N of M". A heatmap slide holds a native table instead of a chart.
+    text boxes: the rule caption and "N of M". A heatmap or "table" slide holds a native table instead of a chart.
+    A title replaces the file name in the first box of the title slide.
     """
     prs = Presentation()
     prs.slide_width, prs.slide_height = Emu(_W), Emu(_H)
     blank = prs.slide_layouts[6]
     name = Path(dataset.path).name + (f" - {dataset.sheet}" if dataset.sheet else "")
     slide = prs.slides.add_slide(blank)
-    _box(slide, 2286000, 1000000, name, 40, True)
+    _box(slide, 2286000, 1000000, name if title is None else title, 40, True)
     of = "" if rows_shown is None else f"{rows_shown:,} of "
     _box(slide, 3429000, 600000, f"Rows: {of}{dataset.rows:,}, {len(dataset.columns):,} columns", 20)
     _box(slide, 4100000, 600000, summary, 20)
     for c in charts:
         slide = prs.slides.add_slide(blank)
         _box(slide, 228600, 685800, c["title"], 28, True)
-        (_table if c["kind"] == "heatmap" else _chart)(slide, c)
+        (_table if c["kind"] in ("heatmap", "table") else _chart)(slide, c)
         _box(slide, 5943600, 400000, c["rule"], 14)
         _box(slide, 6343600, 400000, f"{c['shown']:,} of {c['total']:,} {'points' if c['kind'] in _POINTS else 'rows'}", 14)
     out = io.BytesIO()

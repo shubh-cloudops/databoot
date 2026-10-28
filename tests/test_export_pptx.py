@@ -16,7 +16,7 @@ TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentatio
 def download(client, path, sheet=None):
     ds = client.get("/api/datasets").json()
     d = next(d for d in ds if d["path"] == path and d["sheet"] == sheet)
-    r = client.get(f"/datasets/{d['id']}/export.pptx")
+    r = client.get(f"/datasets/{d['id']}/export.pptx?app=explorer")
     assert r.status_code == 200
     return r, r.content
 
@@ -144,7 +144,7 @@ def test_no_charts_and_illegal_characters_stay_valid():
 def test_filtered_title_slide_and_chart_total(make_client, data_dir):
     client = make_client(data_dir)
     d = next(d for d in client.get("/api/datasets").json() if d["path"] == "sales.csv")
-    prs = Presentation(io.BytesIO(client.get(f"/datasets/{d['id']}/export.pptx?f.region=North").content))
+    prs = Presentation(io.BytesIO(client.get(f"/datasets/{d['id']}/export.pptx?app=explorer&f.region=North").content))
     slides = list(prs.slides)
     assert texts(slides[0]) == ["sales.csv", "Rows: 3 of 6, 3 columns", "Filters: region = North"]
     bar = next(s.chart for sl in slides[1:] for s in sl.shapes

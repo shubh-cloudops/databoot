@@ -145,9 +145,10 @@ def _chart(book, c, name, head, cols):
     return ch
 
 
-def write(dataset, rows, charts, summary="Filters: none"):
+def write(dataset, rows, charts, summary="Filters: none", title=None):
     """Workbook bytes: sheet Data, then one sheet per chart (its table at A1 plus a native chart that references it), then Summary (A1 = summary).
 
+    With a title, Summary has A1 = title and A2 = summary. A "table" chart is its grid only, with no chart.
     A heatmap gets its matrix with a 3-colour scale and no chart; Office has no heatmap chart type.
     A chart with no rows keeps its sheet and table but gets no chart.
     """
@@ -157,6 +158,9 @@ def write(dataset, rows, charts, summary="Filters: none"):
     for c in charts:
         name = f"{c['id']} {c['kind']}"[:31]
         ws = book.add_worksheet(name)
+        if c["kind"] == "table":
+            _grid(ws, c["data"]["head"], c["data"]["rows"])
+            continue
         if c["kind"] == "heatmap":
             labels = c["data"]["labels"]
             _grid(ws, [c["x_label"], *labels], ([lab, *r] for lab, r in zip(labels, c["data"]["z"])))
@@ -168,6 +172,8 @@ def write(dataset, rows, charts, summary="Filters: none"):
         _grid(ws, head, zip(*cols))
         if cols[0]:
             ws.insert_chart(1, len(head) + 1, _chart(book, c, name, head, cols))
-    book.add_worksheet("Summary").write_string(0, 0, summary)
+    ws = book.add_worksheet("Summary")
+    for r, text in enumerate([summary] if title is None else [title, summary]):
+        ws.write_string(r, 0, text)
     book.close()
     return out.getvalue()

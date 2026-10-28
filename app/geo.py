@@ -9,7 +9,7 @@ import math
 
 from app import apps
 from app.business import TOP, _ranked
-from app.rules import COUNTRY, _chart, _clean, _map3d, _num
+from app.rules import COUNTRY, _chart, _clean, _map3d, _num, _sample
 
 HEX_AT = 5000
 HEX_ACROSS = 40
@@ -55,6 +55,12 @@ def _regions(columns, rows, typed, mapping, prim):
             "orientation": "h", "baseline": 0, "drill": False, "other": len(sums) > TOP}
 
 
+def _valid(typed, lat, lon):
+    """Indexes of the rows with a usable lat and lon."""
+    return [i for i, r in enumerate(typed)
+            if r[lat] is not None and r[lon] is not None and -90 <= r[lat] <= 90 and -180 <= r[lon] <= 180]
+
+
 def view(columns, rows, typed, mapping, settings):
     """Figures of the Map app on the view rows; no chart without a lat + lon pair."""
     role = apps.roles(columns, mapping, typed)
@@ -62,8 +68,7 @@ def view(columns, rows, typed, mapping, settings):
         return {"charts": [], "map3d": None}
     lat, lon = role["lat"], role["lon"]
     prim = (apps.measures(columns, mapping) or [None])[0]
-    pts = [i for i, r in enumerate(typed)
-           if r[lat] is not None and r[lon] is not None and -90 <= r[lat] <= 90 and -180 <= r[lon] <= 180]
+    pts = _valid(typed, lat, lon)
     name = columns[prim] if prim is not None else None
     x, y = columns[lon], columns[lat]
     lons, lats = [typed[i][lon] for i in pts], [typed[i][lat] for i in pts]
@@ -86,3 +91,19 @@ def view(columns, rows, typed, mapping, settings):
     if regions:
         charts.append({**regions, "id": "chart-2"})
     return {"charts": charts, "map3d": next(iter(_map3d(columns, typed, mapping, settings, prim)), None)}
+
+
+def export(view, columns, typed, mapping, settings):
+    """Chart dicts of the Map export: lon x lat scatter (stride-sampled to chart_cap, like rules._scatter), top regions bar."""
+    role = apps.roles(columns, mapping, typed)
+    if not role["G"]:
+        return []
+    lat, lon = role["lat"], role["lon"]
+    points = [(typed[i][lon], typed[i][lat]) for i in _valid(typed, lat, lon)]
+    shown = _sample(points, settings.chart_cap)
+    xs, ys = zip(*shown) if shown else ([], [])
+    out = [_chart("scatter", f"{columns[lat]} vs {columns[lon]}", columns[lon], columns[lat],
+                  f"geospatial {columns[lon]} + {columns[lat]}: scatter", len(shown), len(points),
+                  {"x": list(xs), "y": list(ys)}, 0)]
+    out += [c for c in view["charts"] if c["kind"] == "bar"]
+    return [{**c, "id": f"chart-{i}"} for i, c in enumerate(out, 1)]

@@ -16,7 +16,7 @@ TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 def download(client, path, sheet=None):
     ds = client.get("/api/datasets").json()
     d = next(d for d in ds if d["path"] == path and d["sheet"] == sheet)
-    r = client.get(f"/datasets/{d['id']}/export.xlsx")
+    r = client.get(f"/datasets/{d['id']}/export.xlsx?app=explorer")
     assert r.status_code == 200
     return r, zipfile.ZipFile(io.BytesIO(r.content))
 
@@ -136,12 +136,12 @@ def test_scatter_and_heatmap_from_numeric_file(make_client, tmp_path):
 def test_filtered_export_has_filtered_rows_and_summary(make_client, data_dir):
     client = make_client(data_dir)
     d = next(d for d in client.get("/api/datasets").json() if d["path"] == "sales.csv")
-    r = client.get(f"/datasets/{d['id']}/export.xlsx?f.region=North")
+    r = client.get(f"/datasets/{d['id']}/export.xlsx?app=explorer&f.region=North")
     names = xlsx.sheet_names(io.BytesIO(r.content))
     assert names[0] == "Data" and names[-1] == "Summary"
     assert len(xlsx.read_sheet(io.BytesIO(r.content), "Data")[1]) == 3
     assert xlsx.read_sheet(io.BytesIO(r.content), "Summary")[0] == ["Filters: region = North"]
     bar = next(n for n in names if n.endswith(" bar"))
     assert sum(row[1] for row in xlsx.read_sheet(io.BytesIO(r.content), bar)[1]) == 16
-    plain = client.get(f"/datasets/{d['id']}/export.xlsx")
+    plain = client.get(f"/datasets/{d['id']}/export.xlsx?app=explorer")
     assert xlsx.read_sheet(io.BytesIO(plain.content), "Summary")[0] == ["Filters: none"]

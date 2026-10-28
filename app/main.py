@@ -139,18 +139,31 @@ def _download(d, ext, body, media_type):
     return Response(body, headers={"Content-Disposition": disposition}, media_type=media_type)
 
 
+TITLES = {"business": "Business overview", "map": "Map overview"}
+
+
+def _export(d, params):
+    """(view, charts, title) of the shown app under the request's filters; Explorer has no title."""
+    f = filters.parse(params, d.columns, _base(d)[1])
+    v, shown = _view(d, f), _shown(d, params)
+    a = _appview(d, f, shown)
+    if shown == "business":
+        return v, business.export(a), TITLES[shown]
+    if shown == "map":
+        return v, geo.export(a, d.columns, v["typed"], v["mapping"], config.get()), TITLES[shown]
+    return v, a["charts"], None
+
+
 @app.get("/datasets/{id}/export.xlsx")
 def export_xlsx(request: Request, id: str):
     d = _dataset(id)
-    f = filters.parse(request.query_params, d.columns, _base(d)[1])
-    v = _view(d, f)
-    return _download(d, "xlsx", xlsx.write(d, v["rows"], _appview(d, f, "explorer")["charts"], filters.summary(v["labels"])), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    v, charts, title = _export(d, request.query_params)
+    return _download(d, "xlsx", xlsx.write(d, v["rows"], charts, filters.summary(v["labels"]), title), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @app.get("/datasets/{id}/export.pptx")
 def export_pptx(request: Request, id: str):
     d = _dataset(id)
-    f = filters.parse(request.query_params, d.columns, _base(d)[1])
-    v = _view(d, f)
+    v, charts, title = _export(d, request.query_params)
     shown = len(v["rows"]) if v["filters"] else None
-    return _download(d, "pptx", export.pptx(d, _appview(d, f, "explorer")["charts"], filters.summary(v["labels"]), shown), "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+    return _download(d, "pptx", export.pptx(d, charts, filters.summary(v["labels"]), shown, title), "application/vnd.openxmlformats-officedocument.presentationml.presentation")

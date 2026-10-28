@@ -1,0 +1,112 @@
+{
+  "header": {
+    "ticket": 451,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1907180
+  },
+  "goal": "App exports: title, table kind, Business and Map section lists, exports follow the shown app (E2; Explorer output unchanged)",
+  "acceptance_criteria": [
+    {
+      "text": "app/main.py: both export routes use `_shown(d, request.query_params)`; Explorer passes `_appview(d, f, \"explorer\")[\"charts\"]` and no title and its output equals the round 4 output exactly (sales.csv `?app=explorer`: same sheet list and Summary A1 `Filters: none`)",
+      "passes": true
+    },
+    {
+      "text": "xlsx.write(dataset, rows, charts, summary, title=None) and export.pptx(dataset, charts, summary, rows_shown, title=None): with a title the Summary sheet has A1 = title and A2 = the summary line, the PPTX title slide's first text is the title; Data stays the first sheet and Summary the last; a title of None changes nothing",
+      "passes": true
+    },
+    {
+      "text": "New chart kind \"table\" (data {head, rows}): XLSX sheet `chart-N table` with the grid and no chart; PPTX a native table slide (export._table generalised)",
+      "passes": true
+    },
+    {
+      "text": "business.export(view) builds [cards table (Measure, Previous, Latest, Change %), trend line(s), leaderboard bar, change table] with ids chart-1..; geo.export(view) builds [scatter of lon x / lat y stride-sampled to chart_cap like rules._scatter, top regions bar]; titles `Business overview` and `Map overview`",
+      "passes": true
+    },
+    {
+      "text": "shop.csv `export.xlsx?app=business`: sheets Data, chart-1 table, chart-2 line, chart-3 line, chart-4 bar, chart-5 table, Summary; Summary A1 `Business overview`, A2 `Filters: none`; its PPTX has `Business overview` on slide 1, then table, line, line, bar (has_chart), table slides; places.csv `?app=map`: `Map overview`, an XY scatter then a bar chart",
+      "passes": true
+    },
+    {
+      "text": "Existing route-level export tests that expect round 4 sheets pass `app=explorer` (tests/test_export_xlsx.py L39 and every export.xlsx / export.pptx request in test_export_*.py, tests/test_filters.py if it requests exports); direct xlsx.write / export.pptx calls stay; tests/test_acceptance.py export requests (test_AC_18, test_AC_23, test_AC_40) get only the mechanical `app=explorer` query added (the architecture lists this edit; no other change to that file)",
+      "passes": true
+    },
+    {
+      "text": "Filters still work in every app's exports (AC-40): shop.csv `export.xlsx?app=business&f.channel=web` has fewer Data rows than unfiltered, Summary lists `channel = web` (A2 under the title), and its PPTX title slide says `Rows: N of M` and the filter line; without filters `Rows: M` and `Filters: none`",
+      "passes": true
+    },
+    {
+      "text": "New tests in tests/test_export_apps.py; run test_export_xlsx.py, test_export_pptx.py and test_export_apps.py",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-40, AC-56 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 27%]\n........................................................................ [ 55%]\n........................................................................ [ 83%]\n..........................................                               [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 2 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n258 passed, 102 warnings in 162.57s (0:02:42)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "geo.export takes (view, columns, typed, mapping, settings), not only view",
+      "why": "The scatter must be stride-sampled from all valid points; in hex mode the view only holds cell centres, so the raw typed rows are needed",
+      "evidence": "app/geo.py export; app/main.py _export"
+    },
+    {
+      "what": "With a title, the PPTX title slide's first box shows the title in place of the file name",
+      "why": "Architecture says 'first box = title'; box count and positions stay the same, so Explorer is unchanged",
+      "evidence": "app/export.py pptx; docs/ARCHITECTURE.md L193-197"
+    },
+    {
+      "what": "Extracted geo._valid (lat/lon range test) shared by view and export",
+      "why": "One definition of a usable point",
+      "evidence": "app/geo.py _valid"
+    },
+    {
+      "what": "business.export adds the change table only when a bar chart and view['changes'] exist",
+      "why": "changes is None without latest and previous periods or without a free categorical, so the export skips the table",
+      "evidence": "app/business.py export, view"
+    },
+    {
+      "what": "export._table was generalised: heatmap keeps .2f cells and colours; table charts print ints as {:,} and floats as {:,.2f}",
+      "why": "Heatmap output stays as before; money sums read with thousands separators",
+      "evidence": "app/export.py _table"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First test run of the edit script with `python`",
+      "why_it_failed": "No `python` on PATH here, only python3, so the first edit script did not run; re-ran it with python3"
+    }
+  ],
+  "assumptions": [
+    "Cards table rows follow apps.measures order (primary by name rule first, so revenue before units in shop.csv)",
+    "The Map export includes the regions bar only when geo.view produced one",
+    "Table charts use score 0 and set x_label/y_label to the first two header names"
+  ],
+  "open_questions": [
+    "geo.export needs extra arguments beyond 'export(view)' as written in the ticket; if a later test calls geo.export(view) alone, the signature needs to change",
+    "The PPTX title slide no longer shows the file name when a title is given; say so if you want it on a second line"
+  ],
+  "lessons": [
+    {
+      "lesson": "The bare `python` command is missing in this sandbox: use python3 for scripts and pytest, and check that an edit script really ran before continuing",
+      "when": "Running python in Bash here",
+      "evidence": "'python: command not found' on the first edit attempt"
+    },
+    {
+      "lesson": "In test_acceptance.py the export helper's query string `q` starts with '?', so adding app=explorer needs q.replace('?', '&'); on Python 3.11 use single quotes inside the f-string",
+      "when": "Adding query params to those export requests",
+      "evidence": "tests/test_acceptance.py L1023, L1028"
+    }
+  ],
+  "problems": []
+}

@@ -407,14 +407,14 @@ def test_AC_18(make_client, data_dir):
         i = ids[(name, None)]
         charts = client.get(f"/api/datasets/{i}/charts").json()["charts"]
         assert charts, name
-        r = client.get(f"/datasets/{i}/export.xlsx")
+        r = client.get(f"/datasets/{i}/export.xlsx?app=explorer")
         assert r.status_code == 200 and r.headers["content-type"].endswith("spreadsheetml.sheet"), name
         assert "attachment" in r.headers["content-disposition"] and name.rsplit(".", 1)[0] + ".xlsx" in r.headers["content-disposition"]
         wb = load_workbook(io.BytesIO(r.content))
         assert wb.sheetnames[0] == "Data" and len(wb.sheetnames) > 1, name
         assert [c.value for c in wb["Data"][1]] == list(client.get(f"/api/datasets/{i}/profile").json())
         assert sum(len(ws._charts) for ws in wb.worksheets) > 0, name
-        r = client.get(f"/datasets/{i}/export.pptx")
+        r = client.get(f"/datasets/{i}/export.pptx?app=explorer")
         assert r.status_code == 200 and r.headers["content-type"].endswith("presentationml.presentation"), name
         prs = Presentation(io.BytesIO(r.content))
         assert len(prs.slides) == 1 + len(charts), name
@@ -511,7 +511,7 @@ def test_AC_23(make_client, data_dir):
         assert not [f for f in tracked if f.startswith(lib) or f"/{lib}/" in f or f"site-packages/{lib}" in f], lib
     client = make_client(data_dir)
     i = _ids(client)[("sales.csv", None)]
-    r = client.get(f"/datasets/{i}/export.xlsx")
+    r = client.get(f"/datasets/{i}/export.xlsx?app=explorer")
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         load_workbook(io.BytesIO(r.content))
@@ -1020,12 +1020,12 @@ def test_AC_40(make_client, data_dir):
     assert len(labels) == 2
 
     def xlsx(q):
-        r = client.get(f"/datasets/{i}/export.xlsx{q}")
+        r = client.get(f"/datasets/{i}/export.xlsx?app=explorer{q.replace('?', '&')}")
         assert r.status_code == 200
         return load_workbook(io.BytesIO(r.content))
 
     def pptx(q):
-        r = client.get(f"/datasets/{i}/export.pptx{q}")
+        r = client.get(f"/datasets/{i}/export.pptx?app=explorer{q.replace('?', '&')}")
         assert r.status_code == 200
         return Presentation(io.BytesIO(r.content))
 

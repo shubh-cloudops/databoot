@@ -151,3 +151,18 @@ def _changes(columns, typed, mapping, out, c, m):
     big = max((abs(l - p) for _, p, l in rows), default=0)
     return [{"category": k, "previous": p, "latest": l, "delta": l - p, "t": round((l - p) / big, 2) if big else 0}
             for k, p, l in rows]
+
+
+def _table(title, head, rows):
+    return _chart("table", title, head[0], head[1], "table", len(rows), len(rows), {"head": head, "rows": rows}, 0)
+
+
+def export(view):
+    """Chart dicts of the Business export (ids chart-1..): cards table, trends, leaderboard, change table."""
+    out = [_table("Measures, latest vs previous period", ["Measure", "Previous", "Latest", "Change %"],
+                  [[c["column"], c["previous"], c["latest"], c["pct"]] for c in view["cards"]]), *view["charts"]]
+    bar = next((c for c in view["charts"] if c["kind"] == "bar"), None)
+    if bar and view["changes"]:
+        out.append(_table(f"{bar['title']}: change", [bar["x_label"], "Previous", "Latest", "Change"],
+                          [[r["category"], r["previous"], r["latest"], r["delta"]] for r in view["changes"]]))
+    return [{**c, "id": f"chart-{i}"} for i, c in enumerate(out, 1)]
