@@ -1,0 +1,11 @@
+{% set fd = dict(filters) %}{% set dated = "temporal" in types.values() %}
+{% if options or dated %}<form class="filters" method="get">{% if appq %}<input type="hidden" name="app" value="{{ shown }}">{% endif %}{% for col, values in options.items() %}
+  <div class="field"><label for="f{{ loop.index }}">{{ col }}</label><select id="f{{ loop.index }}" name="f.{{ col }}"><option value=""></option>{% for v in values %}<option value="{{ v }}"{{ " selected" if fd.get("f." ~ col) == v }}>{{ v }}</option>{% endfor %}</select></div>{% endfor %}{% if dated %}
+  <div class="field"><label for="from">From</label><input type="date" id="from" name="from" value="{{ fd.get('from', '') }}"></div>
+  <div class="field"><label for="to">To</label><input type="date" id="to" name="to" value="{{ fd.get('to', '') }}"></div>{% endif %}
+  <button class="btn" type="submit">Apply</button>
+</form>
+{% endif %}{% if chips %}<div class="chips-row"><ul class="chips">{% for label, href in chips %}
+  <li><a href="{{ href }}" aria-label="Remove filter {{ label }}">{{ label }}</a></li>{% endfor %}
+</ul><a class="btn" href="{{ clear }}">Clear filters</a></div>
+{% endif %}

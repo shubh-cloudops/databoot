@@ -58,7 +58,7 @@ def dataset_path(base, name):
     import json
     for d in json.load(urllib.request.urlopen(base + "/api/datasets")):
         if d["path"].endswith(name):
-            return "/datasets/" + d["id"]
+            return "/datasets/" + d["id"] + "?app=explorer"
 
 
 def test_sales_draws_line_and_bar(base, open_page):
@@ -95,7 +95,7 @@ def test_no_horizontal_overflow(base, open_page, name, width):
 
 def test_failed_fetch_shows_note_error(base, browser):
     page = browser.new_page()
-    page.route("**/api/datasets/*/charts", lambda r: r.fulfill(status=500, body="no"))
+    page.route("**/api/datasets/*/app*", lambda r: r.fulfill(status=500, body="no"))
     page.goto(base + dataset_path(base, "sales.csv"))
     page.wait_for_selector(".plot .note-error")
     assert page.locator(".plot.is-loading").count() == 0

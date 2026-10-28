@@ -12,7 +12,7 @@ KPI = re.compile(r"<dt>([^<]*)</dt><dd>([^<]*)</dd>")
 
 def _page(client, name, query="", **kw):
     i = _ids(client)[(name, None)]
-    return i, client.get(f"/datasets/{i}{query}").text
+    return i, client.get(f"/datasets/{i}?app=explorer{query.replace('?', '&')}").text
 
 
 def _kpis(html):
@@ -35,8 +35,8 @@ def test_filtered_page_selected_chip_and_kpis(make_client, data_dir):
     client = make_client(data_dir)
     i, h = _page(client, "sales.csv", "?f.region=North")
     assert '<option value="North" selected>' in h
-    assert '<a href="/datasets/%s" aria-label="Remove filter region = North">region = North</a>' % i in h
-    assert f'<a class="btn" href="/datasets/{i}">Clear filters</a>' in h
+    assert '<a href="/datasets/%s?app=explorer" aria-label="Remove filter region = North">region = North</a>' % i in h
+    assert f'<a class="btn" href="/datasets/{i}?app=explorer">Clear filters</a>' in h
     k = _kpis(h)
     assert k["Rows"] == "3" and k["amount (sum)"] == "16" and k["Columns"] == "3" and k["Missing"] == "0.0%"
     assert _kpis(_page(client, "sales.csv")[1])["Rows"] == "6"
@@ -45,8 +45,8 @@ def test_filtered_page_selected_chip_and_kpis(make_client, data_dir):
 def test_chip_removes_only_its_filter(make_client, data_dir):
     client = make_client(data_dir)
     i, h = _page(client, "sales.csv", "?f.region=North&from=2024-01-02")
-    assert f'href="/datasets/{i}?from=2024-01-02" aria-label="Remove filter region = North"' in h
-    assert f'href="/datasets/{i}?f.region=North" aria-label="Remove filter date from 2024-01-02"' in h
+    assert f'href="/datasets/{i}?from=2024-01-02&amp;app=explorer" aria-label="Remove filter region = North"' in h
+    assert f'href="/datasets/{i}?f.region=North&amp;app=explorer" aria-label="Remove filter date from 2024-01-02"' in h
     assert 'name="from" value="2024-01-02"' in h
 
 
@@ -68,8 +68,8 @@ def test_big_csv_kpi_and_export_links(make_client, big_csv, data_dir):
     assert _kpis(_page(client, "big.csv")[1])["Rows"] == "60,000"
     client = make_client(data_dir)
     i, h = _page(client, "sales.csv", "?f.region=North")
-    assert f'href="/datasets/{i}/export.pptx?f.region=North"' in h and f'href="/datasets/{i}/export.xlsx?f.region=North"' in h
-    plain = _page(client, "sales.csv")[1]
+    assert f'href="/datasets/{i}/export.pptx?f.region=North&amp;app=explorer"' in h and f'href="/datasets/{i}/export.xlsx?f.region=North&amp;app=explorer"' in h
+    plain = client.get(f"/datasets/{i}").text  # no app param: round 4 URLs
     assert f'href="/datasets/{i}/export.pptx"' in plain
 
 

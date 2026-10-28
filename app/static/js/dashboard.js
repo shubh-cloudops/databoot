@@ -1,4 +1,4 @@
-// Draws the charts of one dataset page from GET /api/datasets/<id>/charts with the vendored Plotly.
+// Draws the charts of one dataset page from GET /api/datasets/<id>/app (the shown app's charts, same query string as the page) with the vendored Plotly.
 // Spec: docs/DESIGN.md "Charts". Colours come from the CSS tokens at draw time; the OS decides light or dark.
 (function () {
   "use strict";
@@ -203,7 +203,7 @@
   }
 
   plots.forEach(function (p) { p.classList.add("is-loading"); });
-  fetch("/api/datasets/" + id + "/charts" + location.search)
+  fetch("/api/datasets/" + id + "/app" + location.search)
     .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function (body) {
       charts = body.charts;

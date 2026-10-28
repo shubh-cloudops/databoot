@@ -1,0 +1,15 @@
+{% from "_figure.html" import figure %}<dl class="kpis">
+  <div><dt>Rows</dt><dd>{{ kpis.rows|num }}</dd></div>
+  <div><dt>Columns</dt><dd>{{ kpis.columns|num }}</dd></div>
+  <div><dt>Missing</dt><dd>{{ "%.1f"|format(kpis.missing_pct) }}%</dd></div>{% for s in kpis.sums %}
+  <div><dt>{{ s.column }} (sum)</dt><dd>{{ s.sum|num if s.sum is not none }}</dd></div>{% endfor %}
+</dl>
+{% include "_filters.html" %}
+{% if charts %}
+<div class="charts">{% for c in charts %}
+  {{ figure(c) }}{% endfor %}
+</div>
+{% else %}
+<div class="empty">No charts for this dataset</div>
+{% endif %}
+{% include "_tables.html" %}

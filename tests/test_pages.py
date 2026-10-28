@@ -40,7 +40,7 @@ def test_home_empty_tables_are_hidden(make_client, tmp_path):
 def test_every_dashboard_has_types_and_at_most_20_rows(make_client, data_dir):
     client = make_client(data_dir)
     for d in catalog.scan(config.get().data).datasets:
-        r = client.get(f"/datasets/{d.id}")
+        r = client.get(f"/datasets/{d.id}?app=explorer")
         assert r.status_code == 200, d.path
         html = r.text
         assert f"<h1>{d.path}" in html and "<caption><h2>Columns</h2></caption>" in html and "badge" in html
@@ -57,7 +57,7 @@ def test_sheet_in_heading_and_figure_captions(make_client, data_dir):
     ids = _ids(client)
     html = client.get(f'/datasets/{ids[("sub/book.xlsx", "Lookup")]}').text
     assert '<span class="muted">Lookup</span>' in html
-    html = client.get(f'/datasets/{ids[("sales.csv", None)]}').text
+    html = client.get(f'/datasets/{ids[("sales.csv", None)]}?app=explorer').text
     api = client.get(f'/api/datasets/{ids[("sales.csv", None)]}/charts').json()["charts"]
     figs = FIGURE.findall(html)
     assert figs == [(c["id"], c["kind"]) for c in api] and {"line", "bar"} <= {k for _, k in figs}
@@ -77,7 +77,7 @@ def test_big_csv_counts_have_separators(make_client, big_csv):
     client = make_client(big_csv)
     assert "<td class=\"num\">60,000</td>" in client.get("/").text
     i = _ids(client)[("big.csv", None)]
-    html = client.get(f"/datasets/{i}").text
+    html = client.get(f"/datasets/{i}?app=explorer").text
     shown = next(c for c in client.get(f"/api/datasets/{i}/charts").json()["charts"] if c["kind"] == "map3d")["shown"]
     assert 0 < shown <= 50_000 and f"{shown:,} of 60,000 points" in html and "60,000 of 60,000 rows" in html
     assert html.split('class="data-table"')[1].split("<tbody>")[1].count("<tr>") == 20

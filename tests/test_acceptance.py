@@ -141,9 +141,9 @@ def test_AC_4(make_client, data_dir, live):
     line = [c for c in charts if c["kind"] == "line"]
     assert len(line) == 1
     assert line[0]["data"]["x"][0] == "2024-01-01" and line[0]["data"]["y"] == [10, 20, 5, 7, 3, 1]
-    html = client.get(f"/datasets/{i}").text
+    html = client.get(f"/datasets/{i}?app=explorer").text
     assert 'data-kind="line"' in html
-    n, external, errors = _drawn(live, f"/datasets/{i}", '[data-kind="line"] .plot .scatterlayer path.js-line')
+    n, external, errors = _drawn(live, f"/datasets/{i}?app=explorer", '[data-kind="line"] .plot .scatterlayer path.js-line')
     assert n == 1 and external == [] and errors == []
 
 
@@ -154,8 +154,8 @@ def test_AC_5(make_client, data_dir, live):
     assert len(bar) == 1
     sums = dict(zip(bar[0]["data"]["x"], bar[0]["data"]["y"]))
     assert sums == {"North": 16, "South": 23, "East": 7}  # 10+5+1, 20+3, 7
-    assert 'data-kind="bar"' in client.get(f"/datasets/{i}").text
-    n, external, errors = _drawn(live, f"/datasets/{i}", '[data-kind="bar"] .plot .barlayer .point')
+    assert 'data-kind="bar"' in client.get(f"/datasets/{i}?app=explorer").text
+    n, external, errors = _drawn(live, f"/datasets/{i}?app=explorer", '[data-kind="bar"] .plot .barlayer .point')
     assert n == 3 and external == [] and errors == []
 
 
@@ -164,21 +164,21 @@ def test_AC_6(make_client, data_dir, live):
     i, charts = _charts(client, "points.tsv")
     maps = [c for c in charts if c["kind"] == "map3d"]
     assert len(maps) == 1 and len(maps[0]["data"]["lat"]) == 4 and len(maps[0]["data"]["lon"]) == 4
-    assert 'data-kind="map3d"' in client.get(f"/datasets/{i}").text
-    n, external, errors = _drawn(live, f"/datasets/{i}", '[data-kind="map3d"] .plot canvas')
+    assert 'data-kind="map3d"' in client.get(f"/datasets/{i}?app=explorer").text
+    n, external, errors = _drawn(live, f"/datasets/{i}?app=explorer", '[data-kind="map3d"] .plot canvas')
     assert n >= 1 and external == [] and errors == []
     # no lat/lon columns: no map, in the API or on the page
     for name in ("sales.csv", "notes.csv"):
         j, cs = _charts(client, name)
         assert all(c["kind"] != "map3d" for c in cs)
-        assert 'data-kind="map3d"' not in client.get(f"/datasets/{j}").text
+        assert 'data-kind="map3d"' not in client.get(f"/datasets/{j}?app=explorer").text
 
 
 def test_AC_7(make_client, data_dir):
     client = make_client(data_dir)
     i, charts = _charts(client, "notes.csv")
     assert charts == []
-    r = client.get(f"/datasets/{i}")
+    r = client.get(f"/datasets/{i}?app=explorer")
     assert r.status_code == 200
     assert "<figure" not in r.text and "comment" in r.text and "<caption><h2>Columns</h2></caption>" in r.text
     assert "free text number 0" in r.text
@@ -188,7 +188,7 @@ def test_AC_7(make_client, data_dir):
 def test_AC_8(make_client, data_dir):
     client = make_client(data_dir)
     for d in client.get("/api/datasets").json():
-        r = client.get(f"/datasets/{d['id']}")
+        r = client.get(f"/datasets/{d['id']}?app=explorer")
         assert r.status_code == 200, d["path"]
         html = r.text
         types = client.get(f"/api/datasets/{d['id']}/profile").json()
@@ -199,7 +199,7 @@ def test_AC_8(make_client, data_dir):
         assert body.count("<tr>") == min(d["rows"], 20), d["path"]
     # more than 20 rows: exactly the first 20
     d = [x for x in client.get("/api/datasets").json() if x["path"] == "notes.csv"][0]
-    html = client.get(f"/datasets/{d['id']}").text
+    html = client.get(f"/datasets/{d['id']}?app=explorer").text
     assert "free text number 19" in html and "free text number 20" not in html
 
 
@@ -233,7 +233,7 @@ def test_AC_10(make_client, big_csv):
     cap = 50_000
     assert len(m["data"]["lat"]) == len(m["data"]["lon"]) <= cap
     assert m["shown"] == len(m["data"]["lat"]) and m["total"] == 60_000
-    html = client.get(f"/datasets/{i}").text
+    html = client.get(f"/datasets/{i}?app=explorer").text
     assert f"{m['shown']:,} of 60,000 points" in html
 
 
@@ -373,7 +373,7 @@ def test_AC_16(make_client, data_dir):
     assert cmap["data"]["locationmode"] == "country names"
     i, many = _charts(client, "many.csv")
     assert 1 < len(many) <= 8
-    assert client.get(f"/datasets/{i}").text.count("<figure") == len(many)
+    assert client.get(f"/datasets/{i}?app=explorer").text.count("<figure") == len(many)
 
 
 def test_AC_17(make_client, data_dir):
@@ -382,7 +382,7 @@ def test_AC_17(make_client, data_dir):
     for d in client.get("/api/datasets").json():
         if d["rows"] == 0:
             continue
-        html = client.get(f"/datasets/{d['id']}").text
+        html = client.get(f"/datasets/{d['id']}?app=explorer").text
         charts = client.get(f"/api/datasets/{d['id']}/charts").json()["charts"]
         figs = re.findall(r"<figure.*?</figure>", html, re.S)
         assert len(figs) == len(charts), d["path"]
@@ -428,9 +428,9 @@ def test_AC_19(make_client, data_dir):
     home = client.get("/").text
     assert re.search(r"<title>DataBoot</title>", home) and re.search(r"<h1[^>]*>\s*DataBoot\s*</h1>", home)
     for d in client.get("/api/datasets").json():
-        html = client.get(f"/datasets/{d['id']}").text
+        html = client.get(f"/datasets/{d['id']}?app=explorer").text
         assert re.search(r"<title>[^<]* - DataBoot</title>", html), d["path"]
-    assert not re.search(r"DataOS", home + client.get(f"/datasets/{d['id']}").text, re.I)
+    assert not re.search(r"DataOS", home + client.get(f"/datasets/{d['id']}?app=explorer").text, re.I)
 
 
 def test_AC_20(make_client, data_dir):
@@ -453,7 +453,7 @@ def test_AC_21(make_client, data_dir, big_csv):
     row = _rows_of(home, "Datasets")[0]
     assert "60,000" in row and "60000" not in "".join(row)
     i = _ids(client)[("big.csv", None)]
-    page = client.get(f"/datasets/{i}").text
+    page = client.get(f"/datasets/{i}?app=explorer").text
     shown = next(c for c in client.get(f"/api/datasets/{i}/charts").json()["charts"] if c["kind"] == "map3d")["shown"]
     assert shown >= 1000 and f"{shown:,} of 60,000 points" in page
     text = re.sub(r"<[^>]+>", " ", re.search(r"<main.*?</main>", page, re.S).group(0))
@@ -483,7 +483,7 @@ def test_AC_22(live, data_dir):
         assert page.locator("table > caption:not(:has(> h2))").count() == 0
     finally:
         close()
-    page, errors, close = _page(live, "/datasets/" + ids[("points.tsv", None)])
+    page, errors, close = _page(live, "/datasets/" + ids[("points.tsv", None)] + "?app=explorer")
     try:
         caps = page.locator("table > caption > h2").all_inner_texts()
         assert caps == ["Columns", "First 4 rows"]
@@ -520,7 +520,7 @@ def test_AC_23(make_client, data_dir):
 
 def test_AC_24(live):
     ids = _ids_http(live)
-    page, errors, close = _page(live, "/datasets/" + ids[("sales.csv", None)])
+    page, errors, close = _page(live, "/datasets/" + ids[("sales.csv", None)] + "?app=explorer")
     try:
         page.wait_for_selector('[data-kind="line"] .plot .modebar-btn')
         bar = page.locator(".modebar").first
@@ -578,7 +578,7 @@ def test_AC_27(live, data_dir):
     assert cmap["data"]["locations"] == ["Brazil", "Japan", "France"]
     bar = next(c for c in json.load(urllib.request.urlopen(f"{live}/api/datasets/{ids[('sales.csv', None)]}/charts"))["charts"] if c["kind"] == "bar")
     assert bar["data"]["y"] == sorted(bar["data"]["y"], reverse=True)  # same order rule as the bar chart
-    page, errors, close = _page(live, "/datasets/" + ids[("points.tsv", None)])
+    page, errors, close = _page(live, "/datasets/" + ids[("points.tsv", None)] + "?app=explorer")
     try:
         page.wait_for_selector('[data-kind="map3d"] .plot canvas')
         got = page.evaluate("""() => { const g = document.querySelector('[data-kind="map3d"] .plot');
@@ -675,7 +675,7 @@ def _staff(folder):
 
 
 def _path(base, name):
-    return "/datasets/" + next(d["id"] for d in json.load(urllib.request.urlopen(base + "/api/datasets")) if d["path"] == name)
+    return "/datasets/" + next(d["id"] for d in json.load(urllib.request.urlopen(base + "/api/datasets")) if d["path"] == name) + "?app=explorer"
 
 
 @contextmanager
@@ -808,7 +808,7 @@ def test_AC_33(make_client, data_dir):
                 tied = True
                 if a["kind"] != b["kind"]:
                     assert order.index(a["kind"]) < order.index(b["kind"]), key
-        html = client.get(f"/datasets/{i}").text
+        html = client.get(f"/datasets/{i}?app=explorer").text
         assert re.findall(r'<figure class="chart" id="[^"]+" data-kind="([^"]+)"', html) == [c["kind"] for c in cs], key
     assert tied
     geo = [c["kind"] for c in _charts(client, "geo.csv")[1]]
@@ -844,7 +844,7 @@ def test_AC_35(live):
     base_charts = {}
     for name in ("sales.csv", "points.tsv"):
         path = _path(live, name)
-        api = json.load(urllib.request.urlopen(live + path.replace("/datasets/", "/api/datasets/") + "/charts"))["charts"]
+        api = json.load(urllib.request.urlopen(live + path.split("?")[0].replace("/datasets/", "/api/datasets/") + "/charts"))["charts"]
         with _open(live, path) as (page, external, errors):
             rules = [page.locator(f"#{c['id']} .chart-rule").inner_text() for c in api]
             assert len(rules) == len(api) >= 1
@@ -885,15 +885,15 @@ def test_AC_37(make_client, data_dir):
     client = make_client(data_dir)
     ids = _ids(client)
     i = ids[("staff.csv", None)]
-    html = client.get(f"/datasets/{i}").text
+    html = client.get(f"/datasets/{i}?app=explorer").text
     form = html.split('<form class="filters" method="get">')[1].split("</form>")[0]
     assert re.findall(r'<select id="\w+" name="([^"]+)"', form) == ["f.department", "f.region"]  # one per categorical
     assert 'type="date" id="from"' in form and 'type="date" id="to"' in form
     for name in ("points.tsv", "sub/records.json"):  # no categorical or temporal column: no control
-        assert "<form" not in client.get(f"/datasets/{ids[(name, None)]}").text
-    s = client.get(f"/datasets/{ids[('sales.csv', None)]}").text.split('<form class="filters"')[1]
+        assert "<form" not in client.get(f"/datasets/{ids[(name, None)]}?app=explorer").text
+    s = client.get(f"/datasets/{ids[('sales.csv', None)]}?app=explorer").text.split('<form class="filters"')[1]
     assert s.count("<select") == 1 and 'name="from"' in s
-    book = client.get(f"/datasets/{ids[('sub/book.xlsx', 'Revenue')]}").text.split('<form class="filters"')[1]
+    book = client.get(f"/datasets/{ids[('sub/book.xlsx', 'Revenue')]}?app=explorer").text.split('<form class="filters"')[1]
     assert 'name="from"' in book and 'name="f.team"' in book
     base = _api(client, i)
     assert base["kpis"]["rows"] == 40 and base["filters"] == []
@@ -908,13 +908,13 @@ def test_AC_37(make_client, data_dir):
             assert c["total"] < before["total"], (query, c["kind"])
             if c["kind"] in ("histogram", "bar"):
                 assert c["total"] == want, (query, c["kind"])
-        page = client.get(f"/datasets/{i}{query}").text
+        page = client.get(f"/datasets/{i}?app=explorer{query.replace('?', '&')}").text
         assert f"{want} of {want} rows" in page
 
 
 def test_AC_38(live):
     path = _path(live, "sales.csv")
-    with _open(live, path + "?f.region=North&from=2024-01-02") as (page, external, errors):
+    with _open(live, path + "&f.region=North&from=2024-01-02") as (page, external, errors):
         # opening the URL restores the state: dropdown, date, KPI and one chip per filter
         assert page.locator("select[name='f.region']").input_value() == "North"
         assert page.locator("input[name='from']").input_value() == "2024-01-02"
@@ -931,7 +931,7 @@ def test_AC_38(live):
         assert "f.region=South" in page.url and "from=2024-01-02" in page.url and _kpi(page)["Rows"] == "2"
         page.click("text=Clear filters")
         _settle(page)
-        assert urlparse(page.url).query == "" and _kpi(page)["Rows"] == "6" and page.locator(".chips a").count() == 0
+        assert urlparse(page.url).query == "app=explorer" and _kpi(page)["Rows"] == "6" and page.locator(".chips a").count() == 0
         assert external == [] and errors == []
 
 
@@ -950,7 +950,7 @@ def test_AC_39(live, data_dir):
         assert orient == "v"
         _click_nav(page, "bar")
         want = labels[0]
-        assert parse_qs(urlparse(page.url).query) == {"f.region": [want]}
+        assert parse_qs(urlparse(page.url).query) == {"f.region": [want], "app": ["explorer"]}
         n = {"South": 2, "North": 3, "East": 1}[want]
         assert page.locator("select[name='f.region']").input_value() == want and _kpi(page)["Rows"] == str(n)
         assert page.locator(".chips a").count() == 1
@@ -960,7 +960,7 @@ def test_AC_39(live, data_dir):
             if fig.get_attribute("data-kind") in ("bar", "histogram"):
                 assert count.startswith(f"{n} of {n} ")
         _click_nav(page, "bar")
-        assert urlparse(page.url).query == "" and _kpi(page)["Rows"] == "6"
+        assert urlparse(page.url).query == "app=explorer" and _kpi(page)["Rows"] == "6"
         assert errors == [] and external == []
     # horizontal bar (labels > 12 chars): same set and toggle, plus a second filter on another column ANDs
     with _open(live, staff) as (page, external, errors):
@@ -968,21 +968,21 @@ def test_AC_39(live, data_dir):
         assert orient == "h" and max(map(len, labels)) > 12
         _click_nav(page, "bar")
         want = labels[0]
-        assert parse_qs(urlparse(page.url).query) == {"f.department": [want]}
+        assert parse_qs(urlparse(page.url).query) == {"f.department": [want], "app": ["explorer"]}
         n = sum(1 for k in range(40) if STAFF_DEPTS[k % 3] == want)
         assert page.locator("select[name='f.department']").input_value() == want and _kpi(page)["Rows"] == str(n)
         page.select_option("select[name='f.region']", "North")
         page.click("form.filters button")
         _settle(page)
-        assert set(parse_qs(urlparse(page.url).query)) == {"f.department", "f.region"} and page.locator(".chips a").count() == 2
+        assert set(parse_qs(urlparse(page.url).query)) - {"app"} == {"f.department", "f.region"} and page.locator(".chips a").count() == 2
         _click_nav(page, "bar")  # the bar of the clicked column is still drawn: clicking it removes only that filter
-        assert set(parse_qs(urlparse(page.url).query)) == {"f.region"} and page.locator(".chips a").count() == 1
+        assert set(parse_qs(urlparse(page.url).query)) - {"app"} == {"f.region"} and page.locator(".chips a").count() == 1
         assert errors == [] and external == []
-    with _open(live, staff + "?f.department=Customer+support") as (page, external, errors):
+    with _open(live, staff + "&f.department=Customer+support") as (page, external, errors):
         orient, labels, _ = _plot_values(page, "bar")
         assert orient == "h" and labels == ["Customer support"]
         _click_nav(page, "bar")  # second click on the active horizontal bar
-        assert urlparse(page.url).query == "" and _kpi(page)["Rows"] == "40"
+        assert urlparse(page.url).query == "app=explorer" and _kpi(page)["Rows"] == "40"
         assert errors == [] and external == []
     # donut: a real click on a slice sets the filter
     with _open(live, staff) as (page, external, errors):
@@ -1004,7 +1004,7 @@ def test_AC_39(live, data_dir):
             return [cx + rm * sx / m, cy + rm * sy / m];
         }""")
         _click_nav(page, "donut", (x, y))
-        assert parse_qs(urlparse(page.url).query) == {"f.department": [want]}
+        assert parse_qs(urlparse(page.url).query) == {"f.department": [want], "app": ["explorer"]}
         assert _kpi(page)["Rows"] == str(sum(1 for k in range(40) if STAFF_DEPTS[k % 3] == want))
         assert page.locator('[data-kind="donut"]').count() == 0  # a one-value column drops out of the donuts
         assert errors == [] and external == []
@@ -1085,7 +1085,7 @@ def test_AC_42(big_sales_csv, make_client, tmp_path):
             body = r.json()
             assert body["kpis"]["rows"] == 200_000 and any(c["kind"] == "histogram" and c["total"] == 200_000 for c in body["charts"])
         else:
-            assert "200,000" in r.text
+            assert "rule R2" in r.text  # big_sales is Business now: its minimal body has no row count yet
     # types come from the first 10,000 rows only: later text does not change them
     folder = tmp_path / "late"
     folder.mkdir()

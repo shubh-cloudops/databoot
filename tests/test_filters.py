@@ -75,7 +75,7 @@ def test_charts_api_filters(make_client, data_dir):
 def test_page_accepts_filters(make_client, data_dir):
     client = make_client(data_dir)
     sales = next(d for d in client.get("/api/datasets").json() if d["path"].endswith("sales.csv"))
-    assert client.get(f"/datasets/{sales['id']}?f.region=North").status_code == 200
+    assert client.get(f"/datasets/{sales['id']}?app=explorer&f.region=North").status_code == 200
 
 
 def test_filtered_charts_within_1_s(big_sales_csv, make_client):

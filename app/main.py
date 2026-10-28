@@ -45,14 +45,20 @@ def datasets():
 def dashboard(request: Request, id: str):
     d = _dataset(id)
     v = _view(d, filters.parse(request.query_params, d.columns, _base(d)[1]))
-    f = v["filters"]
-    charts = _appview(d, f, "explorer")["charts"]
-    chips = [(label, f"/datasets/{d.id}" + ("?" + urlencode(f[:i] + f[i + 1:]) if len(f) > 1 else ""))
-             for i, label in enumerate(v["labels"])]
+    f, det, shown = v["filters"], _detected(d), _shown(d, request.query_params)
+    appq = (("app", shown),) if request.query_params.get("app") == shown else ()  # links keep app only if the URL had it
+
+    def url(*pairs):
+        q = urlencode(pairs)
+        return f"/datasets/{d.id}" + ("?" + q if q else "")
+    chips = [(label, url(*f[:i], *f[i + 1:], *appq)) for i, label in enumerate(v["labels"])]
+    view_as = [(apps.NAMES[a], url(*f, ("app", a)), a == shown) for a in det["qualifies"]] if det["qualifies"] != ["explorer"] else []
     return templates.TemplateResponse(request, "dataset.html", {
-        "title": f"{d.path} - DataBoot", "d": d, "types": v["mapping"], "charts": charts, "rows": v["rows"][:20],
-        "points": {"map3d", "line", "scatter"}, "kpis": v["kpis"], "options": v["options"], "labels": v["labels"],
-        "filters": f, "chips": chips, "query": urlencode(f)})
+        "title": f"{d.path} - DataBoot", "d": d, "types": v["mapping"], "rows": v["rows"][:20], "shown": shown,
+        "badge": f"App: {apps.NAMES[det['app']]} (rule {det['rule']})", "view_as": view_as, "appq": bool(appq),
+        "charts": _appview(d, f, "explorer")["charts"] if shown == "explorer" else [],
+        "kpis": v["kpis"], "options": v["options"], "labels": v["labels"], "filters": f, "chips": chips,
+        "clear": url(*appq), "query": urlencode(f + appq)})
 
 
 @app.get("/api/datasets/{id}/profile")

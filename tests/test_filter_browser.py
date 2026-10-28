@@ -26,7 +26,7 @@ def test_form_chip_clear_and_back(base, open_page):
     page.select_option("select[name='f.region']", "South")
     page.click("form.filters button")
     page.wait_for_load_state("networkidle")
-    assert query(page) == {"f.region": ["South"]} and "from" not in page.url and rows(page) == "2"
+    assert query(page) == {"f.region": ["South"], "app": ["explorer"]} and "from" not in page.url and rows(page) == "2"
     page.go_back()
     page.wait_for_load_state("networkidle")
     assert page.url == start and rows(page) == "6"
@@ -44,7 +44,7 @@ def test_form_chip_clear_and_back(base, open_page):
 
 
 def test_charts_fetch_uses_page_query(base, open_page):
-    page, external, errors = open_page(dataset_path(base, "sales.csv") + "?f.region=South")
+    page, external, errors = open_page(dataset_path(base, "sales.csv") + "&f.region=South")
     page.wait_for_selector('[data-kind="line"] .plot svg.main-svg')
     assert page.locator('[data-kind="line"] .plot .scatterlayer .point, [data-kind="line"] .plot path.js-line').count() >= 1
     assert page.evaluate("fetch('/api/datasets/' + location.pathname.split('/')[2] + '/charts' + location.search)"
@@ -56,7 +56,7 @@ def test_bar_click_sets_then_removes_filter(base, open_page):
     page, external, errors = open_page(dataset_path(base, "sales.csv"))
     page.wait_for_selector('[data-kind="bar"] .plot svg.main-svg')
     bar_click(page, "South")
-    assert query(page) == {"f.region": ["South"]}
+    assert query(page) == {"f.region": ["South"], "app": ["explorer"]}
     assert page.locator("select[name='f.region']").input_value() == "South" and rows(page) == "2"
     page.wait_for_selector('[data-kind="bar"] .plot svg.main-svg')
     bar_click(page, "South")

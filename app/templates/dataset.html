@@ -2,51 +2,20 @@
 {% block content %}
 <nav class="crumb"><a href="/">DataBoot</a> / {{ d.path }}</nav>
 <div class="page-head">
-  <h1>{{ d.path }}{% if d.sheet %} <span class="muted">{{ d.sheet }}</span>{% endif %}</h1>
+  <div class="page-title">
+    <h1>{{ d.path }}{% if d.sheet %} <span class="muted">{{ d.sheet }}</span>{% endif %}</h1>
+    <span class="app-badge">{{ badge }}</span>
+  </div>
   <div class="actions">
     <a class="btn btn-primary" href="/datasets/{{ d.id }}/export.pptx{{ "?" ~ query if query }}">Export PPTX</a>
     <a class="btn" href="/datasets/{{ d.id }}/export.xlsx{{ "?" ~ query if query }}">Export XLSX</a>
   </div>
 </div>
-<dl class="kpis">
-  <div><dt>Rows</dt><dd>{{ kpis.rows|num }}</dd></div>
-  <div><dt>Columns</dt><dd>{{ kpis.columns|num }}</dd></div>
-  <div><dt>Missing</dt><dd>{{ "%.1f"|format(kpis.missing_pct) }}%</dd></div>{% for s in kpis.sums %}
-  <div><dt>{{ s.column }} (sum)</dt><dd>{{ s.sum|num if s.sum is not none }}</dd></div>{% endfor %}
-</dl>
-{% set fd = dict(filters) %}{% set dated = "temporal" in types.values() %}
-{% if options or dated %}<form class="filters" method="get">{% for col, values in options.items() %}
-  <div class="field"><label for="f{{ loop.index }}">{{ col }}</label><select id="f{{ loop.index }}" name="f.{{ col }}"><option value=""></option>{% for v in values %}<option value="{{ v }}"{{ " selected" if fd.get("f." ~ col) == v }}>{{ v }}</option>{% endfor %}</select></div>{% endfor %}{% if dated %}
-  <div class="field"><label for="from">From</label><input type="date" id="from" name="from" value="{{ fd.get('from', '') }}"></div>
-  <div class="field"><label for="to">To</label><input type="date" id="to" name="to" value="{{ fd.get('to', '') }}"></div>{% endif %}
-  <button class="btn" type="submit">Apply</button>
-</form>
-{% endif %}{% if chips %}<div class="chips-row"><ul class="chips">{% for label, href in chips %}
-  <li><a href="{{ href }}" aria-label="Remove filter {{ label }}">{{ label }}</a></li>{% endfor %}
-</ul><a class="btn" href="/datasets/{{ d.id }}">Clear filters</a></div>
+{% if view_as %}<nav class="view-as" aria-label="View as"><span class="view-as-label">View as</span><ul>{% for name, href, current in view_as %}
+  <li><a href="{{ href }}"{{ ' aria-current="page"'|safe if current }}>{{ name }}</a></li>{% endfor %}
+</ul></nav>
 {% endif %}
-{% if charts %}
-<div class="charts">{% for c in charts %}
-  <figure class="chart" id="{{ c.id }}" data-kind="{{ c.kind }}" aria-label="{{ c.title }}">
-    <figcaption><span class="chart-title">{{ c.title }}</span> <span class="chart-rule">{{ c.rule }} · score {{ "%.2f"|format(c.score) }}</span> <span class="chart-count">{{ c.shown|num }} of {{ c.total|num }} {{ "points" if c.kind in points else "rows" }}</span></figcaption>
-    <div class="plot" role="img" aria-label="{{ c.title }}: {{ c.rule }}"></div>
-  </figure>{% endfor %}
-</div>
-{% else %}
-<div class="empty">No charts for this dataset</div>
-{% endif %}
-<section class="block"><div class="table-wrap"><table>
-  <caption><h2>Columns</h2></caption>
-  <thead><tr><th scope="col">Column</th><th scope="col">Type</th></tr></thead>
-  <tbody>{% for col in d.columns %}
-    <tr><td class="path">{{ col }}</td><td><span class="badge">{{ types[col] }}</span></td></tr>{% endfor %}
-  </tbody></table></div></section>
-<section class="block"><div class="table-wrap"><table class="data-table">
-  <caption><h2>First {{ rows|length|num }} rows</h2></caption>
-  <thead><tr>{% for col in d.columns %}<th scope="col">{{ col }}</th>{% endfor %}</tr></thead>
-  <tbody>{% for r in rows %}
-    <tr>{% for v in r %}<td>{{ "" if v is none else v }}</td>{% endfor %}</tr>{% endfor %}
-  </tbody></table></div></section>
+{% include "app_" ~ shown ~ ".html" %}
 {% endblock %}
 {% block scripts %}<script src="/static/vendor/plotly/plotly.min.js" defer></script>
 <script src="/static/js/dashboard.js" defer></script>{% endblock %}
