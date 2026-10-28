@@ -8,7 +8,7 @@
   --danger: #b3261e; --ok: #1b6e3c; --warn: #8a5300;
   --c1: #1f5fbf; --c2: #b85c00; --c3: #00796b; --c4: #7b4fb3;
   --c5: #c0392b; --c6: #6b7a00; --c7: #8a5a44; --c8: #b0306f;
-  --seq-lo: #eef3fb; --seq-hi: #1f5fbf;
+  --seq-lo: #eef3fb; --seq-hi: #1f5fbf; --seq-pt-lo: #5f8ad3;
   --div-neg: #b85c00; --div-mid: #f4f4f1; --div-pos: #1f5fbf;
   /* type */
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -17,7 +17,7 @@
   /* space (4px grid), radius, layout */
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
   --radius: 6px; --maxw: 1200px; --tap: 44px;
-  --dur: 160ms; --ease: ease-out;
+  --dur: 160ms; --ease: ease-out; --delta-max: 35%;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -27,12 +27,13 @@
     --danger: #ff8a80; --ok: #6fcf97; --warn: #e0a84a;
     --c1: #6ea4ff; --c2: #f0963c; --c3: #3fc1ad; --c4: #b79bf0;
     --c5: #ff8a7a; --c6: #b5c93a; --c7: #d1a086; --c8: #f08ab8;
-    --seq-lo: #26334a; --seq-hi: #8ab4ff;
+    --seq-lo: #26334a; --seq-hi: #8ab4ff; --seq-pt-lo: #5a7fc4;
     --div-neg: #f0963c; --div-mid: #2a2d32; --div-pos: #6ea4ff;
   }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }  /* .chart and .btn set display, which would otherwise beat the attribute */
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; font: var(--t-md)/1.5 var(--font); color: var(--fg); background: var(--bg); }
 h1, h2, h3 { line-height: 1.25; margin: 0 0 var(--s3); font-weight: 650; overflow-wrap: anywhere; }
@@ -139,11 +140,78 @@ section.block { margin-top: var(--s6); }
 .empty { color: var(--muted); padding: var(--s5) var(--s4); text-align: center; background: var(--surface);
   border: 1px dashed var(--line-strong); border-radius: var(--radius); }
 
+/* round 5: app badge, View as, toggles. Markup: docs/DESIGN.md "Round 5". Spans/div/ul only, no <p> in main. */
+.page-title { display: grid; gap: var(--s2); justify-items: start; min-width: 0; }
+.app-badge { display: inline-block; padding: 2px var(--s3); border: 1px solid var(--line-strong); border-radius: 999px;
+  font-size: var(--t-sm); font-weight: 600; background: var(--surface); }
+.view-as { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin: 0 0 var(--s4); }
+.view-as .view-as-label { font-size: var(--t-sm); font-weight: 600; color: var(--muted); }
+.view-as ul { display: flex; flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
+.view-as a { display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 var(--s4); color: var(--fg);
+  background: var(--surface); border: 1px solid var(--line-strong); margin-left: -1px; font-weight: 600; text-decoration: none;
+  transition: background-color var(--dur) var(--ease); }
+.view-as li:first-child a { margin-left: 0; border-radius: var(--radius) 0 0 var(--radius); }
+.view-as li:last-child a { border-radius: 0 var(--radius) var(--radius) 0; }
+.view-as a:hover { background: var(--accent-soft); }
+.view-as a[aria-current="page"] { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent);
+  position: relative; z-index: 1; }
+.btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.table-toggle { font-size: var(--t-sm); }
+
+/* Business: KPI cards (article.card), sparkline, breadcrumb, delta table */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s3); margin: 0 0 var(--s4); padding: 0; list-style: none; }
+.card { min-width: 0; padding: var(--s4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  display: grid; gap: var(--s1); }
+.card .card-label { font-size: var(--t-sm); color: var(--muted); overflow-wrap: anywhere; }
+.card .card-value { font-size: var(--t-xl); font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.card .card-change { font-size: var(--t-sm); font-weight: 600; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; gap: var(--s1) var(--s2); }
+.card .card-period { font-size: var(--t-sm); color: var(--muted); }
+.card .spark { width: 100%; height: 36px; margin-top: var(--s2); overflow: visible; }
+.spark polyline { fill: none; stroke: var(--c1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.crumbs { margin: 0 0 var(--s4); }
+.crumbs ol { display: flex; flex-wrap: wrap; align-items: center; list-style: none; margin: 0; padding: 0; font-size: var(--t-sm); }
+.crumbs li + li::before { content: "\203a"; content: "\203a" / ""; margin: 0 var(--s2); color: var(--muted); }
+.crumbs a, .crumbs [aria-current] { display: inline-flex; align-items: center; min-height: var(--tap); overflow-wrap: anywhere; }
+.crumbs [aria-current] { font-weight: 650; }
+.chart[data-drill="false"] .plotly .cursor-pointer { cursor: default; }  /* last level: bars do not click, so no pointer */
+.biz-grid { display: grid; gap: var(--s4); margin: var(--s4) 0 0; }
+.biz-grid > * { min-width: 0; }
+.trends { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--s4); margin: var(--s4) 0 0; }
+.trends .chart .plot { height: 260px; min-height: 260px; }
+.chart[data-leaderboard] .plot { height: 420px; }
+.delta-table td.delta { text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; background: var(--div-mid); }
+/* colour = text sign + this tint; --t is delta / largest |delta| (signed or not), tint is capped so --fg keeps >= 4.5:1 */
+.delta-table td.delta.pos { background: color-mix(in srgb, var(--div-pos) calc(max(var(--t, 0), var(--t, 0) * -1) * var(--delta-max)), var(--div-mid)); }
+.delta-table td.delta.neg { background: color-mix(in srgb, var(--div-neg) calc(max(var(--t, 0), var(--t, 0) * -1) * var(--delta-max)), var(--div-mid)); }
+
+/* Map: figure + side panel, 70vh map */
+.map-layout { display: grid; gap: var(--s4); margin: var(--s4) 0 0; }
+.map-layout > * { min-width: 0; }
+.map-layout .chart[data-kind="map2d"] .plot, .map-layout .chart[data-kind="map3d"] .plot { height: 70vh; min-height: 0; }
+.map-panel { display: grid; gap: var(--s4); align-content: start; }
+.map-panel .panel-box { padding: var(--s4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.map-panel h2 { margin: 0 0 var(--s3); font-size: var(--t-md); }
+.map-panel .panel-empty { color: var(--muted); font-size: var(--t-sm); }
+.map-panel dl { display: grid; grid-template-columns: minmax(0, 40%) minmax(0, 1fr); gap: var(--s1) var(--s3); margin: 0; font-size: var(--t-sm); }
+.map-panel dt { color: var(--muted); overflow-wrap: anywhere; }
+.map-panel dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.map-panel .chart .plot { height: 360px; min-height: 360px; }
+
+/* view as table: replaces .plot (which gets hidden), same box */
+.plot-table-wrap { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+.chart[data-kind="map2d"] .plot-table-wrap, .chart[data-kind="map3d"] .plot-table-wrap, .chart[data-kind="heatmap"] .plot-table-wrap,
+.chart[data-kind="country_map"] .plot-table-wrap { max-height: 420px; }
+.plot-table th { position: sticky; top: 0; }
+.plot-table td, .plot-table th { padding: var(--s2) var(--s3); }
+.plot-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+
 /* chart grid: 2 columns from 900px; the first chart (highest score) spans both, the rest sit two per row */
 .charts { display: grid; grid-template-columns: 1fr; gap: var(--s4); margin: var(--s4) 0 0; padding: 0; }
 .chart { margin: 0; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
-.chart figcaption { order: -1; display: grid; gap: var(--s1); }
+.chart figcaption { order: -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--s3); row-gap: var(--s1); align-items: start; }
+.chart figcaption > * { grid-column: 1; }
+.chart figcaption > .table-toggle { grid-column: 2; grid-row: 1 / span 3; }
 .chart .chart-title { font-weight: 650; font-size: var(--t-md); overflow-wrap: anywhere; }
 .chart .chart-rule, .chart .chart-count { font-size: var(--t-sm); color: var(--muted); }
 .chart .chart-count { font-variant-numeric: tabular-nums; }
@@ -162,6 +230,9 @@ section.block { margin-top: var(--s6); }
   .site-header .inner { padding: 0 var(--s5); }
   .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .charts > .chart:first-child { grid-column: 1 / -1; }
+  .biz-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; }
+  .map-layout { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
+  .map-panel { position: sticky; top: var(--s4); }
 }
 @media (max-width: 599px) {
   h1 { font-size: 1.5rem; }
@@ -170,6 +241,13 @@ section.block { margin-top: var(--s6); }
   .chart[data-kind="map3d"] .plot, .chart[data-kind="country_map"] .plot, .chart[data-kind="heatmap"] .plot { height: 340px; }
   .actions .btn { flex: 1 1 100%; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  .card .card-value { font-size: 1.5rem; }
+  .trends .chart .plot { height: 240px; min-height: 240px; }
+  .chart figcaption { grid-template-columns: minmax(0, 1fr); }
+  .chart figcaption > .table-toggle { grid-column: 1; grid-row: auto; justify-self: start; }
+  .map-layout .chart[data-kind="map2d"] .plot, .map-layout .chart[data-kind="map3d"] .plot { height: 70vh; min-height: 0; }
+  .view-as a { padding: 0 var(--s3); }
   .field { flex: 1 1 100%; max-width: none; }
   .filters .btn { flex: 1 1 100%; }
   th, td { padding: var(--s2) var(--s3); }
@@ -181,4 +259,4 @@ section.block { margin-top: var(--s6); }
   .btn:active { transform: none; }
   .plot.is-loading { background: var(--line); }
 }
-@media print { .site-header, .actions, .skip, .filters, .chips-row { display: none; } }
+@media print { .site-header, .actions, .skip, .filters, .chips-row, .view-as, .table-toggle { display: none; } }

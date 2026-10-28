@@ -1,0 +1,87 @@
+{
+  "header": {
+    "ticket": 443,
+    "project": "you-think-of-the-project-name",
+    "from_role": "designer",
+    "phase": "architecture",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "1c53b4636107",
+    "tokens_left": 1866883
+  },
+  "goal": "Write or update docs/DESIGN.md and the shared stylesheet for the approved spec and architecture.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/DESIGN.md defines layout, colour, type, motion and components",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py design",
+    "passed": true,
+    "output_tail": "........................................................................ [ 35%]\n........................................................................ [ 70%]\n.............................................................            [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n205 passed, 99 warnings in 164.02s (0:02:44)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Hexagon cells in the Map app are drawn as a GeoJSON choropleth at true geographic size, not fixed-pixel hexagon markers",
+      "why": "Pixel-sized markers overlap or leave gaps when the map is zoomed, so they would show a density that is not in the data; this differs from the architecture text",
+      "evidence": "docs/DESIGN.md Charts, 'Hexbin'; docs/ARCHITECTURE.md L144-148"
+    },
+    {
+      "what": "Added tokens --seq-pt-lo (#5f8ad3 light, #5a7fc4 dark) and --delta-max (35%)",
+      "why": "The palest --seq-lo is invisible on the land colour; delta tint is capped so --fg stays at least 4.5:1",
+      "evidence": "/tmp/contrast.py output; app/static/css/databoot.css L11, L30, L20"
+    },
+    {
+      "what": "Change arrow and percent on KPI cards are neutral --fg, with the words up, down and no change; the delta table tints by |t| * 35% of --div-pos or --div-neg over grey, with the sign in the text",
+      "why": "Up is not always good, and colour must never be the only carrier; two hues with a grey midpoint as the Board's chart rules ask",
+      "evidence": "docs/DESIGN.md Components, 'ul.cards' and 'td.delta'"
+    },
+    {
+      "what": "The table toggle keeps one label ('View as table') and uses aria-pressed, styled by .btn[aria-pressed=true]",
+      "why": "A changing label plus aria-pressed double-announces the state",
+      "evidence": "docs/DESIGN.md Components, 'button.btn.table-toggle'"
+    },
+    {
+      "what": "Phone map uses dragmode false, and the map plot is 70vh with min-height 0 on both widths",
+      "why": "A 70vh map would trap a finger scroll; AC-51 needs 65 to 75% of the viewport",
+      "evidence": "docs/DESIGN.md Charts, 'Phone map'; app/static/css/databoot.css .map-layout rules"
+    },
+    {
+      "what": "Added [hidden]{display:none!important} to the stylesheet",
+      "why": ".chart and .btn set display, which beats the UA hidden rule, so the hidden 3D figure and hidden plot would show",
+      "evidence": "app/static/css/databoot.css L36; scratch page check, computed display none"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Business trend lines and sparklines all use --c1; each chart is titled with its measure",
+    "The frontend emits the markup in Components exactly, including no <p> in main (test_AC_17)",
+    "CSS color-mix and calc(max()) are available in the Chromium the tests use (verified in the bundled Playwright Chromium)",
+    "Delta --t may be signed or absolute; the CSS takes its absolute value"
+  ],
+  "open_questions": [
+    "Is the architect OK with choropleth hex cells instead of scattergeo hexagon markers (ARCHITECTURE L148 says markers)? The frontend ticket should follow DESIGN.md unless told otherwise",
+    "The Other bar on a drillable leaderboard shows Plotly's pointer cursor but does nothing on click; accepted as a small mismatch unless the Board wants a separate trace",
+    "Explorer bars: does app/rules.py sort them descending with a zero baseline (global rule 1)? I did not check or change backend code",
+    "Should the Map 3D toggle colour by the primary numeric (name rule) rather than the first numerical column? Still open from the architect's notes"
+  ],
+  "lessons": [
+    {
+      "lesson": "Add the new CSS and DESIGN.md in one pass and mark the CSS inert with the exact markup; test colour-mix and calc in a scratch HTML page via Playwright before writing the contrast numbers",
+      "when": "A design ticket lands CSS before the templates exist",
+      "evidence": "/tmp/dz/s.py output: computed delta colours matched /tmp/contrast.py"
+    },
+    {
+      "lesson": "check.py design runs the whole pytest suite (about 165 s); start it in the background and wait with an until-loop instead of a foreground call",
+      "when": "Verifying a design ticket",
+      "evidence": "tasks bkkhug162 and bttepjn9w: 205 passed in 165 s"
+    }
+  ],
+  "problems": []
+}

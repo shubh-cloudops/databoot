@@ -1,11 +1,23 @@
-# Design: DataBoot (round 4)
+# Design: DataBoot (round 5)
 
 Stylesheet: `app/static/css/databoot.css` (all tokens and components below; linked by `app/templates/base.html`).
-Sources: docs/PRD.md, docs/ARCHITECTURE.md ("Pages", R5, R6), Board gates 160 and 165: **branding unchanged:
+Sources: docs/PRD.md, docs/ARCHITECTURE.md ("Pages", "Round 5"), Board gates 160, 165 and 179: **branding unchanged:
 DataBoot, plain neutral style, system sans font, no logo, blank SVG favicon** (`app/static/blank.svg`), text only
 as titles, axis labels, `N of M` counts and one rule caption. No docs/TRENDS.md this round (`team: -trends`), so no
 trend advice is used. No external fonts, images, icons or CDNs; no raster or SVG logo. The brand is the word
 "DataBoot" set in the system font. No docs/brand/ and no site capture exist, so no logo is copied.
+
+**Round 5 delta** (Board gate 179: **branding unchanged**, "Trends off" is a team setting, so no docs/TRENDS.md and no
+trend advice is used; no logo, no new font, no image). Three apps share one shell, so there are new components but the
+look is the same quiet panel:
+1. Badge `App: Business (rule R2)` and the `View as` switch under the title (Components).
+2. Business app: KPI cards with change arrow and sparkline, trend charts, leaderboard, drill breadcrumb, change table.
+3. Map app: a 70vh map with a side panel (point details and top regions) and a `3D view` toggle.
+4. Global chart rules for every chart in every app, including Explorer (section "Global chart rules", AC-57), and a
+   `View as table` button on every Plotly figure.
+5. Donut is drawn for 2 to 5 parts only (gate 179, AC-16): `--c1..--c5`.
+6. Tokens: two new (`--seq-pt-lo`, `--delta-max`); every other colour, size, space and motion value is unchanged.
+Explorer keeps its round 4 layout; only the chart rules and the table button apply to it.
 
 **Round 4 delta** (Board gate 175; branding unchanged from gate 160; `team: -trends`, so no docs/TRENDS.md and no trend
 advice is used; **no token change**: no new colour, size, space or motion value):
@@ -48,15 +60,19 @@ control borders need 3:1.
 | `--on-accent` | #ffffff | #0b0d10 | text on a primary button | 6.1 / 9.3 |
 | `--accent-soft` | #e6eefa | #26334a | row hover, button hover | fg on it > 12 |
 | `--danger` | #b3261e | #ff8a80 | unreadable-file note, chart error | 6.1 / 6.9 |
+| `--delta-max` | 35% | 35% | most tint a change-table delta cell takes (the share of `--div-pos` or `--div-neg` mixed into `--div-mid`) | `--fg` on the full tint: 7.2 to 9.1 light, 5.8 to 5.9 dark (measured, `/tmp/contrast.py`) |
+| `--seq-pt-lo` | #5f8ad3 | #5a7fc4 | low end of map point and hexagon colours | see below |
 | `--ok` / `--warn` | #1b6e3c / #8a5300 | #6fcf97 / #e0a84a | reserved; always with a text label | >= 5.8 |
 
 Chart palette (categorical, in this order, each >= 4.5:1 on `--surface`; colour is never the only carrier, the
 legend or axis names the category):
 `--c1..--c8` light `#1f5fbf #b85c00 #00796b #7b4fb3 #c0392b #6b7a00 #8a5a44 #b0306f`, dark `#6ea4ff #f0963c
-#3fc1ad #b79bf0 #ff8a7a #b5c93a #d1a086 #f08ab8`. A chart with one series uses `--c1`. Donut uses `--c1..--c6`
-in value order (the rule allows 2 to 6 slices). Bars of one series are all `--c1`: bar height already encodes the
+#3fc1ad #b79bf0 #ff8a7a #b5c93a #d1a086 #f08ab8`. A chart with one series uses `--c1`. Donut uses `--c1..--c5`
+in value order (the rule allows 2 to 5 slices, gate 179). Bars of one series are all `--c1`: bar height already encodes the
 value, so no rainbow bars.
-Sequential scale (country map, 3D map z): `--seq-lo` to `--seq-hi`. Diverging scale (correlation heatmap, -1 to
+Sequential scale (country map, 3D map z): `--seq-lo` to `--seq-hi`. Map points and hexagon cells start at
+`--seq-pt-lo` (light #5f8ad3, dark #5a7fc4: 3.2 / 4.4 on the land colour `--bg`, 3.5 / 4.0 on the sea `--surface`) because
+the palest `--seq-lo` would vanish on the land; the colour bar uses the same two ends, so what is drawn is what is read. Diverging scale (correlation heatmap, -1 to
 +1, fixed range, 0 at the middle): `--div-neg` (orange) via `--div-mid` to `--div-pos` (blue). Orange/blue is safe
 for red-green colour blindness; each heatmap cell also prints its value to two decimals, so the number is read,
 not guessed from the hue.
@@ -66,9 +82,9 @@ System stack `--font`: `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica
 (Segoe UI on the Windows 11 target). Code, file paths and cell values may use `--mono`.
 | Token | Size | Use |
 |---|---|---|
-| `--t-xl` | 1.75rem (1.5rem at <= 599px), weight 650 | h1 |
+| `--t-xl` | 1.75rem (1.5rem at <= 599px), weight 650 | h1, Business card figure |
 | `--t-lg` | 1.25rem, 650 | h2, brand |
-| `--t-md` | 1rem, line-height 1.5 | body, chart title (650), table titles (`caption h2`, 650) |
+| `--t-md` | 1rem, line-height 1.5 | body, chart title (650), table titles (`caption h2`, 650), side-panel heading |
 | `--t-sm` | 0.875rem | tables, `th` (650, `--muted`, original case), captions, notes |
 | `--t-xs` | 0.8125rem | badges |
 Numbers in tables and counts use `font-variant-numeric: tabular-nums` and right-align (`.num`). Thousands
@@ -91,6 +107,15 @@ Breakpoints: `<= 599px` phone (gate 175: "phone width" is this one), `600-899px`
 | `dl.kpis > div` | KPI tile: `dt` label (`--t-sm`, `--muted`), `dd` figure (`--t-lg`, 650, tabular numbers, thousands separators). Surface card, hairline border. Not interactive | none |
 | `form.filters`, `.field` | `<label>` above a native `<select>` or `<input type="date">`, 44px high, `--line-strong` border, `--surface` fill, `--fg` text (the controls take `color-scheme`). `.field` is `div.field > label + select` (id on the control, `for` on the label). Fields are 160-260px wide and wrap; `Apply` is a `.btn` in the same row | hover accent border, focus ring |
 | `.chips-row > ul.chips > li > a` | active filter, a pill with the label text (`region = North`) and a CSS `×`; the link removes that filter and has `aria-label="Remove filter region = North"`. After the list comes `a.btn` `Clear filters`. The row is not rendered with no filters | hover surface fill, focus ring |
+| `.page-title > h1 + .app-badge` | the badge sits under the h1 (a `span`, never `<p>`): `App: Business (rule R2)`, pill, `--surface` fill, `--line-strong` border, `--t-sm` 600. Text only: it states the detected app and rule, nothing else | none (not interactive) |
+| `nav.view-as > .view-as-label + ul > li > a` | `View as` label and a joined row of links, one per app the dataset qualifies for (44px high, `--line-strong` border, radius on the ends). The shown app is `aria-current="page"`: `--accent-soft` fill, `--accent` 2px border and the link text; hover soft fill. The whole nav is not rendered when only Explorer qualifies | hover, focus ring, current |
+| `ul.cards > li.card` | Business KPI card: `.card-label` (measure name, `--muted`), `.card-value` (`--t-xl`, tabular, separators; `n/a` when there is no full period), `.card-change` (`<span aria-hidden>▲</span>`, `+19.4%`, `up`; ▼ with `down`; ▶ with `no change`; always three parts, **neutral `--fg`, never green or red**, because up is not always good), `.card-period` (`month 2024-06 vs 2024-05`, `--muted`), `svg.spark` below. With no previous value `.card-change` is absent | none |
+| `svg.spark` | sparkline: `viewBox="0 0 100 36" preserveAspectRatio="none"`, one `<polyline>` of the last 12 periods (2px `--c1`, non-scaling stroke), `role="img"`, `aria-label` and `<title>` such as `revenue, last 12 months`. Drawn only with 2 or more periods. No axis, no fill, no end dot (the stretch would turn it into an ellipse) | none |
+| `nav.crumbs > ol > li` | drill path `All › region: North`; every crumb but the last is a 44px link, the last is `<span aria-current="page">` in 650 weight. `›` is CSS (`content` with empty alt) | hover underline, focus ring |
+| `td.delta` + `.pos`, `.neg` or `.zero` | change-table delta cell, with `style="--t: 0.42"` (the payload's `t`, signed or not: CSS takes its absolute value). Text is the signed number (`+1,200`, `-35`, `0`) in `--fg`, right-aligned, 650 weight. Fill: `zero` is `--div-mid` (grey); `pos` mixes `--div-pos` (blue) into `--div-mid` and `neg` mixes `--div-neg` (orange) by `|t| * --delta-max`. Two hues and a grey midpoint, and the sign is in the text, so colour is never the only carrier | none |
+| `.btn[aria-pressed="true"]` | any toggle button (`View as table`, `3D view`): `--accent-soft` fill and a 2px `--accent` edge (inset, no layout shift). The label never changes; the pressed state says which view is on | hover, focus ring |
+| `button.btn.table-toggle` | `View as table`, last child of every Plotly `figcaption`, right-aligned at >= 600px, under the count at <= 599px (44px high). Pressed: `.plot` gets `hidden` and a `div.plot-table-wrap[tabindex="0"][role="region"][aria-label="<title> data"] > table.plot-table` takes its place, scrolling inside its own box (max 320px high, 420px for maps and heatmap), sticky header, numbers right-aligned with separators. Pressed again: the table is removed and the plot shown. No animation | hover, focus ring, pressed |
+| `.map-layout > figure.chart + aside.map-panel` | Map page body: map left, panel right (340px) from 900px, stacked below. Panel = `.panel-box` with `h2` `Selected point` and its `dl` (or `.panel-empty` text `Click a point to see its row.` / `Click a cell to see its count.`), then a `.panel-box` holding the top-regions figure. `aria-live="polite"` on the details box | none |
 | `.badge` | column type label (`numerical`, `categorical`, `temporal`, `geospatial`, `other`) in a pill, text always shown | |
 | `.note`, `.note-error` | left-bar message, used for fixed labels like `could not be read` | |
 | `.empty` | dashed box: "No charts for this dataset" style fixed label, only when `charts == []` | |
@@ -110,7 +135,15 @@ Breakpoints: `<= 599px` phone (gate 175: "phone width" is this one), `600-899px`
   with no matching rule shows the types table, the first-20-rows table and one `.empty` box in place of charts.
 - **Error**: unreadable files are listed in their own table with the fixed reason in a `.note-error` cell; a failed
   fetch puts `.plot-error` in that figure only; the other charts still draw.
-- **Hover/focus**: described per component. Plotly hover tooltips use `--surface` background, `--fg` text.
+- **Hover/focus**: described per component. Plotly hover tooltips use `--surface` background, `--line-strong` border, `--fg` text (`hoverlabel`).
+- **Table view**: `View as table` swaps the plot for the table of the plotted values in the same box; no spinner, no
+  motion. A figure that failed to draw has no toggle.
+- **Business with too little history**: no full period gives `n/a` cards, no sparkline and no change table; one
+  period gives a card with `n/a` change and no arrow. Nothing is filled in to look busy.
+- **Drill at the last level**: leaderboard bars are not clickable (`data-drill="false"`, default cursor) and the
+  breadcrumb's last crumb is the current page.
+- **Map with no coordinates left** (a filter removed them): the figure keeps its 70vh box with Plotly's empty map and
+  the count reads `0 of M rows`; the panel shows its empty text.
 
 ## Charts (Plotly, `app/static/js/dashboard.js`)
 The engineer reads the tokens at draw time with `getComputedStyle(document.documentElement)` so the CSS stays
@@ -132,20 +165,73 @@ the one source of truth, and passes a shared layout:
   z when z is real data, else `--c1`; with a `z_label` the z axis title and the colour bar title are that column
   name, and with `z_label` null (z is the constant 0) the z axis is hidden and there is no colour bar; country_map = choropleth, `--seq` scale, outlines `--line-strong`, coastlines
   on, `showframe` off, no base tiles.
+- Round 5 kinds (the global rules above apply; every builder also sets `hoverlabel`, `separators: ".,"`, `hoverformat`/
+  `tickformat: ","`):
+  - **Trend** (Business) = the line above, `--c1` 2px, one y-axis titled with the measure, y from 0, plot 260px
+    (240px at 375). Markers when `shown <= 40`. One chart per measure, never a second axis.
+  - **Leaderboard** (`orientation: "h"`) = bars `--c1`, `Other` bar `--line-strong`, `yaxis.autorange: "reversed"` so the
+    biggest is on top, `xaxis.rangemode: "tozero"`, `texttemplate: "%{x:,}"`, `textposition: "outside"`,
+    `cliponaxis: false`, `automargin` on y so long labels fit, plot 420px. Figure carries `data-leaderboard`, and
+    `data-drill="false"` at the last level (CSS removes Plotly's pointer cursor there). The `Other` bar still shows
+    the pointer when others drill, because Plotly sets the cursor per chart, not per bar: it does nothing on click,
+    and that is a known, small mismatch.
+  - **map2d** (`scattergeo`) = `geo`: `projection natural earth`, `fitbounds: "locations"`, `showland` with `landcolor`
+    `--bg`, `bgcolor` `--surface`, `countrycolor` and `coastlinecolor` `--line-strong`, `showframe` off, no tiles. Plot
+    height is 70vh (AC-51: 65 to 75% at desktop and phone). Points = markers size 6, opacity 0.8, 0.5px `--muted`
+    outline so the palest still reads on the land, colour on the `--seq-pt-lo` to `--seq-hi` scale, colour bar titled
+    with the primary numeric's column name; rows with no value form a second trace in `--muted` and the legend shows.
+    Hovering a point shows its place and value with separators; click fills the panel.
+  - **Hexbin** (more than 5,000 points) = cells at **true geographic size**, so neighbours touch at every zoom. Draw
+    them as one `choropleth` of an inline GeoJSON of hexagons built in `dashboard.js` from the server's centres and
+    `size` (vertex = centre + size x (cos, sin) of 30, 90, 150, 210, 270 and 330 degrees), `z` = count, same sequential
+    scale, colour bar titled `Points per cell`, 0.5px `--bg` cell edges, tooltip `1,234 points`. Fixed-pixel markers are
+    not allowed: they would overlap or leave gaps and so show a density that is not in the data. A click shows
+    `Points in cell: N` in the panel.
+  - **Top regions** = a leaderboard (same rules, plot 360px, `drill` false, so no pointer). The 3D view is the
+    round 2 `map3d` figure, 70vh, in the same place.
+  - **Phone map**: `dragmode: false` at <= 599px so a finger drag scrolls the page instead of panning the map; the mode
+    bar's zoom and reset buttons still work. Desktop uses `pan`; wheel zoom stays off (`scrollZoom: false`).
 - Honest data: the point count shown in `.chart-count` is the server's `shown`/`total` (`N of M points` or `N of
   M rows`). When `shown < total` the caption says so and nothing else; no smoothing, no fake trend line. Plotly
   default transitions are off (`transition: {duration: 0}`), so no chart animates on load.
 - Cross-filter (AC-39): bar and donut categories are clickable (Plotly's own pointer cursor over a bar or slice is the
   only hint; no text and no icon is added). Click sets `f.<x_label>=<category>` and reloads; a second click on the same
-  category removes it. With one value selected a donut drops out (its rule needs 2 to 6 slices), but a bar chart stays
+  category removes it. With one value selected a donut drops out (its rule needs 2 to 5 slices), but a bar chart stays
   with the single remaining bar (seen in the ticket 437 review), which is the bar a second click un-filters; no
   "selected bar" style is drawn, the chip and the select already say what is applied. Mouse-only by nature; the dropdowns and chips are the keyboard and touch-reader route to the same result.
 - Keyboard and screen reader: each `figure` has `aria-label` = chart title; each `.plot` has `role="img"` with
   `aria-label` = `<title>: <rule caption>`; the data is also in the first-20-rows table above/below.
 
+## Global chart rules
+Apply to every Plotly figure in every app (Explorer, Business, Map; AC-57). Each rule says what the code must do.
+1. **Magnitude = sorted bars from zero.** Bars sort descending (Business leaderboard: top 10, then `Other` last, in
+   `--line-strong` grey so it reads as the remainder, never a palette colour), the value axis starts at 0
+   (`rangemode: "tozero"`), horizontal when labels are long, value printed on each bar in the leaderboard.
+2. **Change over time = line.** One line per chart, time on x; no bars for time and no smoothing. A partial last
+   period is not drawn (Business trend stops at the latest full period).
+3. **Part-to-whole = stacked bar; donut only for 2 to 5 parts.** With 6 or more parts no donut is drawn. A part-to-whole
+   chart with 6 or more parts must be one stacked bar from zero (none exists yet; the rule is for the next one).
+4. **One y-axis always.** No `yaxis2`, no `overlaying`, no dual axis. Several measures make small multiples: one
+   chart per measure (Business trends, one to three of them).
+5. **Fixed categorical palette order, at most 8, then `Other`.** `--c1..--c8` in that order, never reshuffled by
+   data; more than 8 categories fold into one `Other` in `--line-strong`. One series is always `--c1`.
+6. **At most 3 colour series on a scatter or a map.** Map points are one sequential series plus an optional
+   `--muted` series for rows without a value (2); scatter is 1. A fourth series is folded or dropped.
+7. **Sequential = one hue, light to dark** (`--seq-lo` or `--seq-pt-lo` to `--seq-hi`: the same blue). **Diverging = two
+   hues with a grey midpoint** (`--div-neg` orange, `--div-mid` grey, `--div-pos` blue; heatmap and change table).
+   The midpoint is the zero of the data, never a hue.
+8. **Legend at 2 or more series, direct labels at 4 or fewer.** One series has no legend (the title says what it is);
+   with 2 to 4 series the series name is also printed at the end of its line or bar; with more than 4 only the legend.
+9. **Every chart has a tooltip and a table toggle.** Tooltip (`hoverlabel`) on every mark, none of `hoverinfo: "none"`
+   or `"skip"`; `View as table` (Components) shows the plotted values. The sparkline is not a chart, has no toggle
+   and keeps its `<title>`.
+10. **Thousands separators everywhere.** Axis ticks (`separators: ".,"`, `tickformat: ","`), tooltips (`:,`), bar
+    labels (`%{x:,}`), cards, panel values, table cells and the table view; one decimal for percents (`+19.4%`).
+
 ## Motion rules
 1. Only two moving things exist: the loading shimmer (real pending fetch) and the 160ms colour transition on
-   buttons. Nothing animates because data is "live"; the app does not poll.
+   buttons and View-as links. Drill, `View as`, `View as table` and `3D view` are instant swaps or page loads; the
+   sparkline and cards do not animate. Nothing animates because data is "live"; the app does not poll.
 2. No scroll reveals, no count-up numbers, no entrance animation of charts.
 3. `prefers-reduced-motion: reduce` removes all transitions and animations (blanket rule at the end of the CSS).
    Plotly 3D rotation is user driven only (drag); never auto-rotate.
@@ -153,10 +239,17 @@ the one source of truth, and passes a shared layout:
 ## Accessibility
 - Contrast as in the token tables. Focus: 3px `--accent` outline, 2px offset, on every link and button
   (`:focus-visible`); contrast with the surface >= 3:1 in both themes.
-- Tab order: skip link, brand, page actions, chart mode-bar buttons (visible, 28px, ring on focus), table links.
+- Tab order (Business, Map): skip, brand, export links, View-as links, filter controls, `Apply`, chips, crumbs, then
+  for each figure its `View as table` button and its mode-bar buttons (and `3D view` first on the map), table links.
+  Explorer is as in round 4. A table view's scroll box is focusable (`tabindex="0"`) so the keyboard can scroll it.
+  Leaderboard drill by keyboard: the filter dropdowns and the crumbs do the same (the `keyboardBar` of round 4 also
+  works); the 3D toggle is a button.
+- Tab order (round 4): skip link, brand, page actions, chart mode-bar buttons (visible, 28px, ring on focus), table links.
   Landmarks: `header`, `main#main`. Mode-bar buttons have an `aria-label`.
 - One `h1` per page, then `h2` per table (inside its `<caption>`), no skipped level; figures keep a figcaption
   title, not a heading. Tables have `caption` and `th scope`. Type badges carry text.
+- The sparkline has `role="img"` and a label; the arrow is `aria-hidden` and the words `up`, `down`, `no change` carry it.
+  The badge and View-as are text. On the phone the map must not trap the page scroll (see Map at 375px).
 - `lang="en"`; zoom is not blocked; layout reflows at 320px with no horizontal page scroll.
 
 ## Page layouts
@@ -194,11 +287,48 @@ come first because they say what the charts below are about.
 340px), columns table, rows table (scrolls sideways in its box). Chart legends move below the plot. Nothing overflows
 the page width.
 
+### The shell, Business and Map (round 5)
+The dashboard page is a shell plus one app body. Shell, in order: `.crumb`; `.page-head` with `.page-title` (h1, then
+`.app-badge`) and `.actions`; `nav.view-as` (not rendered when only Explorer qualifies); then the body. Explorer's body
+is the round 4 body above, unchanged. The filter form and chips are the same component in all three apps and sit
+directly under the shell (Business and Map) or after the KPI strip (Explorer, as in round 4).
+
+**Business, 1280px** (single column, `main` max 1200px), in this order:
+1. `ul.cards`: one card per measure (1 to 3), `repeat(auto-fill, minmax(240px, 1fr))`, 12px gap, so 3 cards sit in a
+   row of 4 slots and a lone card is not stretched across the page. The card order is the measure order (primary first).
+2. `form.filters`, then `.chips-row` when a filter is active.
+3. `nav.crumbs` (`All › region: North`); with no active categorical filter it holds just `All` as the current page.
+4. `.trends`: one `figure.chart` per measure, `repeat(auto-fit, minmax(300px, 1fr))`: one measure fills the row, two
+   share it, three sit in a row (about 380px each). Plot 260px.
+5. `.biz-grid` (two columns from 900px, `1.2fr 1fr`, top aligned): left the leaderboard figure (`data-leaderboard`, plot
+   420px), right the change table in a `.table-wrap` (`table.delta-table`, caption h2 `Change`, columns Category,
+   Previous, Latest, Delta; numbers `.num`; the delta cell as in Components, its row in the leaderboard's order).
+   Absent (and the leaderboard full width) when there is no previous period.
+6. Columns table, First rows table, as in Explorer (First rows last).
+**Business, 375px**: crumb, h1, badge, buttons stacked full width, View-as links (each at least 44px), cards one per
+row (value 1.5rem, sparkline full card width), stacked full-width filters, chips, crumbs wrapping, trend charts one per
+row (240px), leaderboard (420px), change table (scrolls inside its box), Columns, First rows. `figcaption` stacks:
+title, rule, count, then the `View as table` button full height 44px at the start.
+
+**Map, 1280px**: shell, filters and chips, then `.map-layout` with two columns: the map figure left (card with title,
+rule, `N of M rows`, a `3D view` button and the `View as table` button on the right of the caption, then the 70vh
+plot) and `aside.map-panel` right, 340px wide and sticky at 16px: a `.panel-box` `Selected point` (a `dl` of column
+and value, label column 40%, or the empty text) and a `.panel-box` with the top-regions figure. A hidden
+`figure[data-kind="map3d"]` shares the map's place: `3D view` hides the 2D figure and shows it, pressed again swaps
+back; both have the same height so the page does not jump. Then Columns and First rows.
+**Map, 375px**: the same order in one column: map (70vh, finger drags scroll the page), then the panel (details, then
+regions), then the tables. The caption buttons stack under the count. No horizontal scroll at any width.
+
 ## Honesty rules (for design review)
 - Skeleton shimmer only while a fetch is pending. No fake progress bars, no "live" dots, no sparkline filler.
 - The score is the server's number, printed as given; the order is the order of the data, not a styled ranking. Chips and
   selects show only filters that are in the URL; nothing is highlighted that is not applied.
-- Every number on screen comes from the server response; chart counts are `shown`/`total` as given.
+- Every number on screen comes from the server response; chart counts are `shown`/`total` as given. The change arrow
+  and percent are the server's `dir` and `pct`, printed as given. Sparklines and cards are drawn from the same sums as
+  the trend; the trend stops at the latest full period so a half-finished month is never drawn as a fall.
+- The badge says which rule matched; `View as` lists only apps the dataset really qualifies for. Delta tints scale
+  with the real delta divided by the largest one, and zero is grey. Hexagon cells are true size; their colour is the
+  count. Nothing pulses, counts up or auto-refreshes.
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
@@ -261,3 +391,18 @@ camera is pulled back at <= 599px so the lat/lon axis titles are not clipped; Pl
 same focus ring. Table names are `<caption>`s (styled like h2) rather than h2 elements. The mode bar uses
 `displayModeBar: "hover"`, so its buttons are not in the tab order until shown; the same data is in the tables.
 No token change.
+
+Round 5 (ticket 443, architecture phase, Board gate 179): `databoot.css` gains, with no template or script using them
+yet (**inert until the frontend tickets emit exactly the markup in Components and "The shell, Business and Map"**):
+`[hidden]{display:none!important}` (needed because `.chart` and `.btn` set `display`, so the hidden 3D figure and the
+hidden `.plot` would otherwise show), `.page-title`, `.app-badge`, `.view-as`, `.btn[aria-pressed="true"]`,
+`.table-toggle` (and a two-column figcaption: title block left, button right, one column at <= 599px; Explorer figcaptions
+have no button, so they look as before), `.cards`/`.card`/`.spark`, `.crumbs`, `.biz-grid`, `.trends`,
+`.delta-table td.delta`, `.map-layout`, `.map-panel`, `.plot-table-wrap`/`.plot-table`, `[data-leaderboard]` and
+`[data-drill="false"]`. Tokens added: `--seq-pt-lo`, `--delta-max`. Contrast measured for the delta cells (`--fg` on the
+full 35% tint: light 8.5 pos, 9.1 neg; dark 5.9 pos, 5.8 neg), for the point low end against land and sea (above) and
+`--seq-hi` against the page (5.7 / 8.4). Checked in a scratch page at 1280 and 375 (light and dark): tints resolve,
+hidden figure is `display: none`, no sideways scroll. Differences from the architecture text, for the frontend ticket:
+(a) hex cells are a GeoJSON `choropleth`, not fixed-pixel hexagon markers (true size), (b) the table toggle keeps one
+label and uses `aria-pressed`, (c) `dragmode: false` on the phone map, (d) trend lines are all `--c1`. Tab order and
+reduced motion are as listed above; no new motion. Donut text in Charts and Cross-filter now says 2 to 5.
