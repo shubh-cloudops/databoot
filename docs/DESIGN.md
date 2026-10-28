@@ -169,12 +169,14 @@ the one source of truth, and passes a shared layout:
   `tickformat: ","`):
   - **Trend** (Business) = the line above, `--c1` 2px, one y-axis titled with the measure, y from 0, plot 260px
     (240px at 375). Markers when `shown <= 40`. One chart per measure, never a second axis.
-  - **Leaderboard** (`orientation: "h"`) = bars `--c1`, `Other` bar `--line-strong`, `yaxis.autorange: "reversed"` so the
-    biggest is on top, `xaxis.rangemode: "tozero"`, `texttemplate: "%{x:,}"`, `textposition: "outside"`,
-    `cliponaxis: false`, `automargin` on y so long labels fit, plot 420px. Figure carries `data-leaderboard`, and
-    `data-drill="false"` at the last level (CSS removes Plotly's pointer cursor there). The `Other` bar still shows
-    the pointer when others drill, because Plotly sets the cursor per chart, not per bar: it does nothing on click,
-    and that is a known, small mismatch.
+  - **Leaderboard** (`orientation: "h"`) = bars `--c1`, `yaxis.autorange: "reversed"` so the biggest is on top,
+    `xaxis.rangemode: "tozero"`, `texttemplate: "%{x:,}"`, `textposition: "outside"`, `cliponaxis: false`, `automargin`
+    on y so long labels fit, a 72px right margin for the value text, plot 420px. The `Other` bar is its own trace in
+    `--muted` (neutral grey, not a palette colour, so it is the only grey bar), on the same category axis and order
+    (`barmode: "overlay"`). Figure carries `data-leaderboard`, and `data-drill="false"` at the last level. Plotly shows
+    no pointer over bars itself, so `dashboard.js` toggles a class on the figure from `plotly_hover` / `plotly_unhover`:
+    `bar-click` (CSS `cursor: pointer`) over a bar that drills, `no-pointer` (CSS `cursor: default`) over `Other` and
+    over every bar at the last level. Clicking `Other`, or any bar at the last level, does nothing.
   - **map2d** (`scattergeo`) = `geo`: `projection natural earth`, `fitbounds: "locations"`, `showland` with `landcolor`
     `--bg`, `bgcolor` `--surface`, `countrycolor` and `coastlinecolor` `--line-strong`, `showframe` off, no tiles. Plot
     height is 70vh (AC-51: 65 to 75% at desktop and phone). Points = markers size 6, opacity 0.8, 0.5px `--muted`
@@ -205,7 +207,7 @@ the one source of truth, and passes a shared layout:
 ## Global chart rules
 Apply to every Plotly figure in every app (Explorer, Business, Map; AC-57). Each rule says what the code must do.
 1. **Magnitude = sorted bars from zero.** Bars sort descending (Business leaderboard: top 10, then `Other` last, in
-   `--line-strong` grey so it reads as the remainder, never a palette colour), the value axis starts at 0
+   `--muted` grey as its own trace with no pointer cursor, so it reads as the remainder, never a palette colour), the value axis starts at 0
    (`rangemode: "tozero"`), horizontal when labels are long, value printed on each bar in the leaderboard.
 2. **Change over time = line.** One line per chart, time on x; no bars for time and no smoothing. A partial last
    period is not drawn (Business trend stops at the latest full period).
@@ -214,7 +216,7 @@ Apply to every Plotly figure in every app (Explorer, Business, Map; AC-57). Each
 4. **One y-axis always.** No `yaxis2`, no `overlaying`, no dual axis. Several measures make small multiples: one
    chart per measure (Business trends, one to three of them).
 5. **Fixed categorical palette order, at most 8, then `Other`.** `--c1..--c8` in that order, never reshuffled by
-   data; more than 8 categories fold into one `Other` in `--line-strong`. One series is always `--c1`.
+   data; more than 8 categories fold into one `Other` in `--muted`. One series is always `--c1`.
 6. **At most 3 colour series on a scatter or a map.** Map points are one sequential series plus an optional
    `--muted` series for rows without a value (2); scatter is 1. A fourth series is folded or dropped.
 7. **Sequential = one hue, light to dark** (`--seq-lo` or `--seq-pt-lo` to `--seq-hi`: the same blue). **Diverging = two

@@ -28,7 +28,7 @@ def test_shop_badge_and_view_as(make_client, archetypes_dir):
     assert _badge(html) == "App: Business (rule R2)"
     assert _view_as(html) == [(f"/datasets/{i}?app=business", ' aria-current="page"', "Business"),
                               (f"/datasets/{i}?app=explorer", "", "Explorer")]
-    assert 'data-kind="line"' not in html and "<h2>Columns</h2>" in html and "<h2>First 20 rows</h2>" in html
+    assert 'class="cards"' in html and 'data-leaderboard' in html and "<h2>Columns</h2>" in html and "<h2>First 20 rows</h2>" in html
     assert f'href="/datasets/{i}/export.xlsx"' in html  # no app param in the request: round 4 URLs
 
 

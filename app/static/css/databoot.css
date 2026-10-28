@@ -173,9 +173,11 @@ section.block { margin-top: var(--s6); }
 .crumbs li + li::before { content: "\203a"; content: "\203a" / ""; margin: 0 var(--s2); color: var(--muted); }
 .crumbs a, .crumbs [aria-current] { display: inline-flex; align-items: center; min-height: var(--tap); overflow-wrap: anywhere; }
 .crumbs [aria-current] { font-weight: 650; }
-.chart[data-drill="false"] .plotly .cursor-pointer { cursor: default; }  /* last level: bars do not click, so no pointer */
+.chart.bar-click .nsewdrag { cursor: pointer; }  /* set by dashboard.js while a bar that drills is hovered (Plotly shows none) */
+.chart.no-pointer .nsewdrag { cursor: default; }  /* hovering Other, or any bar at the last level */
 .biz-grid { display: grid; gap: var(--s4); margin: var(--s4) 0 0; }
 .biz-grid > * { min-width: 0; }
+.biz-grid.solo { grid-template-columns: minmax(0, 1fr); }  /* no change table: the leaderboard takes the row */
 .trends { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--s4); margin: var(--s4) 0 0; }
 .trends .chart .plot { height: 260px; min-height: 260px; }
 .chart[data-leaderboard] .plot { height: 420px; }

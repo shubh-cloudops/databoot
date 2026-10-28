@@ -78,7 +78,8 @@
         line: { color: t.c[0], width: 2 }, marker: { color: t.c[0], size: 6 } }], l];
     },
     bar: function (c, t, l) {
-      var wide = c.data.x.some(function (s) { return String(s).length > 12; });
+      var lead = c.orientation === "h";  // Business leaderboard: always horizontal, biggest on top, values printed
+      var wide = lead || c.data.x.some(function (s) { return String(s).length > 12; });
       l.xaxis.type = "category";
       l.bargap = 0.2;
       var trace = { type: "bar", marker: { color: t.c[0] } };
@@ -90,7 +91,17 @@
         trace.x = c.data.x; trace.y = c.data.y;
       }
       (wide ? l.xaxis : l.yaxis).rangemode = "tozero";  // global rule 1; the server's baseline is 0, so every bar starts there
-      return [[trace], l];
+      var traces = [trace];
+      if (lead) {
+        var n = c.other ? c.data.x.length - 1 : c.data.x.length;  // Other is the last bar: its own trace in --muted, same axis and order
+        traces = [[0, n, t.c[0]], [n, c.data.x.length, t["--muted"]]].filter(function (r) { return r[1] > r[0]; }).map(function (r) {
+          return { type: "bar", orientation: "h", x: c.data.y.slice(r[0], r[1]), y: c.data.x.slice(r[0], r[1]), marker: { color: r[2] },
+            texttemplate: "%{x:,}", textposition: "outside", cliponaxis: false };
+        });
+        l.barmode = "overlay";
+        l.margin.r = 72;  // room for the value printed outside the longest bar
+      }
+      return [traces, l];
     },
     donut: function (c, t, l) {
       delete l.xaxis; delete l.yaxis;
@@ -196,7 +207,9 @@
       var on = btn.getAttribute("aria-pressed") !== "true";
       wrap = fig.querySelector(".plot-table-wrap");
       if (on && !wrap) {
-        var made = tableOf(c, plot.data[0]), table = document.createElement("table"), tr = document.createElement("tr");
+        var made = tableOf(c, plot.data[0]);
+        plot.data.slice(1).forEach(function (extra) { made[1] = made[1].concat(tableOf(c, extra)[1]); });
+        var table = document.createElement("table"), tr = document.createElement("tr");
         table.className = "plot-table";
         made[0].forEach(function (h) { tr.appendChild(cell("th", h, "col")); });
         table.appendChild(document.createElement("thead")).appendChild(tr);
@@ -250,15 +263,29 @@
     fix();
   }
 
+  // Leaderboard cursor (c.drill is a boolean). Plotly itself shows no pointer over bars, so the figure gets a class while a
+  // bar is hovered: `bar-click` (pointer) over a bar that drills, `no-pointer` (default) over Other or at the last level.
+  function barCursor(plot, c) {
+    if (c.kind !== "bar" || typeof c.drill !== "boolean") return;
+    var fig = plot.closest(".chart");
+    plot.on("plotly_hover", function (ev) {
+      var click = c.drill && !(c.other && ev.points[0].curveNumber > 0);
+      fig.classList.toggle("bar-click", click);
+      fig.classList.toggle("no-pointer", !click);
+    });
+    plot.on("plotly_unhover", function () { fig.classList.remove("bar-click", "no-pointer"); });
+  }
+
   // Click on a bar or donut slice of a categorical column sets f.<column> to that category (AND with the other
   // filters); clicking the active value again removes it. Only columns with a dropdown (<= 50 values) filter.
+  // Leaderboard: no click at the last level (c.drill false), and the Other bar (trace 1) never clicks.
   function crossFilter(plot, c) {
-    if (c.kind !== "bar" && c.kind !== "donut") return;
+    if (c.kind !== "bar" && c.kind !== "donut" || c.drill === false) return;
     var key = "f." + c.x_label;
     if (![].some.call(document.querySelectorAll("form.filters select"), function (s) { return s.name === key; })) return;
     plot.on("plotly_click", function (ev) {
       var pt = ev.points && ev.points[0];
-      if (!pt) return;
+      if (!pt || c.other && pt.curveNumber > 0) return;
       var value = String(c.kind === "donut" ? pt.label : pt.data && pt.data.orientation === "h" ? pt.y : pt.x);
       var p = new URLSearchParams(location.search);
       if (p.get(key) === value) p.delete(key); else p.set(key, value);
@@ -275,7 +302,7 @@
       try {
         var made = build[c.kind](c, t, layout(t, c));
         globalRules(made[0], made[1]);
-        Plotly.newPlot(plot, made[0], made[1], CONFIG).then(function () { keyboardBar(plot); crossFilter(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });
+        Plotly.newPlot(plot, made[0], made[1], CONFIG).then(function () { keyboardBar(plot); barCursor(plot, c); crossFilter(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });
       } catch (e) { fail(plot); }
     });
   }

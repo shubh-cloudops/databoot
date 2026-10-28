@@ -15,6 +15,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.filters["num"] = "{:,}".format  # the one thousands-separator filter for every count (gate 161)
+templates.env.filters.update(fmt=business.fmt, signed=business.signed, spark=business.spark)  # Business page: floats, deltas, sparkline
 
 
 @app.get("/")
@@ -57,6 +58,7 @@ def dashboard(request: Request, id: str):
         "title": f"{d.path} - DataBoot", "d": d, "types": v["mapping"], "rows": v["rows"][:20], "shown": shown,
         "badge": f"App: {apps.NAMES[det['app']]} (rule {det['rule']})", "view_as": view_as, "appq": bool(appq),
         "charts": _appview(d, f, "explorer")["charts"] if shown == "explorer" else [],
+        "biz": _appview(d, f, "business", shown if appq else None) if shown == "business" else {},
         "kpis": v["kpis"], "options": v["options"], "labels": v["labels"], "filters": f, "chips": chips,
         "clear": url(*appq), "query": urlencode(f + appq)})
 

@@ -1,0 +1,118 @@
+{
+  "header": {
+    "ticket": 454,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1827355
+  },
+  "goal": "Business page: KPI cards with sparkline, trend figures, leaderboard (Board gate 180: Other bar in neutral grey as its own trace, no pointer cursor, clicks on it do nothing), drill-down click, breadcrumb, change table (B2; Board gate 179: bars at the last level are not clickable)",
+  "acceptance_criteria": [
+    {
+      "text": "app_business.html shows, in order: ul.cards > li.card per card (label, value with thousands separators or `n/a`, `.card-change` with arrow span aria-hidden, signed percent with one decimal and the word up, down or no change, absent when change is None; the sparkline as server-side `<svg class=\"spark\"><polyline>` with a <title>), the filter form and chips, `<nav class=\"crumbs\" aria-label=\"Drill path\">` (last crumb aria-current=\"page\", \u203a separators), the trend figures, the leaderboard figure (data-leaderboard, data-drill=\"false\" at the last level), the change table (td.delta.pos|neg|zero with style --t, sign in the text), Columns, First rows; markup as in docs/DESIGN.md Components; no <p> in main",
+      "passes": true
+    },
+    {
+      "text": "dashboard.js bar builder honours c.orientation == \"h\": yaxis autorange reversed, xaxis rangemode tozero, texttemplate `%{x:,}`, cliponaxis false; the `Other` bar (c.other, last index) is drawn as its own trace in the neutral grey `--muted` token (not a palette colour) so it is the only grey bar, on the same category axis and order (barmode overlay)",
+      "passes": true
+    },
+    {
+      "text": "Pointer cursor: bars of other categories show Plotly's pointer only when c.drill; hovering the Other bar leaves the cursor default (plotly_hover/plotly_unhover toggle a class that CSS uses to force `cursor: default`); at the last level (drill false) no bar shows a pointer",
+      "passes": true
+    },
+    {
+      "text": "crossFilter: clicking a leaderboard bar sets f.<x_label>=<category> keeping app and from/to; clicking the Other bar, or any bar at the last level, does nothing (no navigation); Explorer bars keep the round 4 click filter and toggle",
+      "passes": true
+    },
+    {
+      "text": "docs/DESIGN.md Charts / Leaderboard text and Global chart rule 1 and 5 now say the Other bar is `--muted`, its own trace with no pointer cursor (replacing the 'known, small mismatch' sentence), and the section 'Global chart rules' stays with all ten rules",
+      "passes": true
+    },
+    {
+      "text": "tests/test_business_page.py (Playwright on shop.csv, 1280 and 375 widths): cards show `\u25b2`, `+19.4%`, `up`, `7,392` and an svg each; a card with no previous shows `n/a` and no arrow; every leaderboard bar has a text label with a thousands separator; click bar `web` -> URL f.channel=web, leaderboard group `store`, crumb `All \u203a channel: web`; click `North` -> group `product`, no pointer; clicking a product bar or `Other` does not navigate; click `All` -> no `f.`; go_back() returns to the previous level; Other bar fill is the --muted colour and hovering it gives a default cursor; positive, negative and zero delta cells have three different computed background-colors, zero equal to --div-mid",
+      "passes": true
+    },
+    {
+      "text": "No unseparated 4+ digit number in main text (test_AC_21 regex) on the Business page; no console errors",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-46, AC-48, AC-49, AC-50, AC-55, AC-57 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 25%]\n........................................................................ [ 51%]\n........................................................................ [ 77%]\n.............................................................            [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 2 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n277 passed, 107 warnings in 215.17s (0:03:35)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Cursor is driven by two classes on the figure (bar-click, no-pointer) from plotly_hover/unhover, only for charts whose drill is a boolean",
+      "why": "Plotly in this build sets no pointer over bars, so the old .cursor-pointer CSS rule matched nothing; explicit classes give pointer on drilling bars and default on Other and at the last level, and leave Explorer bars untouched",
+      "evidence": "app/static/js/dashboard.js barCursor; app/static/css/databoot.css:176-177; tests/test_business_page.py::test_other_bar_is_muted_grey_and_has_no_pointer_or_click"
+    },
+    {
+      "what": "Other is drawn as a separate bar trace on the same category axis with barmode overlay; the table view concatenates all traces",
+      "why": "Ticket asks for its own trace in --muted; table toggle must still list every plotted bar",
+      "evidence": "app/static/js/dashboard.js bar builder, tableToggle"
+    },
+    {
+      "what": "Number formatting through new filters fmt/signed in business.py, not the num filter",
+      "why": "Typed sums are floats (7392.0); num would print 7,392.0",
+      "evidence": "app/business.py fmt, signed; app/templates/app_business.html"
+    },
+    {
+      "what": "Leaderboard figure is skipped when total is 0; card n/a is tested with ?from=2030-01-01",
+      "why": "An empty bar chart adds nothing; the n/a card needs a view with no dates",
+      "evidence": "app/templates/app_business.html; tests/test_business_page.py::test_card_without_a_full_period_says_na_and_has_no_arrow"
+    },
+    {
+      "what": "Crumb hrefs are prefixed with /datasets/<id> in the template (trailing ? stripped)",
+      "why": "Resolves the open question from ticket 448",
+      "evidence": "app/templates/app_business.html"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Relying on Plotly's own pointer cursor with a class forcing default over Other",
+      "why_it_failed": "Plotly never sets cursor-pointer on the drag layer for bars here (cursor stays crosshair), so there was no pointer to keep or remove"
+    }
+  ],
+  "assumptions": [
+    "Explorer bars keep Plotly's behaviour (crosshair, no pointer); AC-39's wording about Plotly's pointer is not changed by this ticket",
+    "Card sparkline scales min..max (not from zero); DESIGN.md does not say otherwise",
+    "Category header of the change table is the literal 'Category' as in DESIGN.md"
+  ],
+  "open_questions": [
+    "DESIGN.md Cross-filter (AC-39) still says Plotly's own pointer is the only hint for Explorer bars; Plotly shows none in this build. Should Explorer bars get the same bar-click class?",
+    "Trend lines are not forced to start at y=0 (DESIGN.md says 'y from 0'); the shared line builder is also used by Explorer, so I left it alone"
+  ],
+  "lessons": [
+    {
+      "lesson": "Probe cursor behaviour in the browser before trusting a spec claim about a library default; check getComputedStyle on .nsewdrag after a real hover",
+      "when": "Any ticket about pointer/cursor on Plotly marks",
+      "evidence": "Hover on a regular bar gave 'crosshair', no cursor-pointer class anywhere"
+    },
+    {
+      "lesson": "Scroll the figure into view before using page.mouse with getBoundingClientRect coordinates, and wait ~300ms after a mouse move instead of waiting for a stale .hovertext",
+      "when": "Real-mouse Plotly tests below the 900px fold",
+      "evidence": "tests/test_business_page.py centre() and cursor()"
+    },
+    {
+      "lesson": "SVG text and title elements need text_content() / evaluate_all textContent; inner_text fails or returns None",
+      "when": "Asserting Plotly bar labels or sparkline titles",
+      "evidence": "tests/test_business_page.py"
+    },
+    {
+      "lesson": "A '<p' substring check also matches <polyline>; use a regex like <p[\\s>]",
+      "when": "No-<p>-in-main assertions on pages with inline SVG",
+      "evidence": "tests/test_business_page.py::test_page_order_and_markup"
+    }
+  ],
+  "problems": []
+}

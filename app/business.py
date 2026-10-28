@@ -153,6 +153,24 @@ def _changes(columns, typed, mapping, out, c, m):
             for k, p, l in rows]
 
 
+def fmt(v):
+    """Number with thousands separators: whole values without decimals, others to 2 places (template filter)."""
+    v = round(v, 2)
+    return f"{int(v):,}" if v == int(v) else f"{v:,.2f}"
+
+
+def signed(v):
+    """Delta with its sign: +1,200, -35, 0 (template filter)."""
+    v = round(v, 2)
+    return "0" if v == 0 else ("+" if v > 0 else "-") + fmt(abs(v))
+
+
+def spark(ys):
+    """`points` of a sparkline polyline in a 100 x 36 viewBox: min..max scaled, 2 units of padding (template filter)."""
+    lo, hi = min(ys), max(ys)
+    return " ".join(f"{100 * i / (len(ys) - 1):.1f},{18 if hi == lo else 34 - 32 * (y - lo) / (hi - lo):.1f}" for i, y in enumerate(ys))
+
+
 def _table(title, head, rows):
     return _chart("table", title, head[0], head[1], "table", len(rows), len(rows), {"head": head, "rows": rows}, 0)
 
