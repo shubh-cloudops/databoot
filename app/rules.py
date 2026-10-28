@@ -78,13 +78,14 @@ def _chart(kind, title, x, y, rule, shown, total, data, score):
             "shown": shown, "total": total, "data": data, "score": score}
 
 
-def _map3d(columns, rows, mapping, settings):
+def _map3d(columns, rows, mapping, settings, z=None):
+    """3D scatter; z = column index of the z axis, default the first numerical (Explorer)."""
     geo = [i for i, c in enumerate(columns) if mapping.get(c) == "geospatial"]
     lat = next((i for i in geo if columns[i].strip().lower() in LAT), None)
     lon = next((i for i in geo if columns[i].strip().lower() in LON), None)
     if lat is None or lon is None:
         return []
-    z = _first(columns, mapping, "numerical")
+    z = _first(columns, mapping, "numerical") if z is None else [z]
     points = []
     for r in rows:
         x, y = _num(r[lon]), _num(r[lat])

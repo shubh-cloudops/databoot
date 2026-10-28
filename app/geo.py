@@ -1,13 +1,15 @@
 """Map app figures: 2D points or hexbin cells, row details, top regions, the 3D chart for the toggle
 (docs/ARCHITECTURE.md "Round 5: Map app").
 
-view(columns, rows, typed, mapping, settings) -> {"charts", "map3d"}. This part: the map2d chart (points, or hex cell
-centres above HEX_AT points, drawn as a GeoJSON choropleth: Board gate 180); regions and map3d come next.
+view(columns, rows, typed, mapping, settings) -> {"charts", "map3d"}: the map2d chart (points, or hex cell centres
+above HEX_AT points, drawn as a GeoJSON choropleth: Board gate 180), the top-regions bar (Board gate 179) and the
+Explorer 3D chart with z = the primary numeric (Board gate 180).
 """
 import math
 
 from app import apps
-from app.rules import _chart
+from app.business import TOP, _ranked
+from app.rules import COUNTRY, _chart, _clean, _map3d, _num
 
 HEX_AT = 5000
 HEX_ACROSS = 40
@@ -28,6 +30,29 @@ def _hex(lons, lats):
             zi = -qi - ri
         cells[(qi, zi)] = cells.get((qi, zi), 0) + 1
     return cells, s
+
+
+def _regions(columns, rows, typed, mapping, prim):
+    """Top-regions bar: country column, else the categorical with the fewest distinct values (>= 2); None if none."""
+    cats = [i for i, c in enumerate(columns) if mapping.get(c) == "categorical"]
+    country = [i for i, c in enumerate(columns) if c.strip().lower() in COUNTRY and mapping.get(c) in ("categorical", "other")]
+    distinct = {i: len({r[i] for r in typed if r[i] not in (None, "")}) for i in cats}
+    pool = [i for i in cats if distinct[i] >= 2]
+    c = country[0] if country else min(pool, key=lambda i: (distinct[i], i), default=None)
+    if c is None:
+        return None
+    sums = {}
+    for r in typed:
+        v = 1 if prim is None else _num(r[prim])
+        if r[c] not in (None, "") and v is not None:
+            sums[str(r[c])] = sums.get(str(r[c]), 0) + v
+    bars = _ranked(sums)
+    what = "rows" if prim is None else columns[prim]
+    return {**_chart("bar", f"{what} by {columns[c]}", columns[c], "count" if prim is None else f"{what} (sum)",
+                     f"categorical {columns[c]}" + ("" if prim is None else f" + numerical {columns[prim]}")
+                     + f": bar, {'count' if prim is None else 'sum'} per {columns[c]}, top 10 and Other",
+                     len(sums), len(sums), {"x": [k for k, _ in bars], "y": [_clean(v) for _, v in bars]}, 0),
+            "orientation": "h", "baseline": 0, "drill": False, "other": len(sums) > TOP}
 
 
 def view(columns, rows, typed, mapping, settings):
@@ -56,4 +81,8 @@ def view(columns, rows, typed, mapping, settings):
         extra |= {"columns": list(columns), "rows": [["" if c is None else str(c) for c in rows[i]] for i in pts]}
     chart = _chart("map2d", f"{name} by location" if name else "points", x, y, rule, len(pts), len(typed), data,
                    0.6 if len(pts) >= 2 else 0)
-    return {"charts": [{**chart, **extra, "id": "chart-1"}], "map3d": None}
+    charts = [{**chart, **extra, "id": "chart-1"}]
+    regions = _regions(columns, rows, typed, mapping, prim)
+    if regions:
+        charts.append({**regions, "id": "chart-2"})
+    return {"charts": charts, "map3d": next(iter(_map3d(columns, typed, mapping, settings, prim)), None)}

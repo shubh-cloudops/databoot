@@ -68,8 +68,9 @@ every run.
 - M18. View as. A "View as" switch lists only the apps this dataset qualifies for; picking one shows that app and
   puts `app=<map|business|explorer>` in the URL, so a copied link opens the same app. With only Explorer
   qualifying the switch is not shown (AC-45).
-- M19. Business KPI cards. One card per measure (the first up to 3 N columns; the first is the **primary
-  amount**): the sum for the latest full period, the change against the previous period as an arrow icon
+- M19. Business KPI cards. One card per measure (up to 3 N columns: the numeric columns whose name contains
+  amount, revenue, sales, total, price, value, cost, qty or quantity first, then the rest, each in column order; the
+  first is the **primary amount**): the sum for the latest full period, the change against the previous period as an arrow icon
   (▲ / ▼ / ▶ for zero) + signed % with 1 decimal + a text label ("up", "down", "no change"), never colour alone,
   and a sparkline of the last 12 periods (AC-46).
 - M20. Business trend. The primary amount summed per period at an automatic grain, one y-axis; with several
@@ -77,12 +78,12 @@ every run.
 - M21. Leaderboard. Horizontal bars of the primary amount per category, top 10 sorted descending with the rest
   summed into one "Other" bar at the end, each bar labelled with its value (AC-48).
 - M22. Drill-down. Clicking a leaderboard bar regroups the leaderboard by the next categorical column, inside the
-  clicked category; a breadcrumb ("All › region: North") goes back a level; the drill path is in the URL (AC-49).
+  clicked category (coarse to fine: categorical columns by distinct count, fewest first); a breadcrumb ("All › region: North") goes back a level; the drill path is in the URL (AC-49).
 - M23. Change table. For the leaderboard's categories: category, previous period, latest period, delta; the delta
   cell is coloured on a diverging scale with grey at zero and carries its sign, so colour is never the only cue
   (AC-50).
 - M24. Map app. A 2D map about 70% of the viewport height on the bundled offline world outline; points coloured by
-  the primary numeric (first N column) on a one-hue light-to-dark scale, or one colour when there is no N
+  the primary numeric (name rule) on a one-hue light-to-dark scale, or one colour when there is no N
   (AC-51).
 - M25. Density above 5,000 points. With more than 5,000 rows with coordinates, the map draws hexagonal cells
   coloured by point count instead of the points (AC-52).
@@ -107,16 +108,16 @@ every run.
 - C2. Rules R4-R7 (round 6).
 
 ## Business app definitions (defaults; Board to confirm)
-- Time column = the first T column; measures = the first up to 3 N columns, summed.
+- Time column = the first T column; measures = up to 3 N columns, name-rule matches first (the first is the primary amount), summed.
 - Grain from the span between the first and last date: <= 60 days = day; <= 182 days = ISO week (Monday start);
   <= 3 years (1,096 days) = month; else year.
 - Latest full period = the period holding the last date when that date is the period's last day, else the period
   before it (day grain: always the last day). Previous period = the one right before; a period with no rows is 0.
   Fewer than 2 periods, or a previous value of 0, show "n/a" with no arrow.
-- Leaderboard and change table use the first C column with no active filter; their figures are over all rows of
+- Leaderboard and change table use the categorical column with the fewest distinct values with no active filter; their figures are over all rows of
   the current view (leaderboard) and the latest and previous full periods (change table).
 - Drill-down reuses the round 4 filters: clicking a bar sets `f.<column>=<value>` and the leaderboard moves to the
-  next C column in column order; at the last C column bars are not clickable; "Other" is never clickable. The
+  next C column in drill order (distinct count ascending, ties by column order); at the last C column bars are not clickable; "Other" is never clickable. The
   breadcrumb lists the drilled columns; "All" clears them.
 - The round 4 filter form and chips stay on every app; the Business KPI cards replace the round 4 KPI strip in
   the Business app.
@@ -125,7 +126,10 @@ every run.
 - Map = Plotly 2D geo (`scattergeo`) on the bundled world_110m outline, fitted to the points.
 - Hexbin cells are computed by the server: about 40 cells across the points' longitude span; colour = point count
   on the same one-hue scale; the tooltip shows the count.
-- Top regions = the first C column, row counts, top 10 descending; with no C column the panel shows no bar chart.
+- Top regions = the country column if present, else the C column with the fewest distinct values (>= 2); ranked by the
+  sum of the primary numeric, else by row count; top 10 descending plus "Other"; with no such column the panel shows
+  no bar chart.
+- The 3D view toggle colours the points by the primary numeric (name rule); the Explorer 3D map is unchanged.
 
 ## Out of scope
 - Rules R4-R7 and their apps (round 6); only the table's room for them.

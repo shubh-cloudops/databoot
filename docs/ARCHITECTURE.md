@@ -144,16 +144,18 @@ def _appview(d, f, app):          # the shown app's figures under filters f
 - `> 5000`: `"mode": "hex"`. Cell size `s = (max lon - min lon) / 40` (1.0 when the span is 0); pointy-top axial
   coordinates on the lon/lat plane: `q = (sqrt(3)/3 * lon - lat/3) / s`, `r = (2/3 * lat) / s`, cube-rounded; centre
   `lon = s * sqrt(3) * (q + r/2)`, `lat = s * 1.5 * r`. Data `{"lon", "lat", "count", "size": s}` sorted by `(q, r)`;
-  `sum(count) == len(pts)`. JS draws one `scattergeo` with `marker.symbol: "hexagon"`, colour = count on `--seq`,
-  hover `"%{marker.color:,} points"`; a click shows the count in the panel. big_csv (60,000) is the test case.
+  `sum(count) == len(pts)`. JS (dashboard.js) draws the cells as one GeoJSON `choropleth` of hexagons built from the
+  server's centres and `size` (not hexagon markers: Board gate 180), colour = count on the sequential scale, hover
+  `N points`; a click shows the count in the panel. big_csv (60,000) is the test case.
 - `shown`/`total` = `len(pts)` / `len(rows)` in both modes, printed `N of M rows` (rows with coordinates of view
   rows; AC-17 form). The template's `points` set does not include `map2d`.
 - **Top regions** (gate 179): the country column (name in `rules.COUNTRY`, categorical or other) if any, else the C
   column with the fewest distinct values (>= 2, ties by column order); value = sum of the primary numeric per
   region, else row count; top 10 + `Other`; `bar` dict with `"orientation": "h"`, `"drill": False`. No such column:
   no chart (the panel shows only the details).
-- **3D toggle**: `"map3d": rules._map3d(columns, typed, mapping, settings)[0]` (the Explorer chart unchanged,
-  z = first numerical as in AC-6/AC-27). The page renders a hidden `<figure data-kind="map3d" hidden>`; the
+- **3D toggle** (Board gate 180): `"map3d"` = the Explorer `scatter3d` chart (`rules._map3d`, called with `z` = the
+  primary numeric by the name rule, else the first numerical, so `z_label` is the primary or None); Explorer's own
+  `map3d` keeps z = first numerical (AC-6/AC-27). The page renders a hidden `<figure data-kind="map3d" hidden>`; the
   `3D view` button (`aria-pressed`) hides the 2D figure, shows and (first time) draws the 3D one; again swaps back.
 - Height (AC-51): `.app-map .chart[data-kind="map2d"] .plot { height: 70vh }` (Designer may tune within 65-75%);
   `layout.geo.fitbounds = "locations"`, projection `natural earth`, outline from the bundled topojson.
@@ -925,12 +927,13 @@ exist. QA writes any extra edge file inline (as test_AC_18 does with num.csv).
     `map2d` (JS) and `table` (writers) are new kinds. `/charts` stays as the Explorer contract for old tests.
 26. (Round 5) `_view` stops computing Explorer charts; each app computes only its own figures in `_appview`, so a
     200,000-row Business or Map page does not pay for 8 unused rules (AC-42).
-27. (Round 5) Hexbin cells are computed by the server and drawn as hexagon markers in one `scattergeo` trace: no
-    new library, few marks, exact counts for the test. `# ponytail:` cells live on the lon/lat plane (they stretch
-    away from the equator); project first if owners map polar data.
+27. (Round 5) Hexbin cells are computed by the server (centres and size) and drawn by dashboard.js as one GeoJSON
+    `choropleth` of hexagons (Board gate 180): true geographic size, no new library, exact counts for the test.
+    `# ponytail:` cells live on the lon/lat plane (they stretch away from the equator); project first if owners map
+    polar data.
 28. (Round 5) KPI sparklines are server-rendered SVG polylines, not Plotly figures: 3 tiny charts would each need
     a Plotly instance, a mode bar and a table toggle (PRD assumption approved, gate 179).
 29. (Round 5) The trend stops at the latest full period: a partial last period would draw a false drop (honest
     chart rule). Its rows still count in the leaderboard, which covers all view rows (PRD).
-30. (Round 5) The Map 3D toggle reuses the Explorer `map3d` chart as is (z = first numerical): the PRD says "the
-    existing Plotly 3D scatter", and changing its z would change Explorer (AC-6, AC-27).
+30. (Round 5) The Map 3D toggle reuses the Explorer `map3d` chart with z = the primary numeric (Board gate 180);
+    `rules._map3d` takes an optional `z` index, so Explorer (z = first numerical, AC-6, AC-27) is unchanged.
