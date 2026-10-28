@@ -1,0 +1,93 @@
+{
+  "header": {
+    "ticket": 447,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1939053
+  },
+  "goal": "Business figures part 1: periods, KPI cards with change and sparkline data, one trend per measure (B1a; Board gate 179: primary amount by name rule, KPI cards = up to 3 numericals in that order, latest full period = the period holding the last date only if that date is its last day, else the period before it)",
+  "acceptance_criteria": [
+    {
+      "text": "app/business.py view(columns, rows, typed, mapping, f, options) returns {\"cards\", \"charts\", \"grain\", \"latest\", \"previous\"} for the first temporal column; wired into main._appview for app == \"business\" (the /app route of ticket A1 now returns it)",
+      "passes": true
+    },
+    {
+      "text": "grain from the span of non-empty dates in days: <= 60 day, <= 182 ISO week (Monday start), <= 1096 month, else year; a unit test calls the grain helper with spans 60, 61, 182, 183, 1096, 1097 and expects day, week, week, month, month, year",
+      "passes": true
+    },
+    {
+      "text": "latest full period L = the period holding the last date if that date is the period's last day (day grain: always), else the period before it; previous P = the one before L; an empty period sums to 0",
+      "passes": true
+    },
+    {
+      "text": "shop.csv (month grain, last date 2024-07-10): L = 2024-06-01, P = 2024-05-01; cards for [revenue, units]: revenue latest 7392, previous 6192, pct 19.4, dir \"up\"; units 72, 60, 20.0, \"up\"; pct = round(100 * (latest - previous) / abs(previous), 1); dir is \"up\", \"down\" or \"no change\" from the sign of latest - previous",
+      "passes": true
+    },
+    {
+      "text": "A card where there is no full period, no previous period, or a previous sum of 0 has latest or change `None` (the template prints n/a and no arrow); spark = sums of the last 12 periods ending at L, not before the first period; tests cover a one-month file with day grain and a previous sum of 0",
+      "passes": true
+    },
+    {
+      "text": "charts: one `line` chart dict per card measure in the existing line shape (x = ISO period starts from the first period through L zero-filled, y = sums; the partial last period is left out; shown/total = periods drawn); no chart dict has `yaxis2` or any second axis key; shop.csv gives 2 line charts with x `2024-01-01`..`2024-06-01`",
+      "passes": true
+    },
+    {
+      "text": "Filters apply: with `f.channel=web` the shop sums are those of the web rows only (hand-check one value in the test)",
+      "passes": true
+    },
+    {
+      "text": "Tests in tests/test_business.py use archetypes_dir / shop_rows() and hand-computed numbers; run it and tests/test_apps.py",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-46, AC-47 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 30%]\n........................................................................ [ 61%]\n........................................................................ [ 92%]\n.................                                                        [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n233 passed, 99 warnings in 159.64s (0:02:39)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "The /app route spreads the whole _appview dict into its response, with charts defaulting to []",
+      "why": "The ticket says the route now returns the Business figures; before it passed only 'charts' through",
+      "evidence": "app/main.py dataset_app"
+    },
+    {
+      "what": "Business trend charts get ids chart-1..N and use score.spearman, like the Explorer lines",
+      "why": "Explorer charts carry chart-N ids and the existing JS builder reads the same shape",
+      "evidence": "app/rules.py:266; app/business.py view"
+    },
+    {
+      "what": "A card keeps latest as a number when L exists but previous is None when P is before the first period; pct and dir are None when previous is missing or 0",
+      "why": "Acceptance says latest or change is None in these cases and the template prints n/a with no arrow",
+      "evidence": "tests/test_business.py::test_single_date_has_no_previous_period, test_day_grain_one_month_previous_sum_zero"
+    },
+    {
+      "what": "With no temporal column or no dates, view returns grain/latest/previous None, no charts, and cards with None values",
+      "why": "There is no period to compute; the page can print n/a",
+      "evidence": "tests/test_business.py::test_no_dates_gives_empty_figures"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The leaderboard, changes and crumbs keys are added by the next Business ticket (B1b)",
+    "Day-grain spark and chart zero-fill every calendar day from the first date through L"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "When a ticket says a route 'now returns' a new payload, check that the route passes the extra keys through, not only the one it read before",
+      "when": "wiring a new _appview branch into an existing route",
+      "evidence": "first test run: KeyError 'cards' from /api/datasets/{id}/app until dataset_app spread the _appview dict"
+    }
+  ],
+  "problems": []
+}

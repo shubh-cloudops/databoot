@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import apps, catalog, config, export, filters, profile, rules, xlsx
+from app import apps, business, catalog, config, export, filters, profile, rules, xlsx
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -100,10 +100,13 @@ def _shown(d, params):
 
 @lru_cache(maxsize=8)
 def _appview(d, f, app):
-    """Figures of one app under filters f; the Business and Map branches are added by their own tickets."""
+    """Figures of one app under filters f; the Map branch is added by its own ticket."""
     if app == "explorer":
         v = _view(d, f)
         return {"charts": rules.charts(d.columns, v["typed"], v["mapping"], config.get())}
+    if app == "business":
+        v = _view(d, f)
+        return business.view(d.columns, v["rows"], v["typed"], v["mapping"], f, v["options"])
     return {}
 
 
@@ -113,7 +116,7 @@ def dataset_app(request: Request, id: str):
     f = filters.parse(request.query_params, d.columns, _base(d)[1])
     shown = _shown(d, request.query_params)
     return {"dataset": d.id, **_detected(d), "shown": shown, "filters": _view(d, f)["labels"],
-            "charts": _appview(d, f, shown).get("charts", [])}
+            "charts": [], **_appview(d, f, shown)}
 
 
 @app.get("/api/datasets/{id}/charts")
