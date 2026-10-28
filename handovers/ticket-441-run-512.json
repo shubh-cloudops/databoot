@@ -1,0 +1,114 @@
+{
+  "header": {
+    "ticket": 441,
+    "project": "you-think-of-the-project-name",
+    "from_role": "pm",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "a2dbf282ff46",
+    "tokens_left": 1909567
+  },
+  "goal": "Write or update docs/PRD.md and docs/acceptance.json for the idea in docs/IDEA.md.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/PRD.md describes the product",
+      "passes": true
+    },
+    {
+      "text": "docs/acceptance.json lists testable acceptance items",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py spec",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Spec the round as three apps chosen by an ordered rule table (R1 Map, R2 Business, R3 Explorer = the round 4 page), with R4-R7 added as rows before R3",
+      "why": "Brief and IDEA ask exactly this; R4-R7 are reserved for round 6",
+      "evidence": "docs/BRIEF.md Asked; docs/IDEA.md item 1"
+    },
+    {
+      "what": "Column roles map onto the existing types: G = one lat+lon pair, T = temporal, N = numerical without lat/lon, C = categorical, I = other; a dataset qualifies for every app whose rule holds, so Explorer always qualifies",
+      "why": "Reuses the AC-3 classifier with no new type logic; the brief leaves the I versus C split open",
+      "evidence": "docs/acceptance.json AC-3; docs/BRIEF.md Unclear"
+    },
+    {
+      "what": "Without an app parameter a dataset opens in its detected app; app=explorer gives the round 4 page exactly, and old page tests pass app=explorer",
+      "why": "Lesson: keep the old default switchable so earlier tests stay valid",
+      "evidence": "LESSONS (tickets 280, 289); docs/PRD.md Constraints"
+    },
+    {
+      "what": "Drill-down reuses the round 4 f.<column> filters, and the leaderboard groups by the first categorical column that has no active filter",
+      "why": "No new URL state or server path is needed, and Back and chips already work",
+      "evidence": "app/filters.py; docs/ARCHITECTURE.md Round 4: filters"
+    },
+    {
+      "what": "Changed AC-16 so a donut is drawn only for 2 to 5 values",
+      "why": "The global rule 'donut only for 2-5 parts' applies to Explorer too; rules.py allows 2 to 6 today",
+      "evidence": "docs/IDEA.md item 4; app/rules.py:175"
+    },
+    {
+      "what": "Reworded AC-39 to bar-only toggle and split AC-40 into clear sentences; kept AC-38 as it was",
+      "why": "Gate 178 asked for the rewording; the AC-38 and AC-40 text in the file was complete, so the reported lost words were probably cut off in QA's prompt",
+      "evidence": "graphify-out/memory.md L4-6, L264-271"
+    },
+    {
+      "what": "Added AC-43 to AC-58, with archetype exports as Should and the rest as Must",
+      "why": "These are the brief's 'Done when' items; exports are the least core part",
+      "evidence": "docs/BRIEF.md Done when"
+    },
+    {
+      "what": "team.json: trends off; designer, frontend and design_review on",
+      "why": "The Board named designer + frontend + backend with trends off, and the round adds two new page layouts",
+      "evidence": "docs/IDEA.md last lines; gate 175 'Trends off = team setting only'"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Editing acceptance.json with a Python script through Bash (heredoc, then /tmp script)",
+      "why_it_failed": "The heredoc was blocked as brace expansion and python3 needed approval; used the Edit tool and checked the 58 entries with Grep instead"
+    }
+  ],
+  "assumptions": [
+    "Sparklines are part of a KPI card, not charts, so they get no table toggle",
+    "The primary amount and primary numeric are the first N column in column order",
+    "The Map app uses Plotly scattergeo on the bundled world_110m outline, with hexbin cells computed by the server (about 40 across the longitude span), so no new dependency",
+    "The round 4 filter form and chips stay on all apps; the Business KPI cards replace the round 4 KPI strip in the Business app",
+    "Explorer exports keep their current title and layout",
+    "A 200,000-row dataset opening as Business or Map must still meet AC-41 and AC-42"
+  ],
+  "open_questions": [
+    "Branding: no business website capture and no docs/brand/ folder (docs/reference/ only holds the deck.gl and unstructured.io library captures). Please confirm that gate 160 still holds: name DataBoot, plain neutral style, system sans font, no logo, blank SVG favicon. Or give a logo as an image link in the gate comment.",
+    "Business periods: is the default right? Grain comes from the date span (<=60 days = day, <=182 = ISO week, <=3 years = month, else year). The latest full period is the one ending on the last date, else the period before it.",
+    "Primary amount = the first numerical column, and KPI cards = the first up to 3 numerical columns, summed. Should the owner be able to pick the measure?",
+    "Drill-down goes to the next categorical column in column order, and at the last level bars do not drill. Is a different order wanted?",
+    "Top regions in the Map app = the first categorical column by row count. Should a country column be preferred when there is one?",
+    "When only Explorer qualifies, the 'View as' switch is hidden. Is that right?",
+    "AC-16 now draws a donut only for 2 to 5 values (was 2 to 6), as the global rule asks. Tests with a 6-value donut must change. Confirm?",
+    "Hexbin: about 40 cells across the points' longitude span, coloured by count. Is that acceptable?",
+    "Scope: the Business app (4 parts plus drill-down) and the Map app are a large round. If it must be smaller, move AC-56 (exports) to round 6."
+  ],
+  "lessons": [
+    {
+      "lesson": "When a gate says an AC is 'garbled', read the AC in acceptance.json and memory.md first: the file may be complete and the problem a truncated prompt. Fix only what really changed (here, the gate 178 bar-only toggle in AC-39).",
+      "when": "Rewording round owed by a gate",
+      "evidence": "docs/acceptance.json AC-38/AC-40 were complete; gate 178"
+    },
+    {
+      "lesson": "In this image, Bash heredocs with braces and python3 commands may be blocked. Edit acceptance.json with the Edit tool and check it with a Grep count on the line pattern.",
+      "when": "Changing acceptance.json",
+      "evidence": "ticket 441 tool errors"
+    },
+    {
+      "lesson": "When a global rule in the idea conflicts with an existing AC (donut 2-5 vs AC-16's 2-6), change the AC in place and flag that old tests will break.",
+      "when": "Global design rules applied to an existing app",
+      "evidence": "app/rules.py:175; AC-16"
+    }
+  ],
+  "problems": []
+}

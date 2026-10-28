@@ -1,6 +1,6 @@
 {
-  "trends": {"run": false, "why": "Board said trends off; the plain neutral style was chosen in gate 160, no research needed"},
-  "designer": {"run": true, "why": "New KPI strip, filter bar, score-driven full-width/2-column grid and phone layout need DESIGN.md and a design review"},
-  "frontend": {"run": true, "why": "Dropdowns, date range, URL state with Back button, Clear filters and Plotly click cross-filter are front-end work"},
-  "design_review": {"run": true, "why": "Visible layout change (KPI strip, filters, grid) needs the final screenshot review"}
+  "trends": {"run": false, "why": "Board said trends off (gate 175: team setting only); plain neutral style chosen in gate 160"},
+  "designer": {"run": true, "why": "Board named the designer: new Business and Map layouts and the global chart rules go into DESIGN.md"},
+  "frontend": {"run": true, "why": "Board named frontend: View-as switch, drill-down breadcrumb, map side panel, 3D and table toggles"},
+  "design_review": {"run": true, "why": "Two new page layouts and a table toggle on every chart need the final screenshot review"}
 }

@@ -1,104 +1,148 @@
-# PRD: DataBoot, an offline data-to-dashboard bootstrapper (round 4)
+# PRD: DataBoot, an offline data-to-dashboard bootstrapper (round 5)
 
-Round 4 makes the dashboard assemble itself (docs/IDEA.md, docs/BRIEF.md): every chart gets a fixed-rule interest
-score, the scores set the order and layout, a KPI strip sits at the top, and filters (dropdowns, a date range and
-click-to-filter on bars and donut slices) work server-side, are kept in the URL and carry into the exports.
-No AI, offline, no new dependencies. Everything listed under "Product today" stays as it is.
+Round 5 makes DataBoot pick a whole app layout per dataset by fixed rules (docs/IDEA.md, docs/BRIEF.md): an
+ordered rule table reads the column roles and chooses a **Map app**, a **Business app** or the round 4
+**Explorer**. The page shows which app and rule were used, and a "View as" switch offers the other apps the dataset
+qualifies for. Global chart rules go into docs/DESIGN.md and apply to every app, Explorer included. Exports follow
+the chosen app. No AI, offline, no network requests, no new dependencies. Everything under "Product today" stays.
 
 ## Problem
 Owners of data (a pen drive, a disk or a folder of spreadsheets) cannot see what is in it without an analyst.
-DataBoot reads the files and at once shows datasets, charts and a 3D map, fully offline, with no AI: fixed rules
-look at the column types and pick the visuals. Charts can be taken away as editable XLSX and PPTX files.
-This round: today the charts come in a fixed order whatever the data says, and the owner cannot narrow the data
-down. The most telling chart should come first and largest, the headline numbers should be on top, and the owner
-should be able to slice by category or date and take that slice away as XLSX/PPTX.
+DataBoot reads the files and at once shows datasets and charts, fully offline, with no AI: fixed rules look at the
+column types and pick the visuals. Charts can be taken away as editable XLSX and PPTX files.
+This round: every dataset gets the same chart grid, whatever it holds. Sales data should open as a business
+overview (headline numbers against last period, trend, top categories, what changed), and a file of locations
+should open as a map. The charts must follow one set of honest chart rules everywhere.
 
 ## Users
 - **Data owner (client)**: non-technical; a Windows 11 laptop and a folder or drive of files. Starts the app with
-  one click and looks; may share a filtered dashboard link with a colleague on the same machine or network.
+  one click and looks; may share a dashboard link with a colleague on the same machine or network.
 - **Operator**: installs it once on the client's machine.
 
-## Product today (built in rounds 1 to 3, kept)
-1. Started on one folder (mounted folder or drive letter, no raw device access).
-2. Scans it and its subfolders: CSV, TSV, Excel (.xlsx/.xlsm, one dataset per sheet, per-sheet isolation), JSON/JSONL,
-   GeoJSON and Parquet become datasets; .xls and unknown files go to an "Other files" inventory (type, size, date).
-3. Classifies every column as geospatial, temporal, categorical, numerical or other and saves the mapping as JSON.
-4. Rules pick at most 8 charts in a fixed order: Plotly 3D scatter map, country map, line, bar, donut, histogram,
-   scatter, correlation heatmap (app/rules.py `charts`). Each chart has a one-line "rule used" caption and an
-   "N of M" count. The page then shows the Columns table and the First rows table.
-5. Exports each dataset as XLSX (xlsxwriter, first sheet "Data") and PPTX (python-pptx, title slide + one slide per
-   chart) with native, editable charts.
-6. Accessible tables (h2 captions, original-case headers) and an always-visible chart tool bar.
-7. Launcher: DataBoot.bat + Start-DataBoot.ps1 (venv picks Python 3.13/3.12/3.11, clean failure), Dockerfile optional.
+## Product today (rounds 1 to 4, kept)
+1. Started on one folder (mounted folder or drive letter, no raw device access); lists CSV, TSV, Excel (per-sheet),
+   JSON/JSONL, GeoJSON and Parquet datasets, an "Other files" inventory and a "Could not be read" list.
+2. Classifies every column as geospatial, temporal, categorical, numerical or other (first 10,000 rows).
+3. Rules pick at most 8 charts (3D scatter map, country map, line, bar, donut, histogram, scatter, heatmap), each
+   with a rule caption ending in "· score 0.NN" and an "N of M" count, ordered by score, first one full width.
+4. KPI strip, category dropdowns, a date range, click-to-filter on bars, chips and "Clear filters", all kept in
+   the URL and applied by the server (`f.<column>`, `from`, `to`).
+5. XLSX (Data first, Summary last) and PPTX exports with native, editable charts, following the filters.
+6. Accessible tables, always-visible chart tool bar, Windows launcher, optional Dockerfile.
+This whole page is the **Explorer** app from now on.
+
+## Column roles and archetype rules
+Roles come from the existing column types: **G** = a latitude column plus a longitude column (one pair, counted
+once); **T** = temporal; **N** = numerical, not counting the lat/lon pair; **C** = categorical; **I** = other
+(identifiers and free text). A row "has coordinates" when both lat and lon are numbers in range
+(lat -90..90, lon -180..180).
+
+The detector is an ordered table of (rule id, app, condition); the first rule whose condition holds wins:
+
+| Rule | Condition | App |
+|------|-----------|-----|
+| R1 | G present and (N <= 2 or at least 50% of rows have coordinates) | Map |
+| R2 | T >= 1 and C >= 1 and N >= 1 | Business |
+| R3 | always | Explorer |
+
+R4-R7 (Survey, Directory, Monitoring, Drive) are reserved for round 6 and are added as rows of the same table,
+before R3, with no change to the code that walks it. A dataset **qualifies** for every app whose rule condition
+holds (so Explorer always qualifies). Detection is computed on the full loaded rows and gives the same answer on
+every run.
 
 ## User stories
-### Must (rounds 1 to 3, kept)
-- M1. I see every dataset in the folder listed with name, sheet, rows and columns, offline (AC-1, AC-14).
-- M2. I open a dataset and see its column types, its first 20 rows and the charts the rules pick
-  (AC-2..AC-8, AC-16, AC-27).
-- M3. Every asset is served by the app itself (AC-9); large files are downsampled with an "N of M" count (AC-10).
+### Must (rounds 1 to 4, kept)
+- M1. Every dataset is listed with name, sheet, rows and columns, offline (AC-1, AC-14).
+- M2. A dataset opens with its column types, first 20 rows and the rule-picked charts (AC-2..AC-8, AC-16, AC-27).
+- M3. Every asset is local (AC-9); large files are downsampled with an "N of M" count (AC-10).
 - M4. One launcher command opens the dashboard (AC-11, AC-13, AC-28..AC-30).
-- M5. I download a dataset as XLSX or PPTX with native, editable charts (AC-18, AC-23).
+- M5. XLSX and PPTX exports with native, editable charts (AC-18, AC-23).
 - M6. Tables and the chart tool bar work with keyboard and screen reader (AC-22, AC-24).
+- M7-M15. Round 4 score, order, layout, KPI strip, filters, URL state, cross-filter (bar-only toggle, gate 178),
+  filtered exports, no network (AC-32..AC-42).
 
-### Must (round 4)
-- M7. Interest score. As a data owner, every chart carries a score from 0 to 1 computed by a fixed rule, so the
-  same data always gives the same scores (AC-32):
-  line = |Spearman rho| of the plotted value against time; bar and donut = Gini coefficient of the category totals
-  the chart draws; scatter = |Pearson r| of its two columns; histogram = min(1, |skew| / 3); heatmap = largest
-  off-diagonal |r|; 3D map and country map = 0.6. Fewer than 2 usable values, or constant values, give 0.
-- M8. Order and layout. Charts are shown from highest score to lowest; ties keep the fixed chart order above. The
-  first chart spans the full width; the rest sit in a 2-column grid, 1 column on phones. The First rows table stays
-  below every chart (AC-33, AC-34).
-- M9. Score in the caption. Each rule caption ends with the score, for example
-  "Rule: temporal date + numerical sales: line, sum per date · score 0.82" (AC-35).
-- M10. KPI strip. At the top of the dashboard I see rows, columns, % missing, then the sum of each of the first 3
-  numerical columns, with thousands separators; it reflects the active filters (AC-36).
-- M11. Filters. I get one dropdown per categorical column (at most 50 distinct values, which AC-3 already ensures)
-  and a from/to date range when the dataset has a temporal column. Filtering is done by the server through the
-  charts route's query parameters; every chart, count and KPI changes (AC-37).
-- M12. Filter state in the URL. The page URL holds the filters: opening a copied URL shows the same filtered view,
-  the browser Back button returns to the previous filter state, and "Clear filters" returns to the unfiltered
-  view (AC-38).
-- M13. Cross-filter. Clicking a bar or a donut slice sets that category as the filter on its column and redraws
-  every chart and the KPI strip; clicking the active bar or slice again removes that filter (AC-39, gate 175).
-  Each active filter shows as a removable chip next to "Clear filters" (AC-38, gate 175).
-- M14. Filtered exports. XLSX and PPTX downloads hold only the filtered rows; the PPTX title slide and a "Summary"
-  sheet in the XLSX list the active filters, or say "Filters: none" (AC-40).
-- M15. No network. Filters, scores and layout add no request to another host (AC-9 stays valid).
+### Must (round 5)
+- M16. Archetype detection. As a data owner, each dataset opens in the app the rule table picks, and the same
+  file always gets the same app (AC-43).
+- M17. Badge. The page shows "App: <name> (rule <id>)", for example "App: Business (rule R2)" (AC-44).
+- M18. View as. A "View as" switch lists only the apps this dataset qualifies for; picking one shows that app and
+  puts `app=<map|business|explorer>` in the URL, so a copied link opens the same app. With only Explorer
+  qualifying the switch is not shown (AC-45).
+- M19. Business KPI cards. One card per measure (the first up to 3 N columns; the first is the **primary
+  amount**): the sum for the latest full period, the change against the previous period as an arrow icon
+  (▲ / ▼ / ▶ for zero) + signed % with 1 decimal + a text label ("up", "down", "no change"), never colour alone,
+  and a sparkline of the last 12 periods (AC-46).
+- M20. Business trend. The primary amount summed per period at an automatic grain, one y-axis; with several
+  measures, one small chart per measure, never a second y-axis (AC-47).
+- M21. Leaderboard. Horizontal bars of the primary amount per category, top 10 sorted descending with the rest
+  summed into one "Other" bar at the end, each bar labelled with its value (AC-48).
+- M22. Drill-down. Clicking a leaderboard bar regroups the leaderboard by the next categorical column, inside the
+  clicked category; a breadcrumb ("All › region: North") goes back a level; the drill path is in the URL (AC-49).
+- M23. Change table. For the leaderboard's categories: category, previous period, latest period, delta; the delta
+  cell is coloured on a diverging scale with grey at zero and carries its sign, so colour is never the only cue
+  (AC-50).
+- M24. Map app. A 2D map about 70% of the viewport height on the bundled offline world outline; points coloured by
+  the primary numeric (first N column) on a one-hue light-to-dark scale, or one colour when there is no N
+  (AC-51).
+- M25. Density above 5,000 points. With more than 5,000 rows with coordinates, the map draws hexagonal cells
+  coloured by point count instead of the points (AC-52).
+- M26. Side panel. Clicking a point shows its column values in a side panel (a cell shows its point count); the
+  panel also holds a top-regions bar chart; a "3D view" toggle swaps the map for the existing Plotly 3D scatter and
+  back (AC-53).
+- M27. Global chart rules in every app. No figure has a second y-axis; every chart has a hover tooltip and a
+  "view as table" toggle that shows the chart's plotted values as a table (AC-54); thousands separators
+  everywhere, in page text, tooltips, axis ticks and value labels (AC-55); donut only for 2 to 5 parts (AC-16).
+  The full rule list lives in docs/DESIGN.md (AC-57).
+- M28. No network. No app, toggle or drill makes a request to another host (AC-58).
 
 ### Should
-- S1. Unreadable, empty or undecodable files are listed with a reason, and the rest still works (AC-12, AC-20,
-  AC-25, AC-26, AC-31).
-- S2. Other files are listed in an inventory with type, size and date (AC-15).
-- S3. Numbers use thousands separators (AC-21); the product is named DataBoot (AC-19).
-- S4. Speed. Applying a filter to a 200,000-row dataset returns the filtered charts within 1 second (AC-41).
+- S1. Unreadable files listed with a reason; Other files inventory; DataBoot name; speed (AC-12, AC-15, AC-19..AC-21,
+  AC-25, AC-26, AC-31, AC-41).
+- S2. Archetype exports. XLSX and PPTX follow the shown app: Business = title "Business overview", then KPIs,
+  trend, leaderboard, change table; Map = title "Map overview", then map (native XY scatter of lon/lat) and top
+  regions. Explorer exports stay as today. Data stays the first sheet and Summary the last (AC-56).
 
 ### Could
 - C1. Pick a different folder from the home page without restarting.
-- C2. Moved to M13 by gate 175 (build now).
+- C2. Rules R4-R7 (round 6).
+
+## Business app definitions (defaults; Board to confirm)
+- Time column = the first T column; measures = the first up to 3 N columns, summed.
+- Grain from the span between the first and last date: <= 60 days = day; <= 182 days = ISO week (Monday start);
+  <= 3 years (1,096 days) = month; else year.
+- Latest full period = the period holding the last date when that date is the period's last day, else the period
+  before it (day grain: always the last day). Previous period = the one right before; a period with no rows is 0.
+  Fewer than 2 periods, or a previous value of 0, show "n/a" with no arrow.
+- Leaderboard and change table use the first C column with no active filter; their figures are over all rows of
+  the current view (leaderboard) and the latest and previous full periods (change table).
+- Drill-down reuses the round 4 filters: clicking a bar sets `f.<column>=<value>` and the leaderboard moves to the
+  next C column in column order; at the last C column bars are not clickable; "Other" is never clickable. The
+  breadcrumb lists the drilled columns; "All" clears them.
+- The round 4 filter form and chips stay on every app; the Business KPI cards replace the round 4 KPI strip in
+  the Business app.
+
+## Map app definitions (defaults; Board to confirm)
+- Map = Plotly 2D geo (`scattergeo`) on the bundled world_110m outline, fitted to the points.
+- Hexbin cells are computed by the server: about 40 cells across the points' longitude span; colour = point count
+  on the same one-hue scale; the tooltip shows the count.
+- Top regions = the first C column, row counts, top 10 descending; with no C column the panel shows no bar chart.
 
 ## Out of scope
-- Any AI or learned recommender, any new dependency (scores use the standard library or the installed pyarrow /
-  Plotly only), any network request.
-- New chart kinds, user-adjustable scores or weights, more than one value per dropdown, filter types other than
-  category dropdowns and one date range, numeric range filters.
-- Changing the 8-chart cap or which charts the rules pick: scoring only reorders the charts already chosen.
+- Rules R4-R7 and their apps (round 6); only the table's room for them.
+- Any AI or learned recommender, any new dependency, any network request, map tiles or online geocoding.
+- Changes to the Explorer beyond the global chart rules (table toggle, tooltips, donut 2-5, separators).
 - Launcher, Dockerfile, readers, Power BI, shapefile, PDF/Word, SQL. New branding, logo or theme toggle.
 
 ## Constraints
-- Deterministic: scores are rounded to 2 decimals before sorting; the sort is stable on the existing rule order, so
-  the same file gives the same order on every run and in the API, page and exports.
-- Scores are computed on the full filtered rows read (up to DATABOOT_MAX_ROWS, default 200,000), not on the sample
-  sent to the browser.
-- The charts API (`GET /api/datasets/<id>/charts`) gains the filter query parameters and a numeric `score` per
-  chart, plus the KPI values; the dashboard page and both export routes accept the same query parameters. With no
-  parameters every route answers exactly as before, so the round 1 to 3 tests stay valid (lesson: old default on).
-- The "N of M" counts and existing rule caption text stay; only " · score 0.NN" is appended (AC-17 stays valid: one
-  caption, one count, no other sentences; KPI labels and filter labels are labels, not sentences).
-- The XLSX keeps "Data" as its first sheet (AC-18); the filter list goes to an extra "Summary" sheet.
-- Phone layout follows the existing CSS breakpoint for narrow screens; the 1 s target is measured server-side in the
-  test image.
+- Deterministic: same file, same roles, same app, same figures, in the API, page and exports.
+- With no `app` parameter a dataset opens in its detected app; `app=explorer` gives the round 4 page exactly, so
+  the round 1 to 4 page tests that rely on the Explorer layout pass `app=explorer` (old default on). The charts API
+  answers as before; the app choice is a separate field or route.
+- An `app` value the dataset does not qualify for shows the detected app.
+- Speed: a 200,000-row CSV that opens as Business or Map still answers within AC-42's 5 seconds cold and AC-41's
+  1 second filtered.
+- Text allowed on pages stays as before: titles, axis labels, counts, the rule caption, the badge, KPI labels,
+  breadcrumb and button labels. No generated sentences (AC-17).
 - Style follows docs/DESIGN.md: plain neutral, system sans font, OS colour preference only.
 
 ## Branding
