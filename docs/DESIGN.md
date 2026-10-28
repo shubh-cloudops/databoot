@@ -137,8 +137,9 @@ the one source of truth, and passes a shared layout:
   default transitions are off (`transition: {duration: 0}`), so no chart animates on load.
 - Cross-filter (AC-39): bar and donut categories are clickable (Plotly's own pointer cursor over a bar or slice is the
   only hint; no text and no icon is added). Click sets `f.<x_label>=<category>` and reloads; a second click on the same
-  category removes it. A chart on a filtered column disappears with its rule, so there is no "selected bar" style to
-  draw. Mouse-only by nature; the dropdowns and chips are the keyboard and touch-reader route to the same result.
+  category removes it. With one value selected a donut drops out (its rule needs 2 to 6 slices), but a bar chart stays
+  with the single remaining bar (seen in the ticket 437 review), which is the bar a second click un-filters; no
+  "selected bar" style is drawn, the chip and the select already say what is applied. Mouse-only by nature; the dropdowns and chips are the keyboard and touch-reader route to the same result.
 - Keyboard and screen reader: each `figure` has `aria-label` = chart title; each `.plot` has `role="img"` with
   `aria-label` = `<title>: <rule caption>`; the data is also in the first-20-rows table above/below.
 
@@ -209,6 +210,16 @@ them yet: the frontend ticket must emit exactly the markup in Components (`dl.kp
 skip, brand, export links, filter controls, `Apply`, chips, `Clear filters`, mode-bar buttons, table links. Contrast:
 chip text is `--fg` on `--accent-soft` (> 12:1 both themes), chip border `--accent` against the page 5.7 / 7.5, control
 border `--line-strong` 3.2 / 4.3 (>= 3:1 for a control edge). No new motion; reduced motion unchanged. No token change.
+
+Design review (ticket 437, round 4), 1280, 800 and 375 px, light and dark, a demo folder (sales.csv with 3D map, lines,
+histogram, bars, donut, scatter and, filtered by region + dates, a heatmap; countries.csv with country map; a long-named
+TSV; an unreadable file; a notes.txt; a 404), keyboard pass in light and dark with reduced motion: scrollWidth equals
+the viewport everywhere (no sideways scroll at 375), all plots drawn, no `.plot-error`, no console error except the
+expected 404, KPI tiles (two per row at 375), filter fields (stacked, 44px), chips and `Clear filters` as specified,
+first chart full width and the rest two per row from 900px, the First rows table last. Country map and histogram at half
+width read fine at their current heights. Every Tab stop shows the 3px ring; the one exception is the browser's own
+calendar button inside a date input, which Chrome rings itself. The only smaller-than-44px controls are the Plotly mode
+bar buttons (28px, documented). Nothing fell short, so no template, CSS or script change. No token change.
 
 Design review (ticket 413), 1280 and 375 px, light and dark, Home, three datasets (8 charts incl. 3D and country map; a
 long-named TSV; an unreadable file), a 404: no sideways scroll (scrollWidth = viewport), all 10 plots drawn, no `.plot-error`,

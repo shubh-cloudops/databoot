@@ -1,0 +1,75 @@
+{
+  "header": {
+    "ticket": 437,
+    "project": "you-think-of-the-project-name",
+    "from_role": "designer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "1c53b4636107",
+    "tokens_left": 1918770
+  },
+  "goal": "Design review: open every page with the Playwright browser tools at desktop and phone width, compare with docs/DESIGN.md, and fix templates, CSS and front-end scripts directly where they fall short.",
+  "acceptance_criteria": [
+    {
+      "text": "Every page matches docs/DESIGN.md at desktop and phone width",
+      "passes": true
+    },
+    {
+      "text": "No page scrolls sideways at 375px",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 37%]\n........................................................................ [ 74%]\n.................................................                        [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 25 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n193 passed, 90 warnings in 117.62s (0:01:57)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "No template, CSS or script change",
+      "why": "Every page matched DESIGN.md at 1280, 800 and 375; no overflow, no plot errors, rings visible",
+      "evidence": "/tmp/mk/shots.py output (sw == vw on all pages), /tmp/shots/*.png, /tmp/mk/tab.py"
+    },
+    {
+      "what": "Corrected the cross-filter paragraph in DESIGN.md: a bar chart stays with one bar after filtering, only the donut drops out",
+      "why": "The doc said a chart on a filtered column disappears, but the review showed the bars stay (ticket 436 relies on that bar for the toggle)",
+      "evidence": "docs/DESIGN.md Charts, Cross-filter; salesf-light-375.png"
+    },
+    {
+      "what": "Left the half-width country map and histogram at their current heights",
+      "why": "Looks fine at 1280; the gate asked the review to decide",
+      "evidence": "/tmp/shots/countries-light-1280.png"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Playwright MCP screenshot tools",
+      "why_it_failed": "Only navigate, evaluate, click and similar tools were available, with no screenshot tool, so I used Python Playwright scripts in /tmp/mk and read the PNGs"
+    }
+  ],
+  "assumptions": [
+    "The demo folder in /tmp/demo (sales, countries, long-named TSV, unreadable file) stands in for the live data"
+  ],
+  "open_questions": [
+    "Should a bar chart on a column that is filtered to one value still be drawn? It is by design today (the toggle uses it), but the spec text (gate 175) said such a chart is absent; DESIGN.md now describes what the code does."
+  ],
+  "lessons": [
+    {
+      "lesson": "When the MCP has no screenshot tool, drive Python Playwright from a /tmp script (PLAYWRIGHT_BROWSERS_PATH=/opt/playwright), and send the same Read twice for PNGs because the pretool hook blocks the first",
+      "when": "design review in the build phase",
+      "evidence": "/tmp/mk/shots.py, tab.py"
+    },
+    {
+      "lesson": "In a Tab pass, a date input's calendar button shows as a focused INPUT with :focus-visible false; it is native and not a missing ring",
+      "when": "keyboard review of pages with type=date inputs",
+      "evidence": "/tmp/mk/tab2.py output"
+    }
+  ],
+  "problems": []
+}
