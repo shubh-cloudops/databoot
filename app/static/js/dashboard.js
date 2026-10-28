@@ -89,6 +89,7 @@
       } else {
         trace.x = c.data.x; trace.y = c.data.y;
       }
+      (wide ? l.xaxis : l.yaxis).rangemode = "tozero";  // global rule 1; the server's baseline is 0, so every bar starts there
       return [[trace], l];
     },
     donut: function (c, t, l) {
@@ -142,6 +143,82 @@
         colorbar: { outlinewidth: 0, thickness: 12, tickfont: { color: t["--fg"] } } }], l];
     }
   };
+
+  // Global rules (DESIGN.md "Global chart rules" 9, 10): thousands separators in ticks and tooltips on every figure.
+  var HOVER = { pie: "%{label}<br>%{value:,}<extra></extra>", choropleth: "%{location}<br>%{z:,}<extra></extra>",
+    scatter3d: "%{x:,}, %{y:,}, %{z:,}<extra></extra>" };
+  function globalRules(data, l) {
+    l.separators = ".,";
+    var sc = l.scene || {};
+    [l.xaxis, l.yaxis, sc.xaxis, sc.yaxis, sc.zaxis].forEach(function (a) {
+      if (a && a.type !== "date" && a.type !== "category") a.hoverformat = ",";
+    });
+    data.forEach(function (tr) { if (HOVER[tr.type]) tr.hovertemplate = HOVER[tr.type]; });
+  }
+
+  // "View as table": [head, rows] from the traces handed to Plotly (plot.data).
+  function tableOf(c, tr) {
+    var zip = function () {
+      var a = [].slice.call(arguments);
+      return a[0].map(function (_, i) { return a.map(function (col) { return col[i]; }); });
+    };
+    if (tr.type === "pie") return [[c.x_label || "Category", c.y_label || "Count"], zip(tr.labels, tr.values)];
+    if (tr.type === "heatmap") {
+      var rows = [];
+      tr.y.forEach(function (yl, i) { tr.x.forEach(function (xl, j) {
+        var z = tr.z[i][j]; rows.push([yl, xl, z === null ? "" : z.toFixed(2)]);
+      }); });
+      return [["Column", "Column", "Correlation"], rows];
+    }
+    if (tr.type === "choropleth") return [[c.x_label || "Location", c.y_label || "Value"], zip(tr.locations, tr.z)];
+    if (tr.type === "scatter3d") {
+      var real = tr.z.some(function (z) { return z !== null && z !== 0; });
+      return real ? [[c.x_label, c.y_label, c.z_label], zip(tr.x, tr.y, tr.z)] : [[c.x_label, c.y_label], zip(tr.x, tr.y)];
+    }
+    return tr.orientation === "h" ? [[c.x_label, c.y_label], zip(tr.y, tr.x)] : [[c.x_label, c.y_label], zip(tr.x, tr.y)];
+  }
+
+  function cell(tag, v, scope) {
+    var e = document.createElement(tag);
+    e.textContent = typeof v === "number" ? v.toLocaleString("en-US") : v === null || v === undefined ? "" : String(v);
+    if (scope) e.scope = scope;
+    return e;
+  }
+
+  // The table is built on first press and kept; a redraw (colour scheme, phone width) drops it and starts over.
+  function tableToggle(fig, plot, c) {
+    var btn = fig.querySelector(".table-toggle"), wrap = fig.querySelector(".plot-table-wrap");
+    if (wrap) wrap.remove();
+    plot.hidden = false;
+    if (!btn) return;
+    btn.setAttribute("aria-pressed", "false");
+    btn.onclick = function () {
+      var on = btn.getAttribute("aria-pressed") !== "true";
+      wrap = fig.querySelector(".plot-table-wrap");
+      if (on && !wrap) {
+        var made = tableOf(c, plot.data[0]), table = document.createElement("table"), tr = document.createElement("tr");
+        table.className = "plot-table";
+        made[0].forEach(function (h) { tr.appendChild(cell("th", h, "col")); });
+        table.appendChild(document.createElement("thead")).appendChild(tr);
+        var body = table.appendChild(document.createElement("tbody"));
+        made[1].forEach(function (r) {
+          var row = body.appendChild(document.createElement("tr"));
+          r.forEach(function (v, i) { row.appendChild(cell("td", v)); });
+        });
+        wrap = document.createElement("div");
+        wrap.className = "plot-table-wrap";
+        wrap.tabIndex = 0;
+        wrap.setAttribute("role", "region");
+        wrap.setAttribute("aria-label", fig.querySelector(".chart-title").textContent + " data");
+        wrap.appendChild(table);
+        plot.after(wrap);
+      }
+      btn.setAttribute("aria-pressed", String(on));
+      plot.hidden = on;
+      if (wrap) wrap.hidden = !on;
+      if (!on) Plotly.Plots.resize(plot);  // the plot was laid out while hidden
+    };
+  }
 
   function fail(plot) {
     plot.classList.remove("is-loading");
@@ -197,7 +274,8 @@
       if (!plot) return;
       try {
         var made = build[c.kind](c, t, layout(t, c));
-        Plotly.newPlot(plot, made[0], made[1], CONFIG).then(function () { keyboardBar(plot); crossFilter(plot, c); }).catch(function () { fail(plot); });
+        globalRules(made[0], made[1]);
+        Plotly.newPlot(plot, made[0], made[1], CONFIG).then(function () { keyboardBar(plot); crossFilter(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });
       } catch (e) { fail(plot); }
     });
   }

@@ -1,0 +1,102 @@
+{
+  "header": {
+    "ticket": 453,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1928336
+  },
+  "goal": "Global chart rules in the browser: table toggle on every figure, tooltips and separators, one y-axis, zero baseline for bars (G1 part 2; Board gate 180: Explorer bars sorted descending from zero, global rule 1)",
+  "acceptance_criteria": [
+    {
+      "text": "The figure macro's figcaption gets `<button type=\"button\" class=\"btn table-toggle\" aria-pressed=\"false\">View as table</button>` (one fixed label); it carries neither the chart-rule nor the chart-count class, so test_AC_17 holds",
+      "passes": true
+    },
+    {
+      "text": "dashboard.js: pressing the toggle hides `.plot`, shows (build once) a `table.plot-table` inside `.plot-table-wrap` generated from the traces passed to Plotly (x/y, labels/values, lon/lat/colour or count, heatmap z with labels), numbers via toLocaleString(\"en-US\"); pressing again restores the plot; aria-pressed follows",
+      "passes": true
+    },
+    {
+      "text": "After each newPlot the layout has `separators: \".,\"` and `hoverformat: \",\"` on numeric axes; geo, pie and 3D traces get a hovertemplate with `:,`; no builder sets hoverinfo none or skip; no builder sets yaxis2 or overlaying",
+      "passes": true
+    },
+    {
+      "text": "The Explorer bar builder sets `yaxis.rangemode: \"tozero\"` (and honours the server's `baseline` key) and keeps data order as given (sorted descending)",
+      "passes": true
+    },
+    {
+      "text": "tests/test_table_toggle.py (Playwright, app=explorer on sales.csv; Business and Map pages are covered by their own tickets): every `.js-plotly-plot` has no `yaxis2` and no axis with `overlaying`, hovermode is not false, each figure has exactly one .table-toggle, clicking shows a table.plot-table whose row count equals the trace's point count, clicking again shows the plot; the Explorer bar's y-axis range starts at 0",
+      "passes": true
+    },
+    {
+      "text": "Cross-filter wording of gates 175/178 (AC-39): in tests/test_table_toggle.py or tests/test_filter_browser.py a real click on a bar sets f.region and a second click on the same bar removes it; a click on a donut slice sets its filter and the filter is removed with its chip or `Clear filters` (the donut cannot be clicked again, bar-only toggle)",
+      "passes": true
+    },
+    {
+      "text": "No console errors; test_browser.py, test_AC_24 (modebar) and test_AC_39 (cross-filter) still pass",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-39, AC-54, AC-55 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 26%]\n........................................................................ [ 53%]\n........................................................................ [ 80%]\n....................................................                     [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 2 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n268 passed, 107 warnings in 184.24s (0:03:04)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "hoverformat \",\" set in a post-pass (globalRules) on every axis whose type is not date or category, instead of inside axis()",
+      "why": "A \",\" hoverformat on a date axis would print literally on the line chart; the post-pass also covers scene axes",
+      "evidence": "app/static/js/dashboard.js globalRules"
+    },
+    {
+      "what": "Bar value axis (x for horizontal, y for vertical) gets rangemode tozero unconditionally",
+      "why": "Server baseline is always 0 for bars; Business/Map bars use the same key",
+      "evidence": "app/static/js/dashboard.js bar builder; app/rules.py:139"
+    },
+    {
+      "what": "Table is generated from plot.data[0] at first press, handler assigned via btn.onclick, and reset on each redraw",
+      "why": "No duplicate listeners after the phone/dark redraw, and the table always matches the traces given to Plotly",
+      "evidence": "app/static/js/dashboard.js tableToggle"
+    },
+    {
+      "what": "Heatmap table is long form (Column, Column, Correlation), one row per cell",
+      "why": "Keeps rows == plotted points as the acceptance test states",
+      "evidence": "app/static/js/dashboard.js tableOf"
+    },
+    {
+      "what": "Table cells are all td (no th scope=row)",
+      "why": "Shared CSS makes every .plot-table th sticky at top, so row headers would stack over the header",
+      "evidence": "app/static/css/databoot.css:204"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Asserting the donut-click query key order as [f.region, app]",
+      "why_it_failed": "location.assign keeps the existing app param first, so the order is app, f.region; assert on the sorted keys"
+    }
+  ],
+  "assumptions": [
+    "No CSS changes needed: .table-toggle, .plot-table-wrap and .plot-table rules already exist from the design ticket",
+    "Histogram table shows bin midpoints (the trace x) and counts, not bin ranges"
+  ],
+  "open_questions": [
+    "Business and Map figures (heatmap-free) are not exercised by the toggle test; their tickets must add the toggle test for shop and places",
+    "Hex choropleth and 'Other' grey bar builders do not exist yet; their tickets must apply the same tooltip and table handling"
+  ],
+  "lessons": [
+    {
+      "lesson": "In a Playwright test, scroll a pie slice into view before using elementsFromPoint to find a clickable ring point, and compare URL query keys sorted",
+      "when": "Writing real-click tests for Plotly donut slices",
+      "evidence": "tests/test_table_toggle.py pie_point; first run returned None for an off-screen slice"
+    }
+  ],
+  "problems": []
+}
