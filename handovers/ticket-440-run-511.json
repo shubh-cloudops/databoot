@@ -1,0 +1,64 @@
+{
+  "header": {
+    "ticket": 440,
+    "project": "you-think-of-the-project-name",
+    "from_role": "router",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "medium",
+    "prompt_version": "775d10f51fce",
+    "tokens_left": 1980167
+  },
+  "goal": "Read docs/IDEA.md with no history and write docs/BRIEF.md: what this round asks for.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/BRIEF.md has the sections Asked, Deliverable, Done when, Unclear and Not asked",
+      "passes": true
+    },
+    {
+      "text": "It restates only what docs/IDEA.md says",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py brief",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Treat the round as a change to the existing app: rule-based archetype detection plus Business and Map layouts, global chart rules in DESIGN.md, and archetype-aware exports",
+      "why": "The idea asks only for these changes and says to keep everything earlier rounds built and the business's branding",
+      "evidence": "docs/IDEA.md L29: \"Keep everything the earlier rounds built and the business's branding; change only what these suggestions ask.\""
+    },
+    {
+      "what": "Keep rules R4-R7 out of scope, with the detector built as an ordered rule table",
+      "why": "The idea reserves them for round 6 but wants the design to allow them to plug in",
+      "evidence": "docs/IDEA.md L8: \"Rules R4-R7 ... are reserved for round 6; design the detector as an ordered rule table so they plug in.\""
+    },
+    {
+      "what": "Treat no AI, offline, no network requests and no new dependencies as hard constraints",
+      "why": "The idea states them up front and lists a no-network-requests test",
+      "evidence": "docs/IDEA.md L3: \"NO AI, offline, no new deps\"; L26: \"no network requests\""
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The tests listed in the idea are part of the deliverable",
+    "\"Explorer\" is the existing round 4 dashboard and stays unchanged apart from the global chart rules"
+  ],
+  "open_questions": [
+    "What counts as the latest full period and previous period when data ends mid-period?",
+    "How is the primary numeric or amount chosen?",
+    "Which categorical column is next for drill-down, and what happens at the last level?",
+    "How are top regions defined for the Map app?",
+    "How are column roles (especially I versus C) assigned?",
+    "What does the View-as switch show when only Explorer qualifies?",
+    "What title and section order do exports use for Explorer?",
+    "What hexbin cell size and density visual are wanted?",
+    "What does \"trends off\" mean?"
+  ],
+  "lessons": [],
+  "problems": []
+}

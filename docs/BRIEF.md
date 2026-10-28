@@ -1,36 +1,43 @@
-# Brief: round 4
+# Brief: round 5
 
 ## Asked
-Make the dashboard assemble itself with fixed rules, no AI, offline and with no new dependencies. Each chart gets a deterministic interest score from 0 to 1, and the scores decide the layout: the top chart goes full width and the rest sit in a 2-column grid (1 column on phones). A KPI strip goes at the top. Filters (dropdowns and a date range) are applied server-side and kept in the URL, clicking a bar or donut slice cross-filters everything, and the XLSX/PPTX exports respect the active filters.
+Make the app pick a layout for each dataset by fixed rules, with no AI, offline and no new dependencies. A dataset is assigned an archetype from its column roles (T temporal, N numeric, C categorical, G lat+lon pair, I identifier/text). The first matching rule wins:
+- R1: G present and (N<=2 or at least 50% of rows have coordinates) -> Map app.
+- R2: T>=1 and C>=1 and N>=1 -> Business app.
+- R3: otherwise -> Explorer (the round 4 dashboard, unchanged).
+
+The detector is an ordered rule table. Rules R4-R7 (Survey, Directory, Monitoring, Drive) are reserved for round 6 and must be able to plug in later. The page shows a badge such as "App: Business (rule R2)" and a "View as" switch that lists only the archetypes the dataset qualifies for. The choice is kept in the URL.
+
+Business app: KPI cards (primary amount for the latest full period, change vs previous period as arrow icon + signed % + text label, sparkline); a trend of amount by period (auto grain day/week/month/year, one y-axis, small multiples for several measures, never a dual axis); a leaderboard (horizontal bars, top 10 descending, direct value labels, rest folded into "Other"); drill-down (clicking a bar re-groups by the next categorical column, with a breadcrumb back); a change table (category, previous period, latest period, delta, delta on a diverging scale with grey at zero).
+
+Map app: map at about 70% of viewport height with a bundled offline outline; points coloured by the primary numeric on a single-hue sequential scale; above 5,000 points, density/hexbin cells instead of overplotting; side panel with details of the clicked point plus a top-regions bar chart; the 3D view stays available as a toggle.
+
+Global chart rules go into DESIGN.md and apply to every app and to Explorer (see Done when). XLSX/PPTX exports follow the archetype's section order and title ("Business overview", "Map overview").
 
 ## Deliverable
-A change to the existing dashboard web app (frontend, backend and design work), plus tests. The team is designer + frontend + backend, with trends off.
+A change to the existing app (earlier rounds' work): a rule-based archetype detector, a Business app layout, a Map app layout, chart rules in DESIGN.md, archetype-aware XLSX/PPTX exports, and tests. Team named: designer + frontend + backend; trends off.
 
 ## Done when
-- Each chart kind gets its score by the stated rule: line = |Spearman rho| of value vs time; bar/donut = Gini of category totals; scatter = |Pearson r|; histogram = min(1, |skew|/3); heatmap = max off-diagonal |r|; maps = 0.6; table is always last.
-- Charts are ordered by score, ties broken by the existing fixed chart order, and the same data always gives the same order.
-- The highest-scored chart is full width and the others are in 2 columns (1 on phones). Each chart's caption shows its score, e.g. "Rule: temporal + numeric · score 0.82".
-- The KPI strip shows rows, columns, % missing, then the sum of the first 3 numeric columns with thousands separators.
-- There is one dropdown per categorical column (<=50 distinct values) and a date range if a temporal column exists. Filters go through the existing chart route as query params, the URL holds the state (shareable, back button works), and a "Clear filters" button resets them.
-- Clicking a bar or donut slice sets that category filter and redraws every chart and KPI.
-- XLSX and PPTX exports use the active filters, and the title slide / summary sheet lists them.
-- Filtering and redrawing take under 1 s on 200,000 rows.
-- Tests cover: score per chart kind on fixture data, order stability, filter changes counts, click sets filter, exports honor filters, and no external network requests.
+- One fixture per archetype produces the expected app, and detection gives the same result every time.
+- The badge shows the app and rule, and the "View as" switch lists only qualifying archetypes and works; the choice is in the URL.
+- Business app has the KPI cards, trend, leaderboard, drill-down with breadcrumb, and change table as described.
+- Map app has the 70%-height map, sequential colouring, hexbin/density above 5,000 points, side panel, and the 3D toggle.
+- No figure has a second y-axis (no yaxis2), every chart has a hover tooltip and a "view as table" toggle, and thousands separators are used everywhere.
+- XLSX/PPTX exports follow the archetype's section order and title, DESIGN.md holds the global chart rules, and the app makes no network requests.
 
 ## Unclear
-- Which value column and which time column does the line chart use when there is more than one of each?
-- Is the Gini for bar/donut computed on the same category totals the chart draws?
-- Do the KPI figures (rows, % missing, sum) reflect the active filters? "Redraws every chart and KPI" suggests yes.
-- What is the score and caption for the table, which is "always last"? And what happens when a chart kind is absent or its inputs are degenerate (e.g. constant data, fewer than 2 points)?
-- Can a cross-filter be removed by clicking again, or only with "Clear filters"? Can several categories be picked in one dropdown?
-- Does clicking a bar or donut on a column with more than 50 distinct values still set a filter, given it has no dropdown?
-- When no filters are active, what should the exports' title slide / summary sheet say?
-- What counts as a phone width, and what is the hardware for the 1 s target?
-- What does "trends off" mean in practice? The idea does not say.
+- What counts as a "latest full period" and the "previous period" when the data ends mid-period?
+- Which numeric is the "primary" amount or primary numeric, and how is it chosen?
+- Which categorical column is "next" for drill-down, and what happens at the last level?
+- How are "top regions" defined for the Map app, and from which column?
+- How are column roles assigned (e.g. what makes a column I rather than C)?
+- If a dataset is Explorer-only, does "View as" show a single option or hide?
+- What exports should look like for Explorer, which has no named title in the idea?
+- Hexbin cell size and the exact density visual are not specified.
+- "Trends off" is not defined.
 
 ## Not asked
-- Any AI or machine-learning recommendation, any new dependency, or any network request.
-- Removing or changing earlier rounds' features, or changing the business's branding.
-- Charts or scores beyond the kinds listed; a user-adjustable scoring.
-- Filter types other than categorical dropdowns and a date range.
-- Anything for trends.
+- Rules R4-R7 (Survey, Directory, Monitoring, Drive); only the table's room for them.
+- Any AI or generative model use, online services, or new dependencies.
+- Changes to the Explorer dashboard, earlier rounds' features, or the business's branding beyond what is listed.
+- A dual y-axis or colour-only signalling of change.
