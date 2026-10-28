@@ -1,0 +1,77 @@
+{
+  "header": {
+    "ticket": 445,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1959474
+  },
+  "goal": "Global chart rules in app/rules.py (G1 part 1; Board gate 179: donut for 2 to 5 values, update the 6-value tests; Board gate 180: Tech Lead adds a backend ticket enforcing global rule 1 on Explorer bars, sorted descending with a zero baseline, with a test)",
+  "acceptance_criteria": [
+    {
+      "text": "rules._donut returns a donut only when 2 <= distinct values <= 5; a 5-value column gives a donut, a 6-value and a 7-value column give none",
+      "passes": true
+    },
+    {
+      "text": "tests/test_rules_extra.py::test_donut_counts_and_limits: the 6-value line (L25) becomes a 5-value case (`seven[:5]`, values `[1] * 5`) and a new assertion says `seven[:6]` gives no donut",
+      "passes": true
+    },
+    {
+      "text": "Every Explorer bar chart from rules._bars has data.y in non-increasing order (ties by name), including when some sums are negative or zero, and carries the key `baseline` equal to 0 (the zero baseline of global rule 1; dashboard.js draws it with rangemode tozero in the frontend ticket)",
+      "passes": true
+    },
+    {
+      "text": "A new test in tests/test_rules.py checks, on a file with negative and tied category sums, that every bar has sorted-descending data.y and baseline 0; test_sales_bar_and_line's key-set assertion (L22) gains `baseline` for bars only; grep tests for other exact bar key sets and fix them in this ticket",
+      "passes": true
+    },
+    {
+      "text": "/charts still returns the dicts as they are (no change in app/main.py); the donut in docs/DESIGN.md Cross-filter and palette text already says 2 to 5, nothing to edit there",
+      "passes": true
+    },
+    {
+      "text": "Run tests/test_rules.py, tests/test_rules_extra.py and tests/test_acceptance.py -k AC_16 before finishing",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-16, AC-54, AC-57 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 34%]\n........................................................................ [ 69%]\n..............................................................           [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n206 passed, 99 warnings in 158.82s (0:02:38)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Added baseline: 0 to bar dicts in rules._bars by wrapping the _chart() result, leaving _chart() unchanged",
+      "why": "Only bars carry the key; the other kinds' key sets stay as they are",
+      "evidence": "app/rules.py:133-138"
+    },
+    {
+      "what": "Left the sort in _bars untouched",
+      "why": "It already sorts by (-sum, name), which gives non-increasing y with name ties, including negatives and zeros",
+      "evidence": "app/rules.py:131; tests/test_rules.py::test_bars_sorted_descending_with_zero_baseline"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Ran `python -m pytest`",
+      "why_it_failed": "`python` is not installed in this image; used `python3 -m pytest`"
+    }
+  ],
+  "assumptions": [],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "Use `python3 -m pytest`; the bare `python` command is missing here",
+      "when": "Running tests in this image",
+      "evidence": "bash: python: command not found; python3 -m pytest -q gave 206 passed"
+    }
+  ],
+  "problems": []
+}

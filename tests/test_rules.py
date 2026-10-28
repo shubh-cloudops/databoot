@@ -19,7 +19,18 @@ def test_sales_bar_and_line(make_client, data_dir):
     assert bar["kind"] == "bar" and dict(zip(bar["data"]["x"], bar["data"]["y"])) == {"North": 16, "South": 23, "East": 7}
     assert bar["data"]["x"] == ["South", "North", "East"]
     assert bar["shown"] == bar["total"] == 6
-    assert set(bar) == {"id", "kind", "title", "x_label", "y_label", "rule", "shown", "total", "data", "score"}
+    assert set(bar) == {"id", "kind", "title", "x_label", "y_label", "rule", "shown", "total", "data", "score", "baseline"}
+
+
+def test_bars_sorted_descending_with_zero_baseline():
+    cols = ["g", "v"]
+    rows = [["b", "-5"], ["a", "3"], ["c", "3"], ["d", "0"], ["e", "-1"], ["a", "0"]]
+    bars = [c for c in rules.charts(cols, rows, {"g": "categorical", "v": "numerical"}, config.get()) if c["kind"] == "bar"]
+    assert bars
+    for b in bars:
+        y = b["data"]["y"]
+        assert y == sorted(y, reverse=True) and b["baseline"] == 0
+    assert bars[0]["data"]["x"] == ["a", "c", "d", "e", "b"] and bars[0]["data"]["y"] == [3, 3, 0, -1, -5]
 
 
 def test_xlsx_revenue_line(make_client, data_dir):

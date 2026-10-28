@@ -22,7 +22,8 @@ def test_donut_counts_and_limits():
     assert not [c for c in run(["c"], [["a"], ["a"]], {"c": "categorical"}) if c["kind"] == "donut"]  # 1 value
     seven = [[v] for v in "abcdefg"]
     assert not [c for c in run(["c"], seven, {"c": "categorical"}) if c["kind"] == "donut"]  # 7 values
-    assert only(run(["c"], seven[:6], {"c": "categorical"}), "donut")["data"]["values"] == [1] * 6
+    assert only(run(["c"], seven[:5], {"c": "categorical"}), "donut")["data"]["values"] == [1] * 5
+    assert not [c for c in run(["c"], seven[:6], {"c": "categorical"}) if c["kind"] == "donut"]  # 6 values
 
 
 def test_histogram_edges_and_counts():

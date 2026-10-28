@@ -130,11 +130,12 @@ def _bars(columns, rows, mapping, settings):
                     used += 1
             ranked = sorted(sums.items(), key=lambda kv: (-kv[1], kv[0]))
             what, how = ("rows", "count") if n is None else (columns[n], "sum")
-            out.append(_chart("bar", f"{what} by {columns[c]}", columns[c], "count" if n is None else f"{what} (sum)",
-                              f"categorical {columns[c]}" + ("" if n is None else f" + numerical {columns[n]}")
-                              + f": bar, {how} per {columns[c]}",
-                              used, used, {"x": [k for k, _ in ranked], "y": [_clean(v) for _, v in ranked]},
-                              score.gini(sums.values())))
+            out.append({**_chart("bar", f"{what} by {columns[c]}", columns[c], "count" if n is None else f"{what} (sum)",
+                                 f"categorical {columns[c]}" + ("" if n is None else f" + numerical {columns[n]}")
+                                 + f": bar, {how} per {columns[c]}",
+                                 used, used, {"x": [k for k, _ in ranked], "y": [_clean(v) for _, v in ranked]},
+                                 score.gini(sums.values())),
+                        "baseline": 0})  # global rule 1: bars sorted descending, zero baseline
     return out
 
 
@@ -172,7 +173,7 @@ def _donut(columns, rows, mapping, settings):
     for r in rows:
         if r[c] not in (None, ""):
             counts[str(r[c])] = counts.get(str(r[c]), 0) + 1
-    if not 2 <= len(counts) <= 6:
+    if not 2 <= len(counts) <= 5:
         return []
     ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
     used = sum(counts.values())
