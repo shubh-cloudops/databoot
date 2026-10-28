@@ -135,6 +135,46 @@ def big_sales_csv(tmp_path):
     return root
 
 
+SHOP_STORES = ("North", "South", "East")
+SHOP_CHANNELS = ("web", "shop")
+
+
+def shop_rows():
+    """shop.csv rows: date, store, channel, product, units, revenue (Business, rule R2; ARCHITECTURE.md "Round 5").
+
+    Days 5 and 20 of Jan..Jun 2024 plus 2024-07-10, one row per store x channel: 78 rows, 187 days (month grain).
+    The last date is not a month end, so the latest full period is June and the previous one May. units comes
+    first but revenue is the primary amount (name rule, gate 179). Drill order: channel (2), store (3), product (12).
+    """
+    days = [f"2024-{m:02d}-{d:02d}" for m in range(1, 7) for d in (5, 20)] + ["2024-07-10"]
+    rows, i = [], 0
+    for day in days:
+        for s, store in enumerate(SHOP_STORES):
+            for c, channel in enumerate(SHOP_CHANNELS):
+                rows.append((day, store, channel, f"p{i // 6 % 12}", int(day[5:7]), 100 * int(day[5:7]) + 10 * s + c + i % 12))
+                i += 1
+    return rows
+
+
+@pytest.fixture
+def archetypes_dir(tmp_path):
+    """One file per archetype case of AC-43: shop.csv -> business/R2, places.csv -> map/R1 (lat, lon, country and
+    1 numerical), measures.csv -> explorer/R3 (numerical only), sparse.csv -> not map (lat/lon + 3 numerical,
+    coordinates in 4 of 10 rows). big_csv (60,000 points) is the hexbin case (AC-52)."""
+    root = tmp_path / "arch"
+    root.mkdir()
+    with open(root / "shop.csv", "w", newline="") as f:
+        csv.writer(f).writerows([("date", "store", "channel", "product", "units", "revenue"), *shop_rows()])
+    countries = ("France", "Japan", "Brazil", "Kenya")
+    with open(root / "places.csv", "w", newline="") as f:
+        csv.writer(f).writerows([("lat", "lon", "country", "pop"),
+                                 *[(-40 + 4 * i, -120 + 12 * i, countries[i % 4], 1000 * (i + 1)) for i in range(20)]])
+    (root / "measures.csv").write_text("a,b,c\n" + "".join(f"{i},{(i * 7) % 11},{2 * i + 1}\n" for i in range(12)))
+    (root / "sparse.csv").write_text("lat,lon,a,b,c\n" + "".join(
+        (f"{10 + i},{20 + i}" if i < 4 else ",") + f",{i},{i * 2},{i % 3}\n" for i in range(10)))
+    return root
+
+
 @pytest.fixture
 def make_client(monkeypatch, tmp_path):
     """make_client(folder) -> TestClient for the app scanning `folder`, writing outputs to tmp_path/'out'.
@@ -149,8 +189,9 @@ def make_client(monkeypatch, tmp_path):
         catalog.load.cache_clear()
         from app import main
         main._base.cache_clear()
-        if hasattr(main, "_view"):
-            main._view.cache_clear()
+        for cache in ("_view", "_detected", "_appview"):  # round 5 adds the last two (ARCHITECTURE.md "Round 5")
+            if hasattr(main, cache):
+                getattr(main, cache).cache_clear()
         app = main.app
         return TestClient(app)
     return make

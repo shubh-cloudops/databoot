@@ -1,0 +1,115 @@
+{
+  "header": {
+    "ticket": 442,
+    "project": "you-think-of-the-project-name",
+    "from_role": "architect",
+    "phase": "architecture",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "4acf784af3ed",
+    "tokens_left": 1798373
+  },
+  "goal": "Write or update docs/ARCHITECTURE.md and adapt the scaffold for the approved spec.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/ARCHITECTURE.md explains how every acceptance item will be met",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py architecture",
+    "passed": true,
+    "output_tail": "........................................................................ [ 35%]\n........................................................................ [ 70%]\n.............................................................            [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n205 passed, 99 warnings in 164.39s (0:02:44)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Reworded AC-46, AC-49, AC-51, AC-53 (same ids) for gate 179 and noted the override at the top of ARCHITECTURE.md",
+      "why": "Gate 179 replaced the PRD's 'first N column' primary, column-order drill and first-C top regions; check.py plan only forces tickets for changed AC text",
+      "evidence": "graphify-out/memory.md L4-16; LESSONS (ticket 418, gate 171)"
+    },
+    {
+      "what": "Detector = list of (rule id, app, condition) walked in order; qualifies = every true row; cached per dataset on unfiltered rows",
+      "why": "R4-R7 plug in as rows; same file gives the same app regardless of filters",
+      "evidence": "docs/IDEA.md L8; docs/PRD.md Constraints; ARCHITECTURE.md Round 5: detection"
+    },
+    {
+      "what": "_view stops computing Explorer charts; new _appview(d, f, app) computes only the shown app",
+      "why": "Explorer rules cost about 2.8 s on 200,000 typed rows; Business/Map pages must meet AC-42's 5 s cold",
+      "evidence": "ARCHITECTURE.md Round 4: speed; app/main.py:76-85"
+    },
+    {
+      "what": "Drill-down reuses round 4 f.<column> filters plus a computed group column; no new URL param",
+      "why": "Back, chips, exports and shared links already work; breadcrumb derives from f",
+      "evidence": "app/filters.py; app/static/js/dashboard.js:178-190"
+    },
+    {
+      "what": "One JSON route /api/datasets/{id}/app returning the shown app's figures in the existing chart dict shape; /charts unchanged",
+      "why": "Existing JS builders and export writers reuse line/bar dicts; only map2d (JS) and table (writers) are new kinds; old /charts tests stay valid",
+      "evidence": "app/rules.py _chart; app/xlsx.py _table; ARCHITECTURE.md Round 5: page and JSON contract"
+    },
+    {
+      "what": "Exports use the shown app (_shown) by default, so default sales.csv/points.tsv exports become Business/Map; Explorer output unchanged",
+      "why": "PRD S2: exports follow the shown app; page export links carry app only when the URL has it",
+      "evidence": "docs/PRD.md Should S2; acceptance AC-56"
+    },
+    {
+      "what": "Hexbin computed server-side (s = lon span / 40, axial hex rounding), drawn as hexagon markers in one scattergeo trace",
+      "why": "No new dependency, exact counts for the AC-52 test",
+      "evidence": "gate 179 Hexbin; docs/PRD.md Map app definitions"
+    },
+    {
+      "what": "Trend stops at the latest full period; sparklines are server-rendered SVG, not Plotly",
+      "why": "A partial last period draws a false drop; PM assumption that sparklines are not charts was approved",
+      "evidence": "gate 179 'All assumptions OK'; ticket 441 assumptions"
+    },
+    {
+      "what": "Map 3D toggle reuses the Explorer map3d chart unchanged (z = first numerical)",
+      "why": "PRD says 'the existing Plotly 3D scatter'; changing z would change Explorer AC-6/AC-27",
+      "evidence": "docs/PRD.md M26; app/rules.py:81-100"
+    },
+    {
+      "what": "Added archetypes_dir fixture (shop, places, measures, sparse), shop_rows(), cache clears for _detected/_appview, and a roles test",
+      "why": "Shared fixtures with hand-checkable numbers for AC-43..AC-53; roles verified with the existing profiler",
+      "evidence": "tests/conftest.py; tests/test_archetype_fixtures.py (1 passed); full suite 205 passed"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First shop.csv product formula p{i % 12}",
+      "why_it_failed": "Rows for North/web hit only 2 products, so the top-10 + Other leaderboard could not be tested after drilling; changed to p{i // 6 % 12} (12 products in that subset)"
+    },
+    {
+      "what": "Fixture test calling catalog.load directly",
+      "why_it_failed": "catalog.load resolves paths against the configured data folder (/work/sample-data); switched to make_client + /profile"
+    }
+  ],
+  "assumptions": [
+    "KPI measure order = numerical columns matching the name pattern (column order), then the others (column order), first 3",
+    "Business trend x axis runs from the first data period through the latest full period, zero-filled; the partial last period is left out",
+    "Change table includes the 'Other' row and is shown only when both latest and previous full periods exist",
+    "Map points/hex count shows 'N of M rows' (rows with coordinates of view rows)",
+    "Breadcrumb lists every active categorical filter in drill order, including ones set through the form"
+  ],
+  "open_questions": [
+    "Should the Map 3D toggle colour by the primary numeric (name rule) instead of the first numerical column? Kept the Explorer map3d unchanged for now",
+    "PRD.md body still states the pre-gate-179 defaults (first N column, column-order drill, first C top regions); PM may want to align the text, ARCHITECTURE.md and acceptance.json already follow gate 179"
+  ],
+  "lessons": [
+    {
+      "lesson": "When a round changes a page's default layout, list every test helper and direct page/export request that relies on the old default (grep /datasets/ and export.) and name the query param fix per file in ARCHITECTURE.md",
+      "when": "Architecture tickets that add a mode or app switch to an existing page",
+      "evidence": "ARCHITECTURE.md Tests that must change, Round 5"
+    },
+    {
+      "lesson": "Check a test fixture's numbers inside the filtered subsets the tests will use (e.g. after drilling two levels), not only overall, before writing expected values in the doc",
+      "when": "Designing fixtures for drill-down or top-N + Other",
+      "evidence": "shop.csv product formula fix in this ticket"
+    }
+  ],
+  "problems": []
+}

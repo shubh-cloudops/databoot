@@ -1,12 +1,25 @@
-# Architecture: DataBoot (round 4)
+# Architecture: DataBoot (round 5)
 
 DataBoot scans one mounted folder or drive letter, profiles every dataset with fixed rules and draws the
-charts those rules pick, fully offline. Sources: docs/PRD.md (round 4), docs/acceptance.json (AC-1..AC-41),
-Board gates 160-175 (graphify-out/memory.md). Round 4 keeps everything rounds 1 to 3 built and adds: an interest
-score per chart that sets the order, a KPI strip, server-side filters kept in the URL, click cross-filter and
-filtered exports. No new dependency, no new page or route path, so no sitemap or NAV change.
+charts those rules pick, fully offline. Sources: docs/PRD.md (round 5), docs/acceptance.json (AC-1..AC-58),
+Board gates 160-179 (graphify-out/memory.md). Round 5 keeps everything rounds 1 to 4 built (that page is now the
+**Explorer** app) and adds an ordered rule table that picks a **Map**, **Business** or **Explorer** app per
+dataset, a badge, a "View as" switch, the Business and Map layouts, global chart rules (table toggle, tooltips,
+separators, donut 2-5, one y-axis) and app-aware exports. No new dependency, no new page path: one new JSON route
+(`/api/datasets/{id}/app`) and one new query param (`app`), so no sitemap or NAV change.
 
-No docs/TRENDS.md this round (docs/team.json: trends off, gate 175), so I used no trend advice.
+No docs/TRENDS.md this round (docs/team.json: trends off, gates 175 and 179), so I used no trend advice.
+
+**Gate 179 overrides the PRD on four points; I reworded the ACs (same ids) in acceptance.json.**
+(a) Primary amount / primary numeric (AC-46, AC-51): the first numerical column whose name contains
+`amount|revenue|sales|total|price|value|cost|qty|quantity` (case-insensitive), else the first numerical column;
+the KPI measures are up to 3 numerical columns in that same order (matching names first, then the rest, each group
+in column order). The PRD's "first N column" is replaced. (b) Drill order (AC-49): categorical columns sorted by
+distinct count ascending, ties by column order (PRD said column order). (c) Map top regions (AC-53): the country
+column if present, else the categorical column with the fewest distinct values (>= 2), ranked by the sum of the
+primary numeric, else by row count, top 10 + "Other" (PRD said first C column by row count). (d) Donut 2-5 (AC-16)
+confirmed: the 6-value tests change (listed below). View-as hidden when only Explorer qualifies; Explorer exports
+unchanged; AC-56 stays in this round.
 
 **Gate 176 overrides this document (AC-40, new AC-42).** (a) First load: a 200,000-row CSV reaches the dashboard in
 <= 5 s cold (AC-42): `profile.classify` looks at the first 10,000 rows only (deterministic; `total` for the 50% rule
@@ -17,6 +30,172 @@ slide line starts `Rows: M` unfiltered and `Rows: N of M` filtered (N filtered r
 **Gate 175 overrides the PRD on AC-38 and AC-39.** The PRD had C2 (second click removes the filter) as a Could and
 no chips; the Board said "build C2 now" and "each active filter shows as a removable chip, plus Clear filters". I
 reworded AC-38 (chips) and AC-39 (second click removes) in acceptance.json and moved C2 into PRD M13. Ids unchanged.
+
+## Round 5 changes at a glance
+| # | Change | Files | AC |
+|---|---|---|---|
+| A1 | Rule table, roles, `detect`, `measures` (name rule); `GET /api/datasets/{id}/app`; `app` param; `_detected`, `_appview` caches; `_view` stops computing Explorer charts | `app/apps.py` (new, empty), `app/main.py` | AC-43, AC-45 |
+| A2 | Page shell: badge, View-as links, one template per app body; old page tests pass `app=explorer` | `dataset.html` (+ includes), `app/main.py` | AC-44, AC-45 |
+| B1 | Business figures: grain, periods, KPI cards, trend(s), leaderboard, drill order, crumbs, change table | `app/business.py` (new, empty) | AC-46..AC-50 |
+| B2 | Business page: cards (sparkline SVG), breadcrumb, change table; leaderboard drill click in JS | `app/templates/`, `dashboard.js` | AC-46..AC-50, AC-55 |
+| M1 | Map figures: valid coordinates, points or hexbin, row details, top regions, 3D chart | `app/geo.py` (new, empty) | AC-51..AC-53 |
+| M2 | Map page: 70vh `scattergeo`, side panel, 3D toggle | templates, `dashboard.js`, CSS (Designer) | AC-51..AC-53, AC-55 |
+| G1 | Global rules: table toggle on every Plotly figure, tooltips with separators, no `yaxis2`, donut 2-5 | `dashboard.js`, `app/rules.py` L175, DESIGN.md (Designer) | AC-16, AC-54, AC-55, AC-57 |
+| E2 | App exports: `title`, a `table` kind, Business and Map section lists | `app/xlsx.py`, `app/export.py`, `app/main.py` | AC-56 |
+| T2 | `archetypes_dir` fixture (shop, places, measures, sparse) and `shop_rows()`; cache clears in `make_client` (done by the architect) | `tests/conftest.py`, `tests/test_archetype_fixtures.py` | AC-43..AC-53 |
+| N1 | No off-host request in any app, toggle or drill | Playwright test only (all assets already local) | AC-58 |
+
+## Round 5: request flow
+```python
+@lru_cache(maxsize=4)
+def _detected(d):                 # once per dataset, on the full UNFILTERED rows (PRD: same file, same app)
+    rows, mapping, typed, options = _base(d)
+    return apps.detect(d.columns, mapping, typed)   # {"app", "rule", "qualifies": [...]}, qualifies in RULES order
+
+def _shown(d, params):            # app=<name> only when the dataset qualifies, else the detected app (AC-45)
+    a = params.get("app")
+    return a if a in _detected(d)["qualifies"] else _detected(d)["app"]
+
+@lru_cache(maxsize=8)
+def _appview(d, f, app):          # the shown app's figures under filters f
+    v = _view(d, f)
+    if app == "business": return business.view(d.columns, v["rows"], v["typed"], v["mapping"], f, v["options"])
+    if app == "map":      return geo.view(d.columns, v["rows"], v["typed"], v["mapping"], config.get())
+    return {"charts": rules.charts(d.columns, v["typed"], v["mapping"], config.get())}
+```
+- `_view(d, f)` loses its `"charts"` key and gains `"typed"` (the filtered typed rows): Business and Map pages
+  must not pay for the 8 Explorer rules (2.8 s cold on 200,000 rows, round 4 probe), or AC-42 breaks. Every
+  current `v["charts"]` (charts API, both exports, dashboard) becomes `_appview(d, f, "explorer")["charts"]`.
+- `filters.parse` already ignores `app` (only `f.*`, `from`, `to`), so `f` and its caches are app-independent.
+- Links that leave the page state (chips, Clear filters, breadcrumb, export links, View-as) carry `app=<shown>` **only
+  when the request had a valid `app` param** (`appq = [("app", shown)]` else `[]`, appended after `f` in
+  `urlencode`). With no param the URLs stay exactly as in round 4. dashboard.js keeps `location.search`, so the
+  click filters and drills keep `app` by themselves.
+- `make_client` clears `_detected` and `_appview` (already in conftest, guarded by `hasattr`).
+
+## Round 5: detection (`app/apps.py`)
+- **Roles** (`roles(columns, mapping, typed) -> dict`), from the existing types only (gate 179: no new profiler):
+  `lat`, `lon` = the geospatial columns whose lower-cased stripped name is in `rules.LAT` / `rules.LON` (the pair
+  `_map3d` uses; reuse those sets); `G` = both found; `T`, `N`, `C` = lists of temporal, numerical, categorical
+  column indexes in column order (geospatial columns are their own type, so `N` never counts the pair); `I` =
+  the rest. `coords` = rows where `_num(lat)` is in -90..90 and `_num(lon)` in -180..180 (typed rows, full).
+- **Rule table**, walked in order, first true condition is the detected app; every true one is in `qualifies`:
+  ```python
+  RULES = [("R1", "map", lambda r: r["G"] and (len(r["N"]) <= 2 or r["coords"] >= 0.5 * r["rows"])),
+           ("R2", "business", lambda r: r["T"] and r["C"] and r["N"]),
+           ("R3", "explorer", lambda r: True)]
+  ```
+  Round 6 inserts R4-R7 rows before R3; `detect` does not change. `rows == 0`: share 0 (so only N <= 2 maps).
+  `NAMES = {"map": "Map", "business": "Business", "explorer": "Explorer"}` for the badge and switch labels.
+- `measures(columns, mapping) -> [index]`: `MEASURE = re.compile(r"amount|revenue|sales|total|price|value|cost|qty|quantity", re.I)`;
+  `[i for i in N if MEASURE.search(columns[i])] + [i for i in N if not MEASURE.search(columns[i])]`, first 3.
+  `[0]` is the primary amount (Business) and the primary numeric (Map). shop.csv: `revenue`, `units`.
+- Detection reads the full loaded rows once (one pass over typed lat/lon); deterministic, no randomness.
+
+## Round 5: Business app (`app/business.py`)
+`view(columns, rows, typed, mapping, f, options)` works on the filtered view rows (filters apply to every app).
+- **Time column** = first T; **grain** from `(last - first).days` of its non-empty dates: `<= 60` day, `<= 182`
+  week (ISO, Monday start), `<= 1096` month, else year. Period key = its start `date`: `start(d)`, `nxt(p)`,
+  `end(p) = nxt(p) - 1 day`, `prev(p) = start(p - 1 day)`.
+- **Latest full** `L` = `start(last)` if `last == end(start(last))`, else `prev(start(last))` (day grain: always
+  `start(last)`); **previous** `P = prev(L)`. A period with no rows sums to 0. `L < start(first)` (no full period):
+  card value `n/a`. `P < start(first)` or `sum(P) == 0`: change `n/a`, no arrow.
+- **Cards** (one per `apps.measures`): `{"column", "latest", "previous", "pct", "dir", "spark"}`; `pct =
+  round(100 * (latest - previous) / abs(previous), 1)`; `dir` = `"up"` (▲), `"down"` (▼) or `"no change"` (▶)
+  from the sign of `latest - previous`; the page prints arrow + `"+19.4%"` (sign always, `0.0%` for zero) + the
+  `dir` word, never colour alone. `spark` = the sums of the last 12 periods ending at `L` (not before
+  `start(first)`), drawn server-side as an inline `<svg><polyline>` with a `<title>` (not a Plotly chart: no table
+  toggle, PRD assumption approved in gate 179).
+  shop.csv (month grain, last date 2024-07-10, so L = June, P = May): revenue 7,392 vs 6,192 = ▲ +19.4% up; units
+  72 vs 60 = ▲ +20.0% up.
+- **Trend**: one `line` chart per measure (small multiples, never a second axis): x = period starts (ISO) from
+  `start(first)` through `L`, zero-filled; y = sums. Periods after `L` (the partial one) are left out so the line
+  does not end in a false drop; `shown`/`total` = periods drawn. Same dict shape as the round 4 line, so the
+  existing JS builder draws it.
+- **Drill order** = C columns sorted by `(len(options[c]), column index)` (gate 179). **Group column** = the first in
+  that order with no `f.<c>` in `f`; **next** = the next unfiltered one after it; `drill = next is not None`.
+  No unfiltered C column left: no leaderboard and no change table.
+- **Leaderboard**: `bar` chart dict plus `"orientation": "h"`, `"drill": bool`, `"other": bool`; sums of the primary
+  amount per `str(cell)` over all view rows, sorted `(-sum, name)`, top 10, then one `"Other"` = sum of the rest
+  (only when there is a rest; `other` says the last bar is it). `x_label` = the group column (the JS click key).
+- **Change table** (needs L and P): rows for the leaderboard's categories in its order (Other included):
+  `{"category", "previous", "latest", "delta", "t"}`, `t = round(delta / max|delta|, 2)` (0 when all deltas are 0).
+  The template prints the delta with its sign (`+1,200`, `-35`, `0`) and sets `class="delta pos|neg|zero"` and
+  `style="--t: 0.42"`; the Designer mixes `--div-pos`/`--div-neg` with `--div-mid` (grey) by `|t|`.
+- **Crumbs**: `[("All", href)] + [(f"{c}: {v}", href)]` for each active `f.<c>` on a C column, in drill order;
+  each href keeps `from`/`to`, `app` and the crumbs before it; the last crumb is the current page
+  (`aria-current="page"`, no link). Shown as `<nav class="crumbs" aria-label="Drill path">`, `›` separators.
+- Drill click (dashboard.js): the existing `crossFilter` path with key `f.<x_label>` on the leaderboard when
+  `c.drill`; the `Other` bar (`c.other` and last index) never navigates; with `drill` false nothing is attached and
+  the figure gets `data-drill="false"` so the Designer can drop the pointer cursor. Back works (GET navigation).
+  `crossFilter` returns early when `c.drill === false` (leaderboard at the last level, Map top regions); Explorer
+  bars have no `drill` key and keep the round 4 click filter and toggle.
+- Payload: `{"cards": [...], "charts": [trend..., leaderboard], "changes": [...] | None, "crumbs": [...],
+  "grain": "month", "latest": "2024-06-01", "previous": "2024-05-01"}`.
+
+## Round 5: Map app (`app/geo.py`)
+`view(columns, rows, typed, mapping, settings)` on the view rows; primary = `apps.measures(...)[0]` or none.
+- `pts` = rows with valid coordinates (same test as detection). `len(pts) <= 5000` (`HEX_AT = 5000`): chart
+  `{"kind": "map2d", ..., "data": {"mode": "points", "lon", "lat", "color": [primary or None], "row": [view row
+  index]}, "z_label": primary name or None, "columns": [...], "rows": [[cell as str]]}`; `rows` holds only the drawn
+  rows (<= 5000), so the side panel needs no extra request. Points with a `None` colour go in a second trace in
+  `--muted` (<= 2 series); each trace sets `customdata` = the point's position in `rows`, which the
+  `plotly_click` handler uses to fill the panel `<dl>` (`columns[i]` / `rows[k][i]`, numbers with separators).
+- `> 5000`: `"mode": "hex"`. Cell size `s = (max lon - min lon) / 40` (1.0 when the span is 0); pointy-top axial
+  coordinates on the lon/lat plane: `q = (sqrt(3)/3 * lon - lat/3) / s`, `r = (2/3 * lat) / s`, cube-rounded; centre
+  `lon = s * sqrt(3) * (q + r/2)`, `lat = s * 1.5 * r`. Data `{"lon", "lat", "count", "size": s}` sorted by `(q, r)`;
+  `sum(count) == len(pts)`. JS draws one `scattergeo` with `marker.symbol: "hexagon"`, colour = count on `--seq`,
+  hover `"%{marker.color:,} points"`; a click shows the count in the panel. big_csv (60,000) is the test case.
+- `shown`/`total` = `len(pts)` / `len(rows)` in both modes, printed `N of M rows` (rows with coordinates of view
+  rows; AC-17 form). The template's `points` set does not include `map2d`.
+- **Top regions** (gate 179): the country column (name in `rules.COUNTRY`, categorical or other) if any, else the C
+  column with the fewest distinct values (>= 2, ties by column order); value = sum of the primary numeric per
+  region, else row count; top 10 + `Other`; `bar` dict with `"orientation": "h"`, `"drill": False`. No such column:
+  no chart (the panel shows only the details).
+- **3D toggle**: `"map3d": rules._map3d(columns, typed, mapping, settings)[0]` (the Explorer chart unchanged,
+  z = first numerical as in AC-6/AC-27). The page renders a hidden `<figure data-kind="map3d" hidden>`; the
+  `3D view` button (`aria-pressed`) hides the 2D figure, shows and (first time) draws the 3D one; again swaps back.
+- Height (AC-51): `.app-map .chart[data-kind="map2d"] .plot { height: 70vh }` (Designer may tune within 65-75%);
+  `layout.geo.fitbounds = "locations"`, projection `natural earth`, outline from the bundled topojson.
+- Payload: `{"charts": [map2d, regions?], "map3d": {...} | None}`.
+
+## Round 5: page and JSON contract
+- **`GET /api/datasets/{id}/app[?app=&f.*&from&to]`** (fetched once by dashboard.js on load, no polling):
+  ```json
+  {"dataset": "3f2a9c01b7de", "app": "business", "rule": "R2", "qualifies": ["business", "explorer"],
+   "shown": "business", "filters": [], "charts": [{"id": "chart-1", "kind": "line", "...": "..."}],
+   "cards": [...], "changes": [...], "crumbs": [...], "map3d": null}
+  ```
+  `app`/`rule` are always the detected ones (AC-43: stable), `shown` is what the page draws; `charts` are the shown
+  app's figures with `id`s `chart-1..N` in page order (Explorer: exactly `/charts`' list). Business-only and
+  Map-only keys are present only for that app. `/api/datasets/{id}/charts` is unchanged (Explorer charts always).
+- dashboard.js fetches `/app` + `location.search` instead of `/charts` and draws every `charts[i]` into
+  `#chart-i` with the `build` map (new builder `map2d`; `bar` honours `c.orientation == "h"` and prints value
+  labels `texttemplate: "%{x:,}"` when `c.orientation`), then `map3d` lazily on toggle.
+- **Badge** `<span class="app-badge">App: Business (rule R2)</span>` in the page head (a span, not `<p>`:
+  test_AC_17). **View as**: `<nav class="view-as" aria-label="View as">` with one link per `qualifies` entry
+  (`?app=<name>` + current filters), the shown one `aria-current="page"`; absent when `qualifies == ["explorer"]`.
+- **Template split**: `dataset.html` keeps crumb, head (h1, badge, exports), View-as, then
+  `{% include "app_" ~ shown ~ ".html" %}`; `app_explorer.html` = today's body unchanged (KPI strip, form, chips,
+  charts, tables); `_filters.html` (form + chips, shared) and a `figure` macro (figcaption: title, rule, count,
+  `· score` only when the chart has a score, table toggle button). Business: cards, filters, crumbs, trend
+  figure(s), leaderboard figure, change table, Columns, First rows. Map: filters, `<div class="map-layout">` with
+  the map figure and `<aside class="map-panel" aria-live="polite">` (details `<dl>` + regions figure), hidden 3D
+  figure, Columns, First rows. Layout and style: Designer.
+- **Global rules in JS (AC-54, AC-55)**: after each `newPlot`, a `<button type="button" class="table-toggle"
+  aria-pressed="false">View as table</button>` (server-rendered in the figcaption) toggles between `.plot` and a
+  generated `<table class="plot-table">` of the traces just passed to Plotly (x/y, labels/values, lon/lat/colour or
+  count, heatmap z with labels), numbers via `toLocaleString("en-US")`. Layout gets `separators: ".,"` and
+  `hoverformat: ","` on every axis; geo, pie and 3D traces get a `hovertemplate` with `:,`. No builder may set
+  `hoverinfo: "none"|"skip"` or `yaxis2`/`overlaying`. Donut: `rules._donut` `2 <= len(counts) <= 5`.
+- **Exports (AC-56)**: both routes use `_shown(d, request.query_params)`; Explorer passes `_appview(...)["charts"]`
+  and no title (round 4 output exactly). `xlsx.write(dataset, rows, charts, summary, title=None)` and `export.pptx(dataset, charts,
+  summary, rows_shown, title=None)`. With a title: Summary sheet A1 = title, A2 = summary (Explorer: A1 = summary,
+  unchanged); PPTX title slide first box = title. New chart kind `"table"` (`data: {"head": [...], "rows":
+  [[...]]}`): XLSX sheet with the grid and no chart, PPTX a native table slide (generalise `export._table`).
+  Business list = `[cards table (Measure, Previous, Latest, Change %), trend line(s), leaderboard bar, change
+  table]`; Map list = `[scatter of lon (x) / lat (y), stride-sampled to chart_cap like `rules._scatter`, top
+  regions bar]`. Built by `business.export(view)` / `geo.export(view)`; ids `chart-1..` in that order.
 
 ## Round 4 changes at a glance
 | # | Change | Files | AC |
@@ -278,6 +457,12 @@ Round 4: new `app/filters.py` (`parse`, `apply`, `labels`, `summary`, `options`)
 `export.pptx` gain a `summary` argument; `profile._kind` counts distinct strings once; `dataset.html`,
 `databoot.css`, `dashboard.js` as in "Pages". Readers, catalog, launcher and config are unchanged.
 
+Round 5: new `app/apps.py` (rule table, roles, `detect`, `measures`), `app/business.py` (`view`, `export`) and
+`app/geo.py` (`view`, `export`), created empty by the architect; `app/main.py` gains `_detected`, `_shown`,
+`_appview` and the `/app` route; `app/rules.py` donut 2-5 only; `xlsx.write`/`export.pptx` gain `title` and the
+`table` kind; templates split per app; `dashboard.js` fetches `/app`, adds `map2d`, value labels, drill, table
+toggle, 3D toggle. `profile`, `filters`, `score`, readers, catalog, launcher and config are unchanged.
+
 ## Routes (sitemap: two pages, no nav beyond a "DataBoot" home link; unchanged)
 | Method, path | Returns |
 |---|---|
@@ -285,13 +470,15 @@ Round 4: new `app/filters.py` (`parse`, `apply`, `labels`, `summary`, `options`)
 | GET `/datasets/{id}` | Dashboard page; 404 for unknown id; round 4: filter query params (see "Round 4: filters") |
 | GET `/api/datasets` | `[{"id","path","sheet","kind","rows","columns"}]` (columns = count) |
 | GET `/api/datasets/{id}/profile` | `{column: type}` (AC-2), also writes `<out>/profiles/{id}.json` |
-| GET `/api/datasets/{id}/charts` | chart contract below; fetched once by dashboard.js on load with the page's query string (no polling) |
+| GET `/api/datasets/{id}/charts` | chart contract below (Explorer charts; unchanged in round 5) |
+| GET `/api/datasets/{id}/app` | round 5: detection + the shown app's figures ("Round 5: page and JSON contract"); fetched once by dashboard.js on load with the page's query string (no polling) |
 | GET `/datasets/{id}/export.pptx` | PPTX download (same filter params) |
 | GET `/datasets/{id}/export.xlsx` | XLSX download (same filter params) |
 | GET `/health` | `{"ok": true}` |
 | `/static/...` | StaticFiles mount |
 
-No page or route is added in round 4 (only query params), so no sitemap or NAV change.
+No page or route is added in round 4 (only query params), so no sitemap or NAV change. Round 5 adds the `app`
+query param on the page and both exports, and the `/app` JSON route; still two pages, no NAV change.
 
 ## Data access
 - `scan(folder)`: `os.walk` (no symlink follow), skip names starting with `.`; sorted by relative path. Missing
@@ -359,7 +546,7 @@ Built by `rules.charts` in this order, then cut to the first 8 (`MAX_CHARTS`):
 | `country_map` | a categorical/other column named `country`, `country_name`, `nation`, `iso3`, `iso_a3` | sum of first numerical per country (count if none), **sorted by value desc, then name** (gate 162, like bars); `locationmode` `ISO-3` when all values are 3 upper-case letters, else `country names` |
 | `line` | temporal + numerical; first 2 numerical | sum per distinct timestamp, sorted, stride-sampled to `chart_cap` |
 | `bar` | categorical; first 2 numerical, or 1 count chart | sum (or count) per value, sorted by value desc |
-| `donut` | first categorical with 2 to 6 distinct values | row count per value |
+| `donut` | first categorical with 2 to 5 distinct values (round 5, gate 179; was 6) | row count per value |
 | `histogram` | first numerical | 20 equal-width bins over min..max (max in the last bin); **min = max gives 1 bin** with edges `[min, max]` |
 | `scatter` | 2+ numerical | first two numerical, rows with both values, stride-sampled to `chart_cap` |
 | `heatmap` | 3+ numerical | Pearson r of the first 12 numerical, pairwise complete rows; `null` when undefined |
@@ -532,7 +719,7 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
 | AC-13 | `Dockerfile`, `Start-DataBoot.ps1` | text checks: `docker info`, `:/data:ro`, `docker run`, `Start-Process`; no `Start-DataOS.ps1` |
 | AC-14 | readers + pyarrow `parquet.read` (R4) | tsv/json/jsonl/geojson counts; **9** parquet fixtures (zstd now reads) at 40x6; profile and charts equal flat.csv |
 | AC-15 | `others` list, home "Other files" table | manual.pdf `pdf 9 <date>`, old.xls `xls 2`; no `<a ` in that table; `.hidden.csv` absent |
-| AC-16 | rules table above, 8-chart cap | donut, histogram, scatter, heatmap, country map values; many.csv ≤ 8 figures |
+| AC-16 | rules table above, 8-chart cap; round 5: donut only for 2 to 5 values (`rules._donut`) | donut, histogram, scatter, heatmap, country map values; many.csv ≤ 8 figures; a 5-value column gives a donut, a 6-value one none |
 | AC-17 | figcaption has one `.chart-rule` and one `.chart-count` | per figure regex; no `<p>` in main except the folder path |
 | AC-18 | xlsxwriter (R1) and python-pptx (R2) | openpyxl: first sheet `Data`, header = columns, `sum(len(ws._charts)) > 0`; python-pptx: `len(slides) == 1 + len(charts)`, some `shape.has_chart` |
 | AC-19 | titles and h1 in templates | home `<title>DataBoot</title>`, dashboards `… - DataBoot`, no `DataOS` |
@@ -557,7 +744,24 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
 | AC-38 | server-rendered filtered page; GET navigation; chips; Clear filters link | `/datasets/{id}?f.region=North`: `<option value="North" selected>`, chip `region = North`, KPI 3 rows; Playwright: pick South in the select, URL gains `f.region=South`, `page.go_back()` returns to the North URL and its KPI 3; click the chip's link, then `Clear filters`: URL has no `f.`, KPI 6 |
 | AC-39 | J1 `plotly_click` on bar/donut; toggle | Playwright on sales.csv: `page.evaluate` emits a click via `document.getElementById(barId).querySelector('.plot').emit('plotly_click', {points: [{x: 'South', label: 'South', data: {}}]})` (Plotly's own handler path) or a real mouse click on the bar; URL has `f.region=South`, select shows South, KPI rows 2; same click again: no `f.region`, rows 6 |
 | AC-40 | E1 `_view` in both export routes; Summary sheet last; title slide line | XLSX with `?f.region=North`: Data has 3 rows, first sheet `Data`, last `Summary` A1 `Filters: region = North`, bar sheet total 16; without params Summary A1 `Filters: none`; PPTX: slide 1 texts contain `Filters: region = North` / `Filters: none`, a chart's series values sum to the filtered total |
-| AC-41 | D1 caches + heatmap pairs once + Counter in classify | `big_sales_csv`: GET charts (warm-up), then `time.perf_counter()` around GET charts `?f.region=North`: 200 and `< 1.0` s; `kpis.rows == 50000` |
+| AC-41 | D1 caches + heatmap pairs once + Counter in classify | `big_sales_csv`: GET charts (warm-up), then `time.perf_counter()` around GET charts `?f.region=North`: 200 and `< 1.0` s; `kpis.rows == 50000`; round 5: the same timing on `/app` (big_sales opens as Business) |
+| AC-42 | `_base` once; round 5: `_view` no longer runs the Explorer rules, `_appview` runs only the shown app | existing test_AC_42; round 5 adds the cold `/datasets/{id}` (Business) and `/app` timing on `big_sales_csv`, and `big_csv` (Map, hexbin) `<= 5` s |
+| AC-43 | A1 `apps.RULES`, `detect`, `_detected`; `/app` route | `archetypes_dir`: shop.csv `business`/`R2`, places.csv `map`/`R1`, measures.csv `explorer`/`R3`, sparse.csv not `map` (`explorer`/`R3`); `qualifies` of shop `["business", "explorer"]`, places `["map", "explorer"]`; two requests (and a request with filters) give equal `app`, `rule`, `qualifies` |
+| AC-44 | A2 badge from `NAMES[app]` and `rule` | shop page has `App: Business (rule R2)`, measures `App: Explorer (rule R3)`, places `App: Map (rule R1)`, inside `class="app-badge"`; with `app=explorer` the badge still names the detected app |
+| AC-45 | A2 View-as nav; `_shown` | shop page: `nav.view-as` links are exactly Business and Explorer, Business `aria-current`; measures page has no `view-as`; `?app=explorer` shows `data-kind="line"` from the Explorer rules and the KPI strip; `?app=map` on shop shows Business; Playwright: click Explorer, URL has `app=explorer`, reload keeps it |
+| AC-46 | B1 cards, `apps.measures` | shop.csv `/app`: cards `[revenue, units]`; revenue latest 7392, previous 6192, pct 19.4, dir up; units 72, 60, 20.0; page shows `▲`, `+19.4%`, `up`, `7,392`; each card has an `<svg>` sparkline; a file whose dates all sit in one month (day grain over 2 days) or a previous sum of 0 shows `n/a` and no arrow |
+| AC-47 | B1 trend per measure | shop.csv: 2 line charts (revenue, units), x = `2024-01-01`..`2024-06-01` (6 months, July left out), y equal to the month sums; no chart dict has `yaxis2`; grain boundaries by a unit test of the `business` grain helper (span in days: 60 days day, 61 week, 182 week, 183 month, 1096 month, 1097 year) |
+| AC-48 | B1 leaderboard | shop.csv unfiltered: group column `channel` (2 bars, no Other); with `f.channel=web&f.store=North` the group is `product` (12 values): `p0` 800, `p11` 606, `p10` 600 … `p3` 206, then `Other` = 306 (`p2` 200 + `p1` 106); `orientation == "h"`; Playwright: every bar has a text label with separators (`fullLayout` text / `.bartext`) |
+| AC-49 | B1 drill order and crumbs; J `crossFilter` on the leaderboard | `/app` drill order `channel`, `store`, `product` (2, 3, 12 distinct); Playwright on shop: click bar `web` -> URL `f.channel=web`, leaderboard `x_label == "store"`, crumb `All › channel: web`; click `North` -> `product`, `drill` false; clicking a product bar or `Other` does not navigate; click `All` -> no `f.`; `go_back()` returns to the previous level |
+| AC-50 | B1 changes; template classes | shop.csv `changes` rows = leaderboard categories, `delta == latest - previous`; page cells print the sign (`+`/`-`), and computed `background-color` of a pos, a neg and a zero cell differ, zero equal to `--div-mid` |
+| AC-51 | M1 map2d points; M2 70vh | places.csv: `map2d` trace is `scattergeo`, colour data = `pop`, colorbar title `pop`, colorscale two stops on `--seq`; Playwright at 1280x900 and 390x844: plot height / viewport height in 0.65..0.75; `topojsonURL` local |
+| AC-52 | M1 hexbin | big_csv `/app`: `mode == "hex"`, `len(count) < 60000`, `sum(count) == 60000`; places.csv `mode == "points"` with 20 marks; Playwright: hover a cell shows `N points` with separators |
+| AC-53 | M1 regions, rows; M2 panel, 3D toggle | places.csv: regions bar on `country`, x sums of `pop` per country descending; Playwright: click a point -> `.map-panel` shows its `country` and `pop` values; `3D view` -> `[data-kind=map3d]` visible with a WebGL canvas and the 2D figure hidden, press again -> back |
+| AC-54 | G1 table toggle, hover, no second axis | Playwright on shop (Business), places (Map) and sales (`app=explorer`): for every `.js-plotly-plot`, `Object.keys(gd._fullLayout)` has no `yaxis2` and no axis with `overlaying`; `hovermode !== false` and no trace `hoverinfo` in `none`/`skip`; each figure has one `.table-toggle`; clicking shows a `table.plot-table` whose row count equals the trace's point count, clicking again shows the plot |
+| AC-55 | G1 separators | Business and Map pages: no unseparated 4+ digit number in `main` text (the AC-21 regex), nor in `.bartext`, tick labels or a hover label; shop values `7,392`, places `20,000` |
+| AC-56 | E2 `title`, `table` kind, `business.export`, `geo.export` | shop `export.xlsx?app=business`: sheets `Data`, `chart-1 table`, `chart-2 line`, `chart-3 line`, `chart-4 bar`, `chart-5 table`, `Summary`; Summary A1 `Business overview`, A2 `Filters: none`; PPTX slide 1 has `Business overview`, then table, line, line, bar (has_chart), table slides; places `?app=map`: `Map overview`, an XY scatter then a bar; sales.csv `?app=explorer` export equals the round 4 sheet list and Summary A1 `Filters: none` (Explorer unchanged) |
+| AC-57 | Designer: DESIGN.md "Global chart rules" | text check: the section heading exists and lists each rule phrase in AC-57 |
+| AC-58 | all assets local (AC-9); `/app` same origin | Playwright with `page.route("**/*")` counting non-`127.0.0.1` requests: open shop and places, drill, switch View-as, toggle 3D and a table: count 0 |
 
 ## Work items without AC ids: explicit checks
 - **W-1 Unreadable.sheet (gate 162)**: a workbook where one sheet fails lists `book.xlsx - <sheet>` in "Could not
@@ -573,6 +777,36 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
   requirements.txt. QA may add a text test for these lines.
 
 ## Tests that must change with the code (name them in the tickets)
+Round 5 (each edit goes in the ticket that changes the behaviour):
+- **A1/A2 ticket (default app switch)**: these fixtures change app: `sales.csv`, `sub/book.xlsx` Revenue, `staff.csv`
+  and `big_sales_csv` become Business (R2); `points.tsv`, `sub/cities.geojson` and `big_csv` become Map (R1).
+  `notes.csv`, `records.json`, `events.jsonl`, `num.csv`, many.csv stay Explorer. Every page request in the old tests
+  that expects the Explorer layout passes `app=explorer`:
+  - helpers: `tests/test_browser.py::dataset_path` and `tests/test_acceptance.py::_path` return the path with
+    `?app=explorer`; callers that append a query (`test_filter_browser.py` L47 `+ "?f.region=South"`, and any
+    `"?f."` concatenation, grep it) switch to `"&f..."`.
+  - direct `client.get(f"/datasets/{…}")` in `test_acceptance.py` (L144, 157, 167, 174, 181, 191, 202, 236, 376,
+    385, 431, 433, 456, 811, 888, 893-896), `test_pages.py` L43, L80, `test_filters.py` L78, `_page(live, …)` calls
+    L486, 523, 581: add `?app=explorer` (a loop over all datasets may add it to every id: Explorer always qualifies).
+  - test_AC_17 compares page figures with `/charts`; with `app=explorer` they are equal again. test_AC_38/39
+    Playwright URLs keep `app=explorer` through `location.search`; assertions that the URL has no `f.` still hold,
+    but any exact-URL equality must allow `app=explorer`.
+  - `test_AC_42` and `tests/test_speed.py` time the default page: big_sales becomes Business. Keep them on the
+    default (that is the AC-42 promise for Business) and re-time; report the number, do not loosen.
+- **A1 ticket**: `_view` loses `"charts"`: no test reads it (grep `_view(` in tests: none).
+- **G1 ticket (donut 2-5)**: `tests/test_rules_extra.py::test_donut_counts_and_limits` L25 `seven[:6]` -> `seven[:5]`
+  with `[1] * 5`, and add `seven[:6]` gives no donut; `DESIGN.md` "Cross-filter" text "2 to 6 slices" and the
+  palette line "Donut uses `--c1..--c6`" (Designer). Fixtures with 6 values: none found besides L25 (staff has 3
+  departments, sales 3 regions, events 2 kinds); re-run test_rules_extra and test_AC_16.
+- **G1 ticket (table toggle)**: every figure gains a `.table-toggle` button inside `<figcaption>`; test_AC_17 strips
+  figcaptions before its `<p>` check and counts `chart-rule`/`chart-count` only, so it holds; a toggle label must
+  not use those classes.
+- **E2 ticket**: export routes use `_shown` (PRD S2: exports follow the shown app, and the page's export links
+  carry `app` only when the URL had it), so a default `sales.csv` or `points.tsv` export becomes Business or Map.
+  Route-level export tests that expect the round 4 sheets add `app=explorer` (`test_export_xlsx.py` L39 and every
+  `export.xlsx`/`export.pptx` request in test_export_*, test_AC_18, test_AC_23, test_AC_40: grep them). Direct
+  calls of `xlsx.write`/`export.pptx` in unit tests stay (the `title` default is `None`).
+
 Round 4 (put each edit in the ticket that changes the behaviour; sales.csv order becomes line, histogram, bar,
 donut; every XLSX gains a last `Summary` sheet):
 - S1/S2 ticket: `tests/test_rules.py::test_sales_bar_and_line` L16 kinds order, L17 `line, bar = cs[:2]` (pick
@@ -626,6 +860,12 @@ Round 4 (added by the architect): `big_sales_csv` -> folder with `sales.csv`, 20
 product, amount, qty` (region North/South/East/West by `i % 4`, so `f.region=North` keeps 50,000 rows; 12 x 28
 dates; product 20 values; amount `i % 997`; qty 1..9), for AC-41. The hand-checked score values use `data_dir`
 sales.csv. `make_client` must also clear `main._base` and `main._view` once they exist (D1 ticket).
+Round 5 (added by the architect, roles checked by `tests/test_archetype_fixtures.py`): `archetypes_dir` -> folder
+with `shop.csv` (`shop_rows()`: date, store 3, channel 2, product 12, units, revenue; 78 rows, 2024-01-05 ..
+2024-07-10, month grain; hand values in "Round 5: Business app" and the AC-46/48 rows), `places.csv` (20 rows: lat,
+lon, country 4 values, pop), `measures.csv` (a, b, c numerical), `sparse.csv` (lat/lon in 4 of 10 rows + a, b, c).
+`big_csv` (60,000 points) is the hexbin case. `make_client` already clears `_detected` and `_appview` when they
+exist. QA writes any extra edge file inline (as test_AC_18 does with num.csv).
 
 ## Decisions
 1. Office files on xlsxwriter (write), python-pptx (write) and openpyxl `read_only=True` (read), Parquet on
@@ -674,3 +914,23 @@ sales.csv. `make_client` must also clear `main._base` and `main._view` once they
 21. (Round 4) Speed by caching and two exact-result fixes (heatmap pairs once, distinct strings classified once),
     not by sampling for scores: the PRD fixes scores on the full filtered rows, and the measured budget fits.
     `# ponytail:` mark the `_view` cache (8 entries, memory = filtered row lists) and the typed-rows copy.
+22. (Round 5) The detector is a list of `(rule id, app, condition)` walked in order: R4-R7 are new rows before R3,
+    `qualifies` comes free (every true row), and the badge text is `rule id` + app name. No class hierarchy.
+23. (Round 5) Detection runs on the unfiltered rows and is cached per dataset: a filter never changes the app,
+    so the badge, switch and URL stay stable (PRD: same file, same app).
+24. (Round 5) Drill-down is the round 4 `f.<column>` filter plus a computed group column, not a new `drill=` param:
+    Back, chips, exports and shared links already work, and the breadcrumb is derived from `f`.
+25. (Round 5) One JSON route `/app` for the shown app's figures, with the same chart dict shape the Explorer uses:
+    the existing JS builders (line, bar) and both export writers take Business and Map charts unchanged; only
+    `map2d` (JS) and `table` (writers) are new kinds. `/charts` stays as the Explorer contract for old tests.
+26. (Round 5) `_view` stops computing Explorer charts; each app computes only its own figures in `_appview`, so a
+    200,000-row Business or Map page does not pay for 8 unused rules (AC-42).
+27. (Round 5) Hexbin cells are computed by the server and drawn as hexagon markers in one `scattergeo` trace: no
+    new library, few marks, exact counts for the test. `# ponytail:` cells live on the lon/lat plane (they stretch
+    away from the equator); project first if owners map polar data.
+28. (Round 5) KPI sparklines are server-rendered SVG polylines, not Plotly figures: 3 tiny charts would each need
+    a Plotly instance, a mode bar and a table toggle (PRD assumption approved, gate 179).
+29. (Round 5) The trend stops at the latest full period: a partial last period would draw a false drop (honest
+    chart rule). Its rows still count in the leaderboard, which covers all view rows (PRD).
+30. (Round 5) The Map 3D toggle reuses the Explorer `map3d` chart as is (z = first numerical): the PRD says "the
+    existing Plotly 3D scatter", and changing its z would change Explorer (AC-6, AC-27).
