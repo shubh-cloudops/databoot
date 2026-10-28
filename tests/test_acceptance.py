@@ -10,6 +10,8 @@ import re
 import threading
 import time
 import urllib.request
+from contextlib import contextmanager
+from urllib.parse import parse_qs, urlparse
 from pathlib import Path
 
 import pytest
@@ -657,3 +659,438 @@ def test_AC_31(make_client, data_dir):
         page = client.get(f"/datasets/{ids[(name, 'Good')]}")
         assert page.status_code == 200
         assert client.get(f"/api/datasets/{ids[(name, 'Good')]}/charts").json()["charts"]
+
+
+# ---- Round 4: score, order, layout, KPIs, filters, exports, speed (AC-32..AC-42) ----
+
+STAFF_DEPTS = ("Engineering dept", "Customer support", "Human resources")  # labels > 12 chars -> horizontal bar
+
+
+def _staff(folder):
+    """40 rows; the first categorical column has long labels (horizontal bar, donut); region has 4 short ones."""
+    regs = ("North", "South", "East", "West")
+    lines = ["department,date,region,amount,hours"] + [
+        f"{STAFF_DEPTS[i % 3]},2024-01-{i % 28 + 1:02d},{regs[i % 4]},{i * 3 + 1},{(i * 7) % 13}" for i in range(40)]
+    (folder / "staff.csv").write_text("\n".join(lines) + "\n")
+
+
+def _path(base, name):
+    return "/datasets/" + next(d["id"] for d in json.load(urllib.request.urlopen(base + "/api/datasets")) if d["path"] == name)
+
+
+@contextmanager
+def _open(base, path, width=1280):
+    """Chromium page on `path` with off-host requests aborted; yields (page, external, errors) once the plots drew."""
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        page = b.new_page(viewport={"width": width, "height": 900})
+        external, errors = [], []
+
+        def route(r):
+            if r.request.url.startswith(base):
+                r.continue_()
+            else:
+                external.append(r.request.url)
+                r.abort()
+        page.route("**/*", route)
+        page.on("console", lambda m: m.type == "error" and errors.append(m.text))
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        page.goto(base + path)
+        _settle(page)
+        yield page, external, errors
+        b.close()
+
+
+def _settle(page):
+    page.wait_for_load_state("networkidle")
+    page.wait_for_function("""() => document.querySelectorAll('figure.chart').length ===
+        document.querySelectorAll('figure.chart .plot.js-plotly-plot').length && !document.querySelector('.plot.is-loading')""")
+
+
+def _click_nav(page, fig_kind, mouse_xy=None):
+    """Click the first bar (or the given point) of the figure and wait for the reload it causes."""
+    with page.expect_navigation():
+        if mouse_xy:
+            page.mouse.click(*mouse_xy)
+        else:
+            page.locator(f'[data-kind="{fig_kind}"] .barlayer .point').first.click(force=True)
+    _settle(page)
+
+
+def _kpi(page):
+    return {page.locator(".kpis dt").nth(i).inner_text(): page.locator(".kpis dd").nth(i).inner_text()
+            for i in range(page.locator(".kpis dt").count())}
+
+
+def _ranks(v):
+    order = sorted(range(len(v)), key=lambda i: v[i])
+    r = [0.0] * len(v)
+    i = 0
+    while i < len(v):
+        j = i
+        while j + 1 < len(v) and v[order[j + 1]] == v[order[i]]:
+            j += 1
+        for k in range(i, j + 1):
+            r[order[k]] = (i + j) / 2 + 1
+        i = j + 1
+    return r
+
+
+def _pearson(x, y):
+    import statistics
+    return statistics.correlation(x, y)
+
+
+def _gini(v):
+    n, s = len(v), sum(v)
+    return sum(abs(a - b) for a in v for b in v) / (2 * n * s)
+
+
+def _api(client, i, query=""):
+    return client.get(f"/api/datasets/{i}/charts{query}").json()
+
+
+def test_AC_32(make_client, data_dir):
+    import statistics
+    (data_dir / "num.csv").write_text("a,b,c\n" + "".join(f"{i},{(i * 7) % 11},{2 * i + 1}\n" for i in range(12)))
+    (data_dir / "const.csv").write_text("date,region,amount\n2024-01-01,A,5\n2024-01-02,B,5\n2024-01-03,A,5\n2024-01-04,B,5\n")
+    (data_dir / "one.csv").write_text("date,region,amount\n2024-01-01,A,5\n")
+    client = make_client(data_dir)
+    ids = _ids(client)
+    # sales.csv by hand: amounts per date, region totals {South 23, North 16, East 7}, region counts {3, 2, 1}
+    amounts = [10, 20, 5, 7, 3, 1]
+    kind = {c["kind"]: c for c in _charts(client, "sales.csv")[1]}
+    assert all(isinstance(c["score"], float) and 0 <= c["score"] <= 1 for c in kind.values())
+    rho = _pearson(_ranks(list(range(6))), _ranks(amounts))  # Spearman = Pearson of the ranks
+    assert kind["line"]["score"] == round(abs(rho), 2) == 0.89
+    m = statistics.mean(amounts)
+    m2 = sum((a - m) ** 2 for a in amounts) / 6
+    g1 = sum((a - m) ** 3 for a in amounts) / 6 / m2 ** 1.5
+    assert kind["histogram"]["score"] == round(min(1, abs(g1) / 3), 2)
+    assert kind["bar"]["score"] == round(_gini([23, 16, 7]), 2) == 0.23
+    assert kind["donut"]["score"] == round(_gini([3, 2, 1]), 2) == 0.22
+    # scatter = |Pearson r| of its own two columns, heatmap = largest off-diagonal |r|
+    cols = {"a": list(range(12)), "b": [(i * 7) % 11 for i in range(12)], "c": [2 * i + 1 for i in range(12)]}
+    got = _charts(client, "num.csv")[1]
+    scatters = [c for c in got if c["kind"] == "scatter"]
+    assert scatters
+    for c in scatters:
+        assert c["score"] == round(abs(_pearson(cols[c["x_label"]], cols[c["y_label"]])), 2), c["title"]
+    (heat,) = [c for c in got if c["kind"] == "heatmap"]
+    off = [abs(_pearson(cols[p], cols[q])) for p, q in (("a", "b"), ("a", "c"), ("b", "c"))]
+    assert heat["score"] == round(max(off), 2) == 1.0
+    # maps are fixed at 0.6
+    assert {c["kind"]: c["score"] for c in _charts(client, "points.tsv")[1]}["map3d"] == 0.6
+    (country,) = [c for c in _charts(client, "sub/records.json")[1] if c["kind"] == "country_map"]
+    assert country["score"] == 0.6
+    # constant values and a single value give 0 (the chart is still drawn or absent, never a score above 0)
+    const = _charts(client, "const.csv")[1]
+    assert const and all(c["score"] == 0 for c in const)
+    assert all(c["score"] == 0 for c in _charts(client, "one.csv")[1])
+
+
+def test_AC_33(make_client, data_dir):
+    (data_dir / "geo.csv").write_text("lat,lon,country,v\n51.5,-0.1,FRA,3\n48.8,2.3,JPN,4\n40.7,-74,BRA,9\n")
+    _staff(data_dir)
+    client = make_client(data_dir)
+    order = ["map3d", "country_map", "line", "bar", "donut", "histogram", "scatter", "heatmap"]
+    ids = _ids(client)
+    tied = False
+    for key, i in ids.items():
+        first = client.get(f"/api/datasets/{i}/charts").json()
+        again = client.get(f"/api/datasets/{i}/charts").json()
+        assert first == again, key  # same order and scores on a second load
+        cs = first["charts"]
+        assert [c["id"] for c in cs] == [f"chart-{n}" for n in range(1, len(cs) + 1)], key
+        for a, b in zip(cs, cs[1:]):
+            assert a["score"] >= b["score"], key
+            if a["score"] == b["score"]:
+                tied = True
+                if a["kind"] != b["kind"]:
+                    assert order.index(a["kind"]) < order.index(b["kind"]), key
+        html = client.get(f"/datasets/{i}").text
+        assert re.findall(r'<figure class="chart" id="[^"]+" data-kind="([^"]+)"', html) == [c["kind"] for c in cs], key
+    assert tied
+    geo = [c["kind"] for c in _charts(client, "geo.csv")[1]]
+    assert geo[:2] == ["map3d", "country_map"]  # both 0.6: fixed chart order breaks the tie
+    staff = _charts(client, "staff.csv")[1]
+    assert [c["kind"] for c in staff].count("line") == 2 and staff[0]["kind"] == "line"
+
+
+def test_AC_34(live):
+    path = _path(live, "sales.csv")
+    for width in (1280, 375):
+        with _open(live, path, width) as (page, external, errors):
+            wrap = page.locator(".charts").bounding_box()
+            boxes = [page.locator(f"#chart-{n}").bounding_box() for n in range(1, page.locator("figure.chart").count() + 1)]
+            assert len(boxes) == 4
+            assert boxes[0]["width"] > 0.95 * wrap["width"]
+            if width == 1280:
+                assert abs(boxes[1]["y"] - boxes[2]["y"]) < 2 and boxes[1]["y"] > boxes[0]["y"]
+                assert abs(boxes[2]["y"] - boxes[3]["y"]) > 2 or boxes[3]["x"] != boxes[2]["x"]
+                assert all(0.4 * wrap["width"] < b["width"] < 0.55 * wrap["width"] for b in boxes[1:])
+            else:
+                assert all(b["width"] > 0.95 * wrap["width"] for b in boxes)
+                assert all(boxes[k + 1]["y"] > boxes[k]["y"] for k in range(3))
+            table = page.locator("table.data-table").bounding_box()
+            assert table["y"] > max(b["y"] + b["height"] for b in boxes) - 1
+            assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+            assert external == [] and errors == []
+    client_html = urllib.request.urlopen(live + path).read().decode()
+    assert client_html.index('class="data-table"') > client_html.rindex("</figure>")
+
+
+def test_AC_35(live):
+    base_charts = {}
+    for name in ("sales.csv", "points.tsv"):
+        path = _path(live, name)
+        api = json.load(urllib.request.urlopen(live + path.replace("/datasets/", "/api/datasets/") + "/charts"))["charts"]
+        with _open(live, path) as (page, external, errors):
+            rules = [page.locator(f"#{c['id']} .chart-rule").inner_text() for c in api]
+            assert len(rules) == len(api) >= 1
+            for text, c in zip(rules, api):
+                assert re.search(r" · score \d\.\d\d$", text), text
+                assert text.endswith(f" · score {c['score']:.2f}") and text.startswith(c["rule"])
+            assert errors == []
+    html = urllib.request.urlopen(live + _path(live, "sales.csv")).read().decode()
+    assert "· score 0.89" in html
+
+
+def test_AC_36(make_client, data_dir):
+    rows = ["region,n1,n2,n3,n4"] + [
+        f"{'AB'[i % 2]},{1000 + i},{2 * i},{i % 7},{'' if i % 10 == 0 else 5}" for i in range(1200)]
+    (data_dir / "kpi.csv").write_text("\n".join(rows) + "\n")
+    client = make_client(data_dir)
+    i = _ids(client)[("kpi.csv", None)]
+
+    def kpis(query=""):
+        html = client.get(f"/datasets/{i}{query}").text
+        return dict(re.findall(r"<dt>([^<]*)</dt><dd>([^<]*)</dd>", html.split('<dl class="kpis">')[1].split("</dl>")[0]))
+
+    full = kpis()
+    assert list(full) == ["Rows", "Columns", "Missing", "n1 (sum)", "n2 (sum)", "n3 (sum)"]  # first 3 numerical only
+    assert full == {"Rows": "1,200", "Columns": "5", "Missing": "2.0%",
+                    "n1 (sum)": f"{sum(1000 + k for k in range(1200)):,}",
+                    "n2 (sum)": f"{sum(2 * k for k in range(1200)):,}", "n3 (sum)": f"{sum(k % 7 for k in range(1200)):,}"}
+    rows_a = [k for k in range(1200) if k % 2 == 0]
+    a = kpis("?f.region=A")
+    assert a["Rows"] == "600" and a["n1 (sum)"] == f"{sum(1000 + k for k in rows_a):,}"
+    assert a["n2 (sum)"] == f"{sum(2 * k for k in rows_a):,}" and a["Columns"] == "5"
+    assert a["Missing"] == "4.0%"  # every 10th row is even, so all 120 blanks sit in 600 x 5 = 3,000 cells
+    assert client.get(f"/api/datasets/{i}/charts?f.region=A").json()["kpis"]["rows"] == 600
+
+
+def test_AC_37(make_client, data_dir):
+    _staff(data_dir)
+    client = make_client(data_dir)
+    ids = _ids(client)
+    i = ids[("staff.csv", None)]
+    html = client.get(f"/datasets/{i}").text
+    form = html.split('<form class="filters" method="get">')[1].split("</form>")[0]
+    assert re.findall(r'<select id="\w+" name="([^"]+)"', form) == ["f.department", "f.region"]  # one per categorical
+    assert 'type="date" id="from"' in form and 'type="date" id="to"' in form
+    for name in ("points.tsv", "sub/records.json"):  # no categorical or temporal column: no control
+        assert "<form" not in client.get(f"/datasets/{ids[(name, None)]}").text
+    s = client.get(f"/datasets/{ids[('sales.csv', None)]}").text.split('<form class="filters"')[1]
+    assert s.count("<select") == 1 and 'name="from"' in s
+    book = client.get(f"/datasets/{ids[('sub/book.xlsx', 'Revenue')]}").text.split('<form class="filters"')[1]
+    assert 'name="from"' in book and 'name="f.team"' in book
+    base = _api(client, i)
+    assert base["kpis"]["rows"] == 40 and base["filters"] == []
+    for query, rows in (("?f.region=North", 10), ("?f.department=Customer+support", 13),
+                        ("?f.region=North&f.department=Customer+support", None), ("?from=2024-01-10&to=2024-01-12", 6)):  # days 10-12: rows 9-11 and 37-39
+        got = _api(client, i, query)
+        want = rows if rows is not None else sum(1 for k in range(40) if k % 4 == 0 and k % 3 == 1)
+        assert got["kpis"]["rows"] == want, query
+        assert len(got["filters"]) == query.count("=") if "from" not in query else len(got["filters"]) == 2
+        for c in got["charts"]:
+            before = next(b for b in base["charts"] if b["kind"] == c["kind"])
+            assert c["total"] < before["total"], (query, c["kind"])
+            if c["kind"] in ("histogram", "bar"):
+                assert c["total"] == want, (query, c["kind"])
+        page = client.get(f"/datasets/{i}{query}").text
+        assert f"{want} of {want} rows" in page
+
+
+def test_AC_38(live):
+    path = _path(live, "sales.csv")
+    with _open(live, path + "?f.region=North&from=2024-01-02") as (page, external, errors):
+        # opening the URL restores the state: dropdown, date, KPI and one chip per filter
+        assert page.locator("select[name='f.region']").input_value() == "North"
+        assert page.locator("input[name='from']").input_value() == "2024-01-02"
+        assert _kpi(page)["Rows"] == "2" and page.locator(".chips a").count() == 2
+        assert page.locator("text=Clear filters").count() == 1
+        # a chip removes only its own filter
+        page.locator(".chips a", has_text="region = North").click()
+        _settle(page)
+        assert "f.region" not in page.url and "from=2024-01-02" in page.url
+        assert _kpi(page)["Rows"] == "5" and page.locator(".chips a").count() == 1
+        page.select_option("select[name='f.region']", "South")
+        page.click("form.filters button")
+        _settle(page)
+        assert "f.region=South" in page.url and "from=2024-01-02" in page.url and _kpi(page)["Rows"] == "2"
+        page.click("text=Clear filters")
+        _settle(page)
+        assert urlparse(page.url).query == "" and _kpi(page)["Rows"] == "6" and page.locator(".chips a").count() == 0
+        assert external == [] and errors == []
+
+
+def _plot_values(page, kind):
+    return page.evaluate("k => { const d = document.querySelector(`[data-kind=\"${k}\"] .plot`).data[0];"
+                         " return [d.orientation || 'v', d.orientation === 'h' ? d.y : (d.x || d.labels), d.orientation === 'h' ? d.x : (d.y || d.values)]; }", kind)
+
+
+def test_AC_39(live, data_dir):
+    _staff(data_dir)  # written before the first request, so the scan sees it
+    sales = _path(live, "sales.csv")
+    staff = _path(live, "staff.csv")
+    # vertical bar: sales.csv regions (short labels); click the first bar, then the active bar again
+    with _open(live, sales) as (page, external, errors):
+        orient, labels, _ = _plot_values(page, "bar")
+        assert orient == "v"
+        _click_nav(page, "bar")
+        want = labels[0]
+        assert parse_qs(urlparse(page.url).query) == {"f.region": [want]}
+        n = {"South": 2, "North": 3, "East": 1}[want]
+        assert page.locator("select[name='f.region']").input_value() == want and _kpi(page)["Rows"] == str(n)
+        assert page.locator(".chips a").count() == 1
+        for fig in page.locator("figure.chart").all():  # every chart is on the filtered rows
+            count = fig.locator(".chart-count").inner_text()
+            assert count.split(" of ")[0] == count.split(" of ")[1].split(" ")[0]
+            if fig.get_attribute("data-kind") in ("bar", "histogram"):
+                assert count.startswith(f"{n} of {n} ")
+        _click_nav(page, "bar")
+        assert urlparse(page.url).query == "" and _kpi(page)["Rows"] == "6"
+        assert errors == [] and external == []
+    # horizontal bar (labels > 12 chars): same set and toggle, plus a second filter on another column ANDs
+    with _open(live, staff) as (page, external, errors):
+        orient, labels, _ = _plot_values(page, "bar")
+        assert orient == "h" and max(map(len, labels)) > 12
+        _click_nav(page, "bar")
+        want = labels[0]
+        assert parse_qs(urlparse(page.url).query) == {"f.department": [want]}
+        n = sum(1 for k in range(40) if STAFF_DEPTS[k % 3] == want)
+        assert page.locator("select[name='f.department']").input_value() == want and _kpi(page)["Rows"] == str(n)
+        page.select_option("select[name='f.region']", "North")
+        page.click("form.filters button")
+        _settle(page)
+        assert set(parse_qs(urlparse(page.url).query)) == {"f.department", "f.region"} and page.locator(".chips a").count() == 2
+        _click_nav(page, "bar")  # the bar of the clicked column is still drawn: clicking it removes only that filter
+        assert set(parse_qs(urlparse(page.url).query)) == {"f.region"} and page.locator(".chips a").count() == 1
+        assert errors == [] and external == []
+    with _open(live, staff + "?f.department=Customer+support") as (page, external, errors):
+        orient, labels, _ = _plot_values(page, "bar")
+        assert orient == "h" and labels == ["Customer support"]
+        _click_nav(page, "bar")  # second click on the active horizontal bar
+        assert urlparse(page.url).query == "" and _kpi(page)["Rows"] == "40"
+        assert errors == [] and external == []
+    # donut: a real click on a slice sets the filter
+    with _open(live, staff) as (page, external, errors):
+        fig = page.locator('[data-kind="donut"]')
+        fig.scroll_into_view_if_needed()
+        want = _plot_values(page, "donut")[1][0]
+        x, y = page.evaluate("""() => {
+            const paths = [...document.querySelectorAll('[data-kind="donut"] .pielayer .slice > path')];
+            const bs = paths.map(p => p.getBoundingClientRect());
+            const l = Math.min(...bs.map(b => b.left)), r = Math.max(...bs.map(b => b.right));
+            const t = Math.min(...bs.map(b => b.top)), u = Math.max(...bs.map(b => b.bottom));
+            const cx = (l + r) / 2, cy = (t + u) / 2, rm = Math.min(r - l, u - t) / 2 * 0.78;
+            let sx = 0, sy = 0;
+            for (let a = 0; a < 360; a += 2) {
+              const px = cx + rm * Math.cos(a * Math.PI / 180), py = cy + rm * Math.sin(a * Math.PI / 180);
+              if (document.elementsFromPoint(px, py).includes(paths[0])) { sx += Math.cos(a * Math.PI / 180); sy += Math.sin(a * Math.PI / 180); }
+            }
+            const m = Math.hypot(sx, sy) || 1;
+            return [cx + rm * sx / m, cy + rm * sy / m];
+        }""")
+        _click_nav(page, "donut", (x, y))
+        assert parse_qs(urlparse(page.url).query) == {"f.department": [want]}
+        assert _kpi(page)["Rows"] == str(sum(1 for k in range(40) if STAFF_DEPTS[k % 3] == want))
+        assert page.locator('[data-kind="donut"]').count() == 0  # a one-value column drops out of the donuts
+        assert errors == [] and external == []
+
+
+def test_AC_40(make_client, data_dir):
+    from openpyxl import load_workbook
+    from pptx import Presentation
+    client = make_client(data_dir)
+    i = _ids(client)[("sales.csv", None)]
+    query = "?f.region=North&from=2024-01-02"  # North rows on 01-03 and 01-06
+    labels = _api(client, i, query)["filters"]
+    assert len(labels) == 2
+
+    def xlsx(q):
+        r = client.get(f"/datasets/{i}/export.xlsx{q}")
+        assert r.status_code == 200
+        return load_workbook(io.BytesIO(r.content))
+
+    def pptx(q):
+        r = client.get(f"/datasets/{i}/export.pptx{q}")
+        assert r.status_code == 200
+        return Presentation(io.BytesIO(r.content))
+
+    def texts(slide):
+        return [sh.text_frame.text for sh in slide.shapes if sh.has_text_frame]
+
+    full, cut = xlsx(""), xlsx(query)
+    for wb in (full, cut):
+        assert wb.sheetnames[0] == "Data" and wb.sheetnames[-1] == "Summary"
+    assert full["Data"].max_row == 7 and cut["Data"].max_row == 3  # header + rows
+    cells = lambda wb: [str(c.value) for row in wb["Summary"].iter_rows() for c in row if c.value is not None]  # noqa: E731
+    assert "Filters: none" in cells(full)
+    assert all(any(label in c for c in cells(cut)) for label in labels) and "Filters: none" not in cells(cut)
+
+    def bar_sum(wb):
+        ws = wb[next(n for n in wb.sheetnames if n.endswith(" bar"))]
+        return sum(r[1] for r in ws.iter_rows(min_row=2, values_only=True) if isinstance(r[1], (int, float)))
+    assert bar_sum(full) == 46 and bar_sum(cut) == 6  # 5 + 1
+    assert sum(len(ws._charts) for ws in cut.worksheets) > 0
+
+    def bar_values(prs):
+        for s in prs.slides:
+            for sh in s.shapes:
+                if sh.has_chart and "North" in list(sh.chart.plots[0].categories):
+                    return sum(sh.chart.plots[0].series[0].values)
+    p_full, p_cut = pptx(""), pptx(query)
+    t_full, t_cut = texts(p_full.slides[0]), texts(p_cut.slides[0])
+    assert "Rows: 6, 3 columns" in t_full and "Filters: none" in t_full
+    assert "Rows: 2 of 6, 3 columns" in t_cut and "Filters: none" not in " ".join(t_cut)
+    assert all(label in " ".join(t_cut) for label in labels)
+    assert bar_values(p_full) == 46 and bar_values(p_cut) == 6
+
+
+def test_AC_41(big_sales_csv, make_client):
+    client = make_client(big_sales_csv)
+    i = client.get("/api/datasets").json()[0]["id"]
+    assert client.get(f"/api/datasets/{i}/charts").status_code == 200  # warm: the file is read and typed
+    for query, rows in (("?f.region=North", 50_000), ("?f.product=p3", 10_000)):
+        start = time.perf_counter()
+        r = client.get(f"/api/datasets/{i}/charts{query}")
+        took = time.perf_counter() - start
+        print(f"AC-41 {query}: {took:.2f} s")
+        assert r.status_code == 200 and r.json()["kpis"]["rows"] == rows
+        assert took < 1.0, (query, took)
+
+
+def test_AC_42(big_sales_csv, make_client, tmp_path):
+    for url in ("/api/datasets/{id}/charts", "/datasets/{id}"):
+        client = make_client(big_sales_csv)  # clears the caches; the file stays on disk
+        i = client.get("/api/datasets").json()[0]["id"]  # scan only
+        start = time.perf_counter()
+        r = client.get(url.format(id=i))
+        took = time.perf_counter() - start
+        print(f"AC-42 cold {url}: {took:.2f} s")
+        assert r.status_code == 200 and took <= 5.0, (url, took)
+        if "api" in url:  # charts and KPIs cover all 200,000 loaded rows
+            body = r.json()
+            assert body["kpis"]["rows"] == 200_000 and any(c["kind"] == "histogram" and c["total"] == 200_000 for c in body["charts"])
+        else:
+            assert "200,000" in r.text
+    # types come from the first 10,000 rows only: later text does not change them
+    folder = tmp_path / "late"
+    folder.mkdir()
+    (folder / "late.csv").write_text("n,k\n" + "".join(f"{i},{i % 3}\n" for i in range(10_000)) + "".join(f"abc,{i % 3}\n" for i in range(2_000)))
+    client = make_client(folder)
+    i = client.get("/api/datasets").json()[0]["id"]
+    assert client.get(f"/api/datasets/{i}/profile").json()["n"] == "numerical"
+    assert client.get(f"/api/datasets/{i}/charts").json()["kpis"]["rows"] == 12_000

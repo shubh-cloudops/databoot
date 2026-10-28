@@ -1,0 +1,90 @@
+{
+  "header": {
+    "ticket": 438,
+    "project": "you-think-of-the-project-name",
+    "from_role": "qa",
+    "phase": "qa",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "e14d1b175e03",
+    "tokens_left": 1870443
+  },
+  "goal": "Write or extend tests/test_acceptance.py with one test per acceptance item and run them.",
+  "acceptance_criteria": [
+    {
+      "text": "One test per acceptance item, named after its id",
+      "passes": true
+    },
+    {
+      "text": "Failures are reported, not hidden",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa",
+    "passed": true,
+    "output_tail": "........................................................................ [ 35%]\n........................................................................ [ 70%]\n............................................................             [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n204 passed, 99 warnings in 162.77s (0:02:42)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Wrote test_AC_32..test_AC_42; AC-32 expected values come from independent hand math (ranks, Gini formula, population skew, statistics.correlation), not from app/score.py",
+      "why": "Avoid a circular check of the scoring code",
+      "evidence": "tests/test_acceptance.py test_AC_32"
+    },
+    {
+      "what": "Cross-filter test uses real mouse clicks (force=True on the bar, computed ring point for the donut) instead of emitting plotly_click",
+      "why": "Gate 177 asked for real clicking; Plotly's drag layer intercepts normal Playwright clicks",
+      "evidence": "tests/test_acceptance.py test_AC_39, _click_nav"
+    },
+    {
+      "what": "Horizontal bar fixture is staff.csv with 'department' (labels > 12 chars) as the first categorical column",
+      "why": "Bars and donuts are drawn only for the first categorical column; Plotly puts labels on y when orientation is h",
+      "evidence": "tests/test_acceptance.py _staff, _plot_values"
+    },
+    {
+      "what": "AC-41 test warms the cache with an unfiltered request, then times the filtered request",
+      "why": "Same shape as tests/test_filters.py; AC-42 covers the cold case",
+      "evidence": "tests/test_acceptance.py test_AC_41"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Plain locator.click() on a bar and a ring-centre click on a donut slice",
+      "why_it_failed": "The Plotly drag rect intercepts pointer events (timeout), and the bounding-box centre of an annular slice lies in the hole; fixed with force=True and a computed point on the ring"
+    },
+    {
+      "what": "First drafts of AC-36, AC-37 and AC-42 expected values",
+      "why_it_failed": "My own arithmetic was wrong (missing % 4.0 not 2.0, days 10-12 give 6 rows not 3, line chart total is distinct dates not rows); corrected the tests, not the app"
+    }
+  ],
+  "assumptions": [
+    "AC-38 and AC-40 texts in acceptance.json are garbled (missing words); tested their evident meaning with gates 175 and 176",
+    "AC-42 is timed in-process with TestClient after /api/datasets (cold caches, file on disk), as in tests/test_speed.py; the number includes no network or browser time",
+    "AC-41 'under 1 second' is measured after one unfiltered warm-up request",
+    "Missing % in the KPI strip is cells blank / (rows x columns)",
+    "Donut click filter was tested on the first unfiltered load; its toggle is not reachable because the donut disappears once its column has one value"
+  ],
+  "open_questions": [
+    "AC-38 and AC-40 text in docs/acceptance.json is missing words; PM to fix the wording (tests follow gate 175/176 meaning)",
+    "A donut slice cannot be clicked a second time to remove its filter, because a one-value column leaves the donut set. Gate 175 says clicking the active bar or slice removes the filter. Is bar-only toggling acceptable?"
+  ],
+  "lessons": [
+    {
+      "lesson": "To click a Plotly bar in Playwright use locator.click(force=True); for a donut slice compute a point on the ring from elementsFromPoint and use page.mouse.click; wrap the click in expect_navigation when it reloads the page",
+      "when": "Testing click cross-filter or any Plotly click handler in a real browser",
+      "evidence": "tests/test_acceptance.py _click_nav, test_AC_39"
+    },
+    {
+      "lesson": "Horizontal bars hold the labels in plot.data[0].y and the values in x; read orientation before comparing labels",
+      "when": "Asserting bar labels from Plotly data in a browser test",
+      "evidence": "tests/test_acceptance.py _plot_values"
+    },
+    {
+      "lesson": "Hand-check fixture arithmetic (missing %, date-range row counts, distinct-date totals) before running; three of my first expected values were wrong, not the app",
+      "when": "Writing KPI, filter and total assertions for generated CSV fixtures",
+      "evidence": "AC-36, AC-37, AC-42 first runs"
+    }
+  ],
+  "problems": []
+}
