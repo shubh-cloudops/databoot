@@ -42,8 +42,8 @@ def test_shop_cards_and_charts(make_client, archetypes_dir):
     assert (rev["column"], rev["latest"], rev["previous"], rev["pct"], rev["dir"]) == ("revenue", 7392, 6192, 19.4, "up")
     assert (units["column"], units["latest"], units["previous"], units["pct"], units["dir"]) == ("units", 72, 60, 20.0, "up")
     assert rev["spark"] == [1392, 2592, 3792, 4992, 6192, 7392]  # fewer than 12 periods: from the first one
-    charts = got["charts"]
-    assert [c["kind"] for c in charts] == ["line", "line"]
+    charts = got["charts"][:2]  # trends; the leaderboard follows
+    assert [c["kind"] for c in got["charts"]] == ["line", "line", "bar"]
     assert charts[0]["data"]["x"] == [f"2024-{m:02d}-01" for m in range(1, 7)]
     assert charts[0]["data"]["y"] == rev["spark"] and charts[1]["data"]["y"] == [12, 24, 36, 48, 60, 72]
     assert (charts[0]["shown"], charts[0]["total"]) == (6, 6)  # July (partial) is left out
@@ -101,3 +101,60 @@ def test_partial_week_uses_week_before():
     # span 74 days: week grain; the last date (Fri 2024-03-15) is not the week's last day, so L = week of 2024-03-04
     got = _view([("2024-01-01", "a", 1), ("2024-03-15", "a", 2)])
     assert (got["grain"], got["latest"], got["previous"]) == ("week", "2024-03-04", "2024-02-26")
+
+
+def test_shop_unfiltered_leaderboard_and_changes(make_client, archetypes_dir):
+    got = _shop(make_client, archetypes_dir)
+    assert {"cards", "charts", "changes", "crumbs", "grain", "latest", "previous"} <= set(got)
+    assert [c["id"] for c in got["charts"]] == ["chart-1", "chart-2", "chart-3"]
+    lb = got["charts"][-1]
+    assert (lb["kind"], lb["orientation"], lb["x_label"], lb["drill"], lb["other"]) == ("bar", "h", "channel", True, False)
+    assert (lb["data"]["x"], lb["data"]["y"]) == (["shop", "web"], [15354, 15276])
+    # June vs May: each channel gains 600 (2 days x 3 stores x 100), so t is 1.0 for both
+    assert got["changes"] == [{"category": "shop", "previous": 3102, "latest": 3702, "delta": 600, "t": 1.0},
+                              {"category": "web", "previous": 3090, "latest": 3690, "delta": 600, "t": 1.0}]
+    assert got["crumbs"] == [["All", None]]
+
+
+def test_shop_last_level_has_other_and_changes(make_client, archetypes_dir):
+    got = _shop(make_client, archetypes_dir, "?f.channel=web&f.store=North")
+    lb = got["charts"][-1]
+    assert (lb["x_label"], lb["drill"], lb["other"]) == ("product", False, True)
+    assert lb["data"]["x"] == ["p0", "p11", "p10", "p9", "p8", "p7", "p6", "p5", "p4", "p3", "Other"]
+    assert lb["data"]["y"] == [800, 606, 600, 506, 500, 406, 400, 306, 300, 206, 306]  # Other = p2 200 + p1 106
+    ch = {c["category"]: c for c in got["changes"]}
+    assert [c["category"] for c in got["changes"]] == lb["data"]["x"]
+    assert (ch["p11"]["previous"], ch["p11"]["latest"], ch["p11"]["delta"], ch["p11"]["t"]) == (0, 606, 606, 1.0)
+    assert (ch["p9"]["delta"], ch["p9"]["t"], ch["p10"]["t"]) == (-506, -0.83, 0.99)
+    assert ch["p0"]["t"] == 0 and ch["Other"]["delta"] == 0
+
+
+def test_crumbs_keep_range_app_and_earlier_crumbs(make_client, archetypes_dir):
+    got = _shop(make_client, archetypes_dir, "?f.channel=web")
+    assert [c[0] for c in got["crumbs"]] == ["All", "channel: web"] and got["crumbs"][1][1] is None
+    got = _shop(make_client, archetypes_dir, "?app=business&f.channel=web&f.store=North&from=2024-01-01")
+    assert got["crumbs"] == [["All", "?from=2024-01-01&app=business"],
+                             ["channel: web", "?f.channel=web&from=2024-01-01&app=business"],
+                             ["store: North", None]]
+    assert got["charts"][-1]["x_label"] == "product"
+
+
+def test_drill_order_by_distinct_count_then_column():
+    opts = {"b": ["1", "2"], "a": ["1", "2"], "c": ["1"]}
+    cols = ["a", "b", "c", "n"]
+    m = {"a": "categorical", "b": "categorical", "c": "categorical", "n": "numerical"}
+    typed = [["x", "y", "z", 5]]
+    got = business.view(cols, typed, typed, m, (("f.c", "z"),), opts)
+    assert got["charts"][-1]["x_label"] == "a" and got["charts"][-1]["drill"] is True
+    got = business.view(cols, typed, typed, m, (("f.c", "z"), ("f.a", "x"), ("f.b", "y")), opts)
+    assert got["changes"] is None and got["charts"] == []
+    assert [c[0] for c in got["crumbs"]] == ["All", "c: z", "a: x", "b: y"]
+
+
+def test_changes_none_without_previous_and_zero_deltas():
+    got = _view([("2024-03-04", "a", 5)])
+    assert got["changes"] is None
+    rows = [("2024-03-01", "a", 5), ("2024-03-02", "a", 5), ("2024-03-02", "b", 3), ("2024-03-01", "b", 3)]
+    typed = [[datetime.fromisoformat(d), k, a] for d, k, a in rows]
+    got = business.view(COLS, rows, typed, MAP, (), {"kind": ["a", "b"]})
+    assert [c["t"] for c in got["changes"]] == [0, 0] and got["charts"][-1]["data"]["y"] == [10, 6]

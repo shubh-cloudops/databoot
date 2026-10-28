@@ -1,0 +1,97 @@
+{
+  "header": {
+    "ticket": 448,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1936496
+  },
+  "goal": "Business figures part 2: leaderboard with Other row, drill order, breadcrumb trail, change table (B1b; Board gate 179: drill is coarse to fine = categorical columns by distinct count ascending, ties by column order, last level not clickable)",
+  "acceptance_criteria": [
+    {
+      "text": "drill order = categorical columns sorted by (distinct count, column index) from options; group column = the first in that order with no `f.<column>` in f; next = the next unfiltered one after it; drill = next is not None; with no unfiltered column left there is no leaderboard and no change table",
+      "passes": true
+    },
+    {
+      "text": "leaderboard is a `bar` dict with orientation \"h\", drill (bool), other (bool), x_label = the group column: sums of the primary amount per category over the view rows, sorted descending (ties by name), top 10, then one `Other` bar holding the sum of the rest, only when there is a rest",
+      "passes": true
+    },
+    {
+      "text": "shop.csv unfiltered: group `channel` (2 bars, no Other, drill true); with f.channel=web&f.store=North the group is `product` (12 values): p0 800, p11 606, p10 600 ... p3 206, then Other 306 (p2 200 + p1 106), drill false, other true",
+      "passes": true
+    },
+    {
+      "text": "drill order on shop.csv is channel (2), store (3), product (12)",
+      "passes": true
+    },
+    {
+      "text": "changes = rows for the leaderboard's categories in its order (Other included): {category, previous, latest, delta = latest - previous, t = round(delta / max|delta|, 2), 0 when all deltas are 0}; None when L or P is missing",
+      "passes": true
+    },
+    {
+      "text": "crumbs = [(\"All\", href)] + one (\"column: value\", href) per active categorical filter in drill order; each href keeps from/to and `app` (when the request had one) and the crumbs before it; the last crumb has no href; test: `f.channel=web` gives labels `All`, `channel: web`",
+      "passes": true
+    },
+    {
+      "text": "Payload keys {cards, charts (trends then leaderboard), changes, crumbs, grain, latest, previous} are returned by /app for shop.csv; chart ids run chart-1..N in that order",
+      "passes": true
+    },
+    {
+      "text": "Tests added to tests/test_business.py with hand numbers; run it",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-48, AC-49, AC-50 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 30%]\n........................................................................ [ 60%]\n........................................................................ [ 90%]\n......................                                                   [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n238 passed, 99 warnings in 160.20s (0:02:40)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Renamed the old view body to _trend and made view() add leaderboard, changes and crumbs on top; view gained an optional app argument",
+      "why": "Existing callers and tests keep the 6-argument call; crumb hrefs need the request's app param",
+      "evidence": "app/business.py view/_trend; app/main.py _appview"
+    },
+    {
+      "what": "Crumb hrefs are bare query strings ('?f.channel=web&from=..&app=business'); the last crumb's href is None",
+      "why": "view() does not know the dataset id; the page ticket can prefix /datasets/{id}",
+      "evidence": "tests/test_business.py::test_crumbs_keep_range_app_and_earlier_crumbs"
+    },
+    {
+      "what": "The leaderboard dict also carries baseline: 0, like the Explorer bars",
+      "why": "Global rule 1 (zero baseline) so the JS builder treats it the same",
+      "evidence": "app/business.py _leaderboard; app/rules.py:138"
+    },
+    {
+      "what": "_appview passes the app param to business only when the request's app equals the shown app (valid param)",
+      "why": "Architecture: links carry app only when the request had a valid app param",
+      "evidence": "app/main.py dataset_app; docs/ARCHITECTURE.md L70"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Rows with an empty or None group cell are left out of the leaderboard sums, as in rules._bars",
+    "Without a numerical column there is no leaderboard or change table",
+    "Leaderboard and change table do not need a temporal column; changes is None when latest or previous is missing",
+    "A real category named 'Other' is not special-cased"
+  ],
+  "open_questions": [
+    "The page ticket must decide how to prefix the crumb query strings with /datasets/{id}"
+  ],
+  "lessons": [
+    {
+      "lesson": "When a view() gains new chart entries, update the existing test that lists chart kinds in the same ticket",
+      "when": "Appending the leaderboard to charts changed test_shop_cards_and_charts",
+      "evidence": "tests/test_business.py::test_shop_cards_and_charts"
+    }
+  ],
+  "problems": []
+}

@@ -99,14 +99,14 @@ def _shown(d, params):
 
 
 @lru_cache(maxsize=8)
-def _appview(d, f, app):
+def _appview(d, f, app, app_param=None):
     """Figures of one app under filters f; the Map branch is added by its own ticket."""
     if app == "explorer":
         v = _view(d, f)
         return {"charts": rules.charts(d.columns, v["typed"], v["mapping"], config.get())}
     if app == "business":
         v = _view(d, f)
-        return business.view(d.columns, v["rows"], v["typed"], v["mapping"], f, v["options"])
+        return business.view(d.columns, v["rows"], v["typed"], v["mapping"], f, v["options"], app_param)
     return {}
 
 
@@ -116,7 +116,8 @@ def dataset_app(request: Request, id: str):
     f = filters.parse(request.query_params, d.columns, _base(d)[1])
     shown = _shown(d, request.query_params)
     return {"dataset": d.id, **_detected(d), "shown": shown, "filters": _view(d, f)["labels"],
-            "charts": [], **_appview(d, f, shown)}
+            "charts": [],
+            **_appview(d, f, shown, shown if request.query_params.get("app") == shown else None)}
 
 
 @app.get("/api/datasets/{id}/charts")
