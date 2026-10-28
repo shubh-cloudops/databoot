@@ -1,0 +1,62 @@
+{
+  "header": {
+    "ticket": 439,
+    "project": "you-think-of-the-project-name",
+    "from_role": "coach",
+    "phase": "learn",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "847e9e9f8b68",
+    "tokens_left": 1929019
+  },
+  "goal": "Learn from round 4: update the shared skills and lessons and this project's MEMORY.md from /logs/digest.md.",
+  "acceptance_criteria": [
+    {
+      "text": "Skills and lessons come only from evidence in the digest",
+      "passes": true
+    },
+    {
+      "text": "MEMORY.md is current and short",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py learn",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Merged round 4 lessons into existing skills and LESSONS lines instead of creating new skills",
+      "why": "Round 4 repeated known task types (Plotly browser tests, per-item acceptance tests, office exports, round planning); near-duplicates are forbidden and LESSONS must stay under 80 lines",
+      "evidence": "/logs/digest.md tickets 428-438; LESSONS.md 79 lines"
+    },
+    {
+      "what": "Rewrote MEMORY.md sections for layout, Board decisions, open state and pitfalls with round 4 gates 175-178",
+      "why": "MEMORY must be current: new modules, ACs 32-42, bar-only toggle, 5 s first load, AC-38/40 rewording owed",
+      "evidence": "digest gates 175-178; ticket handovers 431-438"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The digest contained no 'Faded history' list, so no re-confirmation was needed",
+    "Code-structure details in MEMORY.md (filters.py, score.py, _view) are taken from ticket handovers and the app/ listing, not re-read from source"
+  ],
+  "open_questions": [
+    "AC-38 and AC-40 wording in acceptance.json is still garbled; PM to fix at round 5 start (gate 178)"
+  ],
+  "lessons": [
+    {
+      "lesson": "Click Plotly bars with force=True and donut slices at a computed ring point, wrapped in expect_navigation when the click reloads the page",
+      "when": "Testing click cross-filter in a real browser",
+      "evidence": "ticket 436, 438"
+    },
+    {
+      "lesson": "Hand-check fixture arithmetic before the first test run and report measured timings instead of loosening a bound",
+      "when": "QA tickets with KPI, filter or speed items",
+      "evidence": "ticket 438, gate 177"
+    }
+  ],
+  "problems": []
+}
