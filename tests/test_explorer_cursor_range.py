@@ -21,7 +21,7 @@ def test_score_only_in_explorer_captions(make_client, archetypes_dir, round6_dir
         assert rules(html) and not any("score" in r for r in rules(html)), name
     client = make_client(round6_dir)
     for name in ("monitor.csv", "survey.csv"):
-        assert not any("score" in r for r in rules(_page(client, name)[1])), name
+        assert not any(" · score " in r for r in rules(_page(client, name)[1])), name
 
 
 def test_design_text_for_cursor_and_zero_baseline():

@@ -11,6 +11,9 @@
     window.addEventListener("pageshow", function () { form.querySelectorAll(":disabled").forEach(function (f) { f.disabled = false; }); });
   }
 
+  var cross = document.querySelector("form.crosstab");
+  if (cross) cross.addEventListener("change", function () { cross.requestSubmit(); });
+
   var plots = document.querySelectorAll(".chart .plot");
   var id = (location.pathname.match(/\/datasets\/([^/]+)/) || [])[1];
   if (!plots.length || !id) return;
@@ -90,6 +93,34 @@
       if (d.spike.length) traces.push({ type: "scatter", mode: "markers+text", name: "spike", text: d.spike.map(function () { return "spike"; }), textposition: "top center", cliponaxis: false,
         x: d.spike.map(function (i) { return d.x[i]; }), y: d.spike.map(function (i) { return d.y[i]; }), marker: { color: t.c[4], size: 10 }, textfont: { color: t["--fg"] } });
       return [traces, l];
+    },
+    // Survey Likert question (DESIGN.md "Monitoring and Survey"): one 100% stacked horizontal bar, a trace per level (zero counts too);
+    // levels before the neutral one fade from --div-neg, the neutral one is --div-mid, those after fade to --div-pos.
+    likert: function (c, t, l) {
+      var d = c.data, last = d.levels.length - 1;
+      var mix = function (a, b, w) { if (!w) return a; var x = rgb(a), y = rgb(b); return "rgb(" + x.map(function (v, n) { return Math.round(v + (y[n] - v) * w); }).join(",") + ")"; };
+      l.barmode = "stack";
+      l.showlegend = true;
+      l.legend = { orientation: "h", x: 0, y: phone.matches ? -0.45 : -0.6, yanchor: "top", traceorder: "normal" };  // stacked bars would list the levels backwards
+      l.margin.b = phone.matches ? 120 : 96;  // the legend wraps under the axis
+      l.xaxis = axis(t, "", { range: [0, 100], ticksuffix: "%", fixedrange: true });
+      l.yaxis = axis(t, "", { type: "category", showticklabels: false, fixedrange: true });
+      return [d.levels.map(function (lv, i) {
+        var color = i === d.neutral ? t["--div-mid"] : i < d.neutral ? mix(t["--div-neg"], t["--div-mid"], i / d.neutral) : mix(t["--div-pos"], t["--div-mid"], (last - i) / (last - d.neutral));
+        return { type: "bar", orientation: "h", name: String(lv), x: [d.pct[i]], y: [c.x_label], customdata: [d.counts[i]], marker: { color: color, line: { color: t["--surface"], width: 1 } },
+          hovertemplate: "%{fullData.name}: %{customdata} (%{x:.1f}%)<extra></extra>" };
+      }), l];
+    },
+    // Survey cross-tab: one heatmap of counts, one-hue scale, each cell prints "count (row %)"; the colour bar is the count.
+    crosstab: function (c, t, l) {
+      var d = c.data, bar = { outlinewidth: 0, tickfont: { color: t["--fg"] }, title: { text: "count", font: { color: t["--fg"] } } };
+      if (phone.matches) Object.assign(bar, { orientation: "h", x: 0.5, xanchor: "center", y: -0.42, yanchor: "top", len: 0.9, nticks: 4, title: { text: "count", side: "top", font: { color: t["--fg"] } } });
+      if (phone.matches) l.margin.b = 170;
+      l.xaxis = axis(t, c.x_label, { type: "category" });
+      l.yaxis = axis(t, c.y_label, { type: "category", autorange: "reversed" });
+      return [[{ type: "heatmap", x: d.x, y: d.y, z: d.z, hoverongaps: false, xgap: 1, ygap: 1, colorscale: [[0, t["--seq-lo"]], [1, t["--seq-hi"]]],
+        text: d.z.map(function (row, i) { return row.map(function (n, j) { return n + " (" + d.pct[i][j].toFixed(1) + "%)"; }); }),
+        texttemplate: "%{text}", hovertemplate: "%{y} / %{x}<br>%{text}<extra></extra>", colorbar: bar }], l];
     },
     bar: function (c, t, l) {
       var lead = c.orientation === "h";  // Business leaderboard: always horizontal, biggest on top, values printed
@@ -235,6 +266,12 @@
       return a[0].map(function (_, i) { return a.map(function (col) { return col[i]; }); });
     };
     if (c.kind === "monitor") return [[c.x_label, c.y_label, "7-point mean", "Spike"], c.data.x.map(function (x, i) { return [x, c.data.y[i], c.data.mean[i], c.data.spike.indexOf(i) < 0 ? "" : "spike"]; })];
+    if (c.kind === "likert") return [[c.x_label, "Count", "Share (%)"], zip(c.data.levels, c.data.counts, c.data.pct.map(function (p) { return p.toFixed(1); }))];
+    if (c.kind === "crosstab") {
+      var cells = [];
+      c.data.y.forEach(function (yl, i) { c.data.x.forEach(function (xl, j) { cells.push([yl, xl, c.data.z[i][j], c.data.pct[i][j].toFixed(1)]); }); });
+      return [[c.y_label, c.x_label, "Count", "Row (%)"], cells];
+    }
     if (tr.type === "pie") return [[c.x_label || "Category", c.y_label || "Count"], zip(tr.labels, tr.values)];
     if (tr.type === "heatmap") {
       var rows = [];
@@ -277,7 +314,7 @@
       wrap = fig.querySelector(".plot-table-wrap");
       if (on && !wrap) {
         var made = tableOf(c, plot.data[0]);
-        plot.data.slice(c.kind === "monitor" ? plot.data.length : 1).forEach(function (extra) { made[1] = made[1].concat(tableOf(c, extra)[1]); });
+        plot.data.slice(c.kind === "monitor" || c.kind === "likert" ? plot.data.length : 1).forEach(function (extra) { made[1] = made[1].concat(tableOf(c, extra)[1]); });
         var table = document.createElement("table"), tr = document.createElement("tr");
         var raw = made[0].map(function (h) { return (c.plain || []).some(function (k) { return c[k + "_label"] === h; }); });
         table.className = "plot-table";
@@ -399,6 +436,7 @@
     var plot = el && el.querySelector(".plot");
     if (!plot) return;
     try {
+      if (c.kind === "crosstab") el.style.setProperty("--plot-w", c.data.x.length * 96 + 140 + "px");  // wide tables scroll inside their card
       var made = build[c.kind](c, t, layout(t, c));
       if (c.kind === "bar" && el.closest(".map-panel")) { made[1].xaxis.nticks = 3; made[1].xaxis.tickangle = 0; }  // 340px box: three ticks fit flat
       globalRules(made[0], made[1], c);

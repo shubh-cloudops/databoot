@@ -1,0 +1,53 @@
+{
+  "header": {
+    "ticket": 474,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1887262
+  },
+  "goal": "Survey page (SU2, docs/DESIGN.md 'Monitoring and Survey (round 6)'): question grid, Likert stacked bars, cross-tab form and heatmap, Respondents histograms",
+  "acceptance_criteria": [
+    {
+      "text": "app_survey.html: filter form + chips, div.questions grid with one figure per question in column order (two per row at 1280 px sharing the same top, one per row at 375 px), cross-tab section, h2 'Respondents' with histograms of age (none: no section), Columns and First rows",
+      "passes": true
+    },
+    {
+      "text": "dashboard.js likert builder: one horizontal 100% stacked bar (barmode stack, a trace per level incl. zero counts), levels before neutral from --div-neg, neutral --div-mid grey, after from --div-pos, x axis 0..100 with % suffix, hover 'level: count (pct%)'; on survey.csv the first and last level colours differ in hue and segment shares sum to 100",
+      "passes": true
+    },
+    {
+      "text": "form.crosstab has two labelled selects 'Row question' and 'Column question' listing the questions plus an Apply button that works without JS; changing a select submits and puts row= and col= in the URL; ?row=q_easy&col=gender shows that pair, bad names show the first two",
+      "passes": true
+    },
+    {
+      "text": "dashboard.js crosstab builder: one heatmap, one-hue sequential scale, cell text 'count (pct%)' with 1 decimal (gender x region female/East shows '3 (21.4%)'), colour bar titled count; question bars filter on click with the bar-click cursor and Other stays no-pointer",
+      "passes": true
+    },
+    {
+      "text": "Every Survey figure has one y-axis, a hover tooltip and a working view-table toggle; no caption shows a score; tests/test_survey_page.py (new) covers the above with Playwright and server HTML checks",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-68, AC-69, AC-70, AC-54 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 18%]\n........................................................................ [ 36%]\n........................................................................ [ 55%]\n........................................................................ [ 73%]\n........................................................................ [ 92%]\n..............................                                           [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n390 passed, 109 warnings in 479.58s (0:07:59)\ncheck passed\n"
+  },
+  "decisions": [],
+  "tried_and_failed": [],
+  "assumptions": [],
+  "open_questions": [],
+  "lessons": [],
+  "problems": [
+    "agent did not end with the handover JSON"
+  ]
+}
