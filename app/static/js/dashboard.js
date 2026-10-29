@@ -77,6 +77,20 @@
       return [[{ type: "scatter", mode: c.shown <= 40 ? "lines+markers" : "lines", x: c.data.x, y: c.data.y,
         line: { color: t.c[0], width: 2 }, marker: { color: t.c[0], size: 6 } }], l];
     },
+    // Monitoring main line (DESIGN.md "Monitoring and Survey"): value line, dashed grey 7-point mean, a labelled marker on each server-flagged spike; one y-axis.
+    monitor: function (c, t, l) {
+      var d = c.data, many = c.shown <= 40;
+      l.xaxis.type = "date";
+      l.showlegend = true;
+      l.legend = { orientation: "h", x: 0, y: phone.matches ? -0.75 : -0.25, yanchor: "top" };
+      if (phone.matches) l.margin.b = 120;  // the legend wraps under the rotated dates and the axis title
+      var traces = [
+        { type: "scatter", mode: many ? "lines+markers" : "lines", name: c.y_label, x: d.x, y: d.y, line: { color: t.c[0], width: 2 }, marker: { color: t.c[0], size: 6 } },
+        { type: "scatter", mode: "lines", name: "7-point mean", x: d.x, y: d.mean, line: { color: t["--muted"], width: 2, dash: "dash" } }];
+      if (d.spike.length) traces.push({ type: "scatter", mode: "markers+text", name: "spike", text: d.spike.map(function () { return "spike"; }), textposition: "top center", cliponaxis: false,
+        x: d.spike.map(function (i) { return d.x[i]; }), y: d.spike.map(function (i) { return d.y[i]; }), marker: { color: t.c[4], size: 10 }, textfont: { color: t["--fg"] } });
+      return [traces, l];
+    },
     bar: function (c, t, l) {
       var lead = c.orientation === "h";  // Business leaderboard: always horizontal, biggest on top, values printed
       var wide = lead || c.data.x.some(function (s) { return String(s).length > 12; });
@@ -220,6 +234,7 @@
       var a = [].slice.call(arguments);
       return a[0].map(function (_, i) { return a.map(function (col) { return col[i]; }); });
     };
+    if (c.kind === "monitor") return [[c.x_label, c.y_label, "7-point mean", "Spike"], c.data.x.map(function (x, i) { return [x, c.data.y[i], c.data.mean[i], c.data.spike.indexOf(i) < 0 ? "" : "spike"]; })];
     if (tr.type === "pie") return [[c.x_label || "Category", c.y_label || "Count"], zip(tr.labels, tr.values)];
     if (tr.type === "heatmap") {
       var rows = [];
@@ -262,7 +277,7 @@
       wrap = fig.querySelector(".plot-table-wrap");
       if (on && !wrap) {
         var made = tableOf(c, plot.data[0]);
-        plot.data.slice(1).forEach(function (extra) { made[1] = made[1].concat(tableOf(c, extra)[1]); });
+        plot.data.slice(c.kind === "monitor" ? plot.data.length : 1).forEach(function (extra) { made[1] = made[1].concat(tableOf(c, extra)[1]); });
         var table = document.createElement("table"), tr = document.createElement("tr");
         var raw = made[0].map(function (h) { return (c.plain || []).some(function (k) { return c[k + "_label"] === h; }); });
         table.className = "plot-table";

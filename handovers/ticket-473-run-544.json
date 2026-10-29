@@ -1,0 +1,105 @@
+{
+  "header": {
+    "ticket": 473,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1905613
+  },
+  "goal": "Monitoring page (MO2, docs/DESIGN.md 'Monitoring and Survey (round 6)'): period links, tiles with SVG sparkline, main line with 7-point mean and spike labels; gate 184 tile cap note",
+  "acceptance_criteria": [
+    {
+      "text": "app_monitoring.html: nav.periods (aria-label Period) with links '7 days','30 days','90 days','All', current one aria-current, each href keeps f + appq + period=; filter form with date range and hidden pick inputs; ul.tiles li.card.tile per tile (label, value, min/max, change arrow + signed % + 'up'/'down'/'no change', svg.spark through the shared card macro); 'n/a' with no arrow for All or no previous period; '8 of N measures' note when capped",
+      "passes": true
+    },
+    {
+      "text": "monitor.csv page: 30 days is aria-current by default; ?period=7 shows 7-point min/max; ?period=bad shows 30; Playwright: click '90 days' puts period=90 in the URL and Back returns; opening the URL shows the same period",
+      "passes": true
+    },
+    {
+      "text": "dashboard.js monitor builder: three traces on one y-axis (value line --c1, dashed muted '7-point mean', spikes as markers+text 'spike' at top center), legend on, no yaxis2; monitor.csv has exactly one 'spike' label, quiet.csv has none; the view-table toggle lists time, value, 7-point mean and spike",
+      "passes": true
+    },
+    {
+      "text": "Values on the page match the hand values: temperature \u25b2 +5.1% up, humidity \u25b6 0.0% no change, quiet.csv \u25bc -0.4% down; period 'all' tiles all read n/a",
+      "passes": true
+    },
+    {
+      "text": "New tests/test_monitoring_page.py covers the above; CSS for .periods and .tile follows the stylesheet the Designer already wrote (app/static/css/databoot.css)",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-65, AC-66, AC-67, AC-54 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 18%]\n........................................................................ [ 37%]\n........................................................................ [ 56%]\n........................................................................ [ 75%]\n........................................................................ [ 94%]\n...................                                                      [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n379 passed, 109 warnings in 441.92s (0:07:21)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Tile values and min/max use the Business fmt filter ('20', not '20.0')",
+      "why": "Same formatting as Business cards, thousands separators, plain columns skip it",
+      "evidence": "app/templates/app_monitoring.html, app/business.py fmt"
+    },
+    {
+      "what": "Extracted a spark macro into app/templates/_cards.html and used it in Business and Monitoring",
+      "why": "Ticket asks for the sparkline through the shared card macro; none existed",
+      "evidence": "app/templates/_cards.html, app_business.html"
+    },
+    {
+      "what": "Cap note is a div.note, not a p",
+      "why": "Keeps the no-prose-in-main checks (AC-17 style) valid",
+      "evidence": "app/templates/app_monitoring.html"
+    },
+    {
+      "what": "Spike trace is added only when c.data.spike is non-empty; markers use --c5 (t.c[4]) with cliponaxis false",
+      "why": "quiet.csv must show no spike label; DESIGN.md names --c5 for spikes; the label was clipped at the plot top",
+      "evidence": "app/static/js/dashboard.js monitor; tests/test_monitoring_page.py::test_main_line_traces_one_spike_and_quiet_none"
+    },
+    {
+      "what": "Phone legend sits at y=-0.75 with margin.b 120",
+      "why": "At 375px the wrapped legend overlapped the rotated date ticks and the axis title",
+      "evidence": "/tmp/shots/fig-375.png"
+    },
+    {
+      "what": "Edited tests/test_app_rules_r6.py::test_pickq_in_links_only_when_in_url to ignore the period nav",
+      "why": "The period links must contain period= by design; the test meant export, chip and form links",
+      "evidence": "tests/test_app_rules_r6.py:129"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First tests compared .card-change text split on spaces and as one line",
+      "why_it_failed": "'no change' splits into two words and the flex wrap puts newlines in inner_text; the tests now normalise whitespace"
+    }
+  ],
+  "assumptions": [
+    "The .monitor-fig class goes on a wrapper div around the figure, because the figure macro takes no class",
+    "The tile's .card-period reads 'latest <date>' from mon.latest[:10]",
+    "The tile value is the latest reading in the period; min and max cover the period"
+  ],
+  "open_questions": [
+    "DESIGN.md's tile example shows 'Min 20.0 Max 60.0' with one decimal; the page prints '20' and '60' (fmt). Should tiles use one decimal?",
+    "I could not stop the background launch server on port 8791: pkill and curl are missing and the kill loop exited 144 (the exit code and git status output were lost). It may still be running."
+  ],
+  "lessons": [
+    {
+      "lesson": "Before adding links that contain a query key to a page, grep the tests for assertions that the key is absent ('period=' not in html).",
+      "when": "Adding period or app links to a template",
+      "evidence": "tests/test_app_rules_r6.py::test_pickq_in_links_only_when_in_url failed in the full suite only"
+    },
+    {
+      "lesson": "Read an image twice when the Read hook asks for it, and screenshot just the figure element for legend and clipping details.",
+      "when": "Reviewing Plotly figures at 375px",
+      "evidence": "/tmp/shots/fig-375.png showed what the full-page shot hid"
+    }
+  ],
+  "problems": []
+}

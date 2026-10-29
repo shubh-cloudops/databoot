@@ -1,0 +1,1 @@
+{% macro spark(c, label) %}{% if c.spark|length >= 2 %}<svg class="spark" viewBox="0 0 100 36" preserveAspectRatio="none" role="img" aria-label="{{ label }}"><title>{{ label }}</title><polyline points="{{ c.spark|spark }}"/></svg>{% endif %}{% endmacro %}

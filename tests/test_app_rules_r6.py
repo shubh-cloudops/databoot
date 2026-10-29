@@ -1,5 +1,6 @@
 """Round 6 rule order, roles L/cols, _pick and the new apps' wiring (ARCHITECTURE.md "Round 6: detection", "request flow")."""
 import io
+import re
 
 import pytest
 from pptx import Presentation
@@ -126,7 +127,7 @@ def test_pickq_in_links_only_when_in_url(make_client, round6_dir):
     client = make_client(round6_dir)
     mid = _ids(client)["monitor.csv"]
     plain = client.get(f"/datasets/{mid}?f.nothing=1&from=2024-04-01").text
-    assert "period=" not in plain
+    assert "period=" not in re.sub(r'<nav class="periods".*?</nav>', "", plain, flags=re.S)  # the period links carry one by design
     page = client.get(f"/datasets/{mid}?from=2024-04-01&period=7").text
     assert "export.xlsx?from=2024-04-01&amp;period=7" in page and "export.pptx?from=2024-04-01&amp;period=7" in page
     sid = _ids(client)["survey.csv"]

@@ -1,10 +1,10 @@
-{% from "_figure.html" import figure %}{% set n = {"month": 7, "year": 4}.get(biz.grain, 10) %}{% if biz.cards %}<ul class="cards">{% for c in biz.cards %}
+{% from "_figure.html" import figure %}{% from "_cards.html" import spark %}{% set n = {"month": 7, "year": 4}.get(biz.grain, 10) %}{% if biz.cards %}<ul class="cards">{% for c in biz.cards %}
   <li class="card">
     <div class="card-label">{{ c.column }}</div>
     <div class="card-value">{{ c.latest|fmt if c.latest is not none else "n/a" }}</div>{% if c.pct is not none %}
     <div class="card-change"><span aria-hidden="true">{{ {"up": "▲", "down": "▼"}.get(c.dir, "▶") }}</span> <span>{{ "%+.1f"|format(c.pct) if c.pct else "0.0" }}%</span> <span>{{ c.dir }}</span></div>{% endif %}{% if c.latest is not none %}
-    <div class="card-period">{{ biz.grain }} {{ biz.latest[:n] }}{% if c.previous is not none %} vs {{ biz.previous[:n] }}{% endif %}</div>{% endif %}{% if c.spark|length >= 2 %}
-    <svg class="spark" viewBox="0 0 100 36" preserveAspectRatio="none" role="img" aria-label="{{ c.column }}, last {{ c.spark|length }} {{ biz.grain }}s"><title>{{ c.column }}, last {{ c.spark|length }} {{ biz.grain }}s</title><polyline points="{{ c.spark|spark }}"/></svg>{% endif %}
+    <div class="card-period">{{ biz.grain }} {{ biz.latest[:n] }}{% if c.previous is not none %} vs {{ biz.previous[:n] }}{% endif %}</div>{% endif %}
+    {{ spark(c, c.column ~ ", last " ~ c.spark|length ~ " " ~ biz.grain ~ "s") }}
   </li>{% endfor %}
 </ul>
 {% endif %}{% include "_filters.html" %}
