@@ -1,0 +1,77 @@
+{
+  "header": {
+    "ticket": 475,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1955293
+  },
+  "goal": "Offline walk of the Monitoring and Survey apps and a keep-everything-passing sweep (AC-9, AC-58 for the new apps; Board gate 182 round 6 QA)",
+  "acceptance_criteria": [
+    {
+      "text": "tests/test_offline_apps.py gains one walk each for monitor.csv (change period, toggle table, hover) and survey.csv (change cross-tab pick, toggle table, click a bar) with a route handler that continues 127.0.0.1 and aborts and counts everything else: off-host request count is 0, no failed local asset, no 4xx/5xx, and len(page.local) > 5 so the zero is not vacuous",
+      "passes": true
+    },
+    {
+      "text": "Both pages load with no console error",
+      "passes": true
+    },
+    {
+      "text": "The full suite is run once at the end and any Monitoring/Survey/export regression found is fixed in the touched templates or dashboard.js only",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-9, AC-58 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 18%]\n........................................................................ [ 36%]\n........................................................................ [ 55%]\n........................................................................ [ 73%]\n........................................................................ [ 91%]\n................................                                         [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n392 passed, 109 warnings in 490.34s (0:08:10)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Reused the base fixture from tests/test_monitoring_page.py (imported as r6_base) to serve monitor.csv and survey.csv",
+      "why": "It already builds the round6 dataset folder and the live server; no new fixture needed",
+      "evidence": "tests/test_offline_apps.py imports; tests/test_monitoring_page.py:13"
+    },
+    {
+      "what": "Monitoring walk hovers the first scatter trace line/point element by bounding box",
+      "why": "The page's hover needs a real data point under the cursor; the plot centre did not trigger a tooltip",
+      "evidence": "tests/test_offline_apps.py test_monitoring_page_walk_asks_no_off_host_url"
+    },
+    {
+      "what": "Survey walk clicks the first bar of #chart-3 (the city question) to navigate to f.city=",
+      "why": "Same chart the existing survey bar-click test uses",
+      "evidence": "tests/test_survey_page.py:70-86"
+    },
+    {
+      "what": "Changed no templates or dashboard.js",
+      "why": "Full suite passed (392) with no Monitoring/Survey/export regression",
+      "evidence": "python3 -m pytest -q: 392 passed"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Toggling the table on figure[data-kind=line] and hovering the plot centre",
+      "why_it_failed": "The page figure kind is 'monitor' (line is only the export kind), and the centre of a 7-day plot has no point within hover distance"
+    }
+  ],
+  "assumptions": [
+    "The orchestrator's check.py runs the same pytest suite; I ran pytest directly because it was not part of my instructions to run check.py"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "In this sandbox use python3, not python, for pytest and scripts; and the Monitoring page figure has data-kind=monitor, not line",
+      "when": "Writing browser tests against the Monitoring page or running commands in the shell",
+      "evidence": "tests/test_offline_apps.py; `python: command not found` in the first run"
+    }
+  ],
+  "problems": []
+}
