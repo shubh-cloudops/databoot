@@ -318,13 +318,21 @@
     fix();
   }
 
-  // Leaderboard cursor (c.drill is a boolean). Plotly itself shows no pointer over bars, so the figure gets a class while a
-  // bar is hovered: `bar-click` (pointer) over a bar that drills, `no-pointer` (default) over Other or at the last level.
+  // A bar or donut click filters when the figure may drill (c.drill is not false) and its column has a filter dropdown (<= 50 values).
+  function clickable(c) {
+    if (c.kind !== "bar" && c.kind !== "donut" || c.drill === false) return false;
+    var key = "f." + c.x_label;
+    return [].some.call(document.querySelectorAll("form.filters select"), function (s) { return s.name === key; });
+  }
+
+  // Bar cursor (Business leaderboard, Explorer and Survey bars). Plotly itself shows no pointer over bars, so the figure gets a class
+  // while a bar is hovered: `bar-click` (pointer) over a bar that filters, `no-pointer` (default) over Other.
   function barCursor(plot, c) {
-    if (c.kind !== "bar" || typeof c.drill !== "boolean") return;
+    var ok = clickable(c);
+    if (!ok && !(c.kind === "bar" && c.drill === false)) return;  // the last-level leaderboard still needs no-pointer (Plotly's crosshair)
     var fig = plot.closest(".chart");
     plot.on("plotly_hover", function (ev) {
-      var click = c.drill && !(c.other && ev.points[0].curveNumber > 0);
+      var click = ok && !(c.other && ev.points[0].curveNumber > 0);
       fig.classList.toggle("bar-click", click);
       fig.classList.toggle("no-pointer", !click);
     });
@@ -335,9 +343,8 @@
   // filters); clicking the active value again removes it. Only columns with a dropdown (<= 50 values) filter.
   // Leaderboard: no click at the last level (c.drill false), and the Other bar (trace 1) never clicks.
   function crossFilter(plot, c) {
-    if (c.kind !== "bar" && c.kind !== "donut" || c.drill === false) return;
+    if (!clickable(c)) return;
     var key = "f." + c.x_label;
-    if (![].some.call(document.querySelectorAll("form.filters select"), function (s) { return s.name === key; })) return;
     plot.on("plotly_click", function (ev) {
       var pt = ev.points && ev.points[0];
       if (!pt || c.other && pt.curveNumber > 0) return;
@@ -378,7 +385,6 @@
     if (!plot) return;
     try {
       var made = build[c.kind](c, t, layout(t, c));
-      if (c.kind === "line" && el.closest(".trends")) made[1].yaxis.rangemode = "tozero";  // DESIGN.md: Business trends start at 0
       if (c.kind === "bar" && el.closest(".map-panel")) { made[1].xaxis.nticks = 3; made[1].xaxis.tickangle = 0; }  // 340px box: three ticks fit flat
       globalRules(made[0], made[1], c);
       Plotly.newPlot(plot, made[0], made[1], c.kind === "map2d" ? Object.assign({}, CONFIG, { scrollZoom: false }) : CONFIG).then(function () { keyboardBar(plot); barCursor(plot, c); crossFilter(plot, c); mapPanel(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });

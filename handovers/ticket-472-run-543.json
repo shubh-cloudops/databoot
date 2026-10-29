@@ -1,0 +1,97 @@
+{
+  "header": {
+    "ticket": 472,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1927587
+  },
+  "goal": "Explorer-only score, bar cursor and automatic line y-range (F3, F4, F5; Board gate 181 items 3-5, reverses ticket 458's zero baseline on Business trends)",
+  "acceptance_criteria": [
+    {
+      "text": "figure(c, hidden=false, score=false) prints ' \u00b7 score 0.NN' only when score is true and only app_explorer.html passes score=true; Explorer captions end with the API score to 2 decimals, shop (Business), places (Map), monitor.csv and survey.csv default pages show no 'score' in any .chart-rule",
+      "passes": true
+    },
+    {
+      "text": "dashboard.js clickable(c) (bar or donut, c.drill not false, a filter select for x_label exists) drives barCursor: hovering an Explorer bar sets class bar-click (computed cursor pointer) like the Business leaderboard, and the Other trace gets no-pointer; Survey question bars use the same helper",
+      "passes": true
+    },
+    {
+      "text": "The .trends rangemode 'tozero' line is deleted: a Business file with month sums 14,000..16,000 has trend _fullLayout.yaxis.range[0] > 0 and rangemode not 'tozero', while the leaderboard and every bar keep range[0] == 0",
+      "passes": true
+    },
+    {
+      "text": "docs/DESIGN.md already holds the Cross-filter (AC-61), zero-baseline-for-bars-only (AC-62) text; a test reads it and finds 'Explorer' with 'bar-click' and 'zero baseline' with 'bars only'",
+      "passes": true
+    },
+    {
+      "text": "Existing tests updated here: any Business/Map caption test expecting 'score' flips to no score, a test asserting rangemode 'tozero' on .trends flips (grep tozero in tests/test_business_page.py), tests/test_table_toggle.py bar-from-zero test still passes",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-35, AC-61, AC-62 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 19%]\n........................................................................ [ 39%]\n........................................................................ [ 58%]\n........................................................................ [ 78%]\n........................................................................ [ 97%]\n.........                                                                [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n369 passed, 109 warnings in 404.30s (0:06:44)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "barCursor also runs for a bar with c.drill === false (last-level leaderboard) and sets no-pointer there",
+      "why": "Plotly shows a crosshair over bars, and the existing test expects 'default' at the last level",
+      "evidence": "app/static/js/dashboard.js barCursor; tests/test_business_page.py::test_drill_down_crumbs_back_and_no_pointer_at_last_level"
+    },
+    {
+      "what": "Moved the 'filter select exists' check from crossFilter into clickable(c), shared with barCursor",
+      "why": "One definition of clickable for both the cursor and the click",
+      "evidence": "app/static/js/dashboard.js clickable"
+    },
+    {
+      "what": "figure() gets a third parameter score=false; app_explorer.html calls figure(c, false, true)",
+      "why": "Only Explorer captions carry the score (gate 181 item 4)",
+      "evidence": "app/templates/_figure.html:1; app/templates/app_explorer.html:10"
+    },
+    {
+      "what": "No change to docs/DESIGN.md",
+      "why": "It already holds the Cross-filter and bars-only zero baseline text",
+      "evidence": "docs/DESIGN.md L18, L203, L258, L269-273; tests/test_explorer_cursor_range.py::test_design_text_for_cursor_and_zero_baseline"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First draft of clickable() returned false for every figure with drill false and barCursor returned early on it",
+      "why_it_failed": "The last-level leaderboard lost its no-pointer class and showed Plotly's crosshair instead of default"
+    },
+    {
+      "what": "First Business trend test data was a short span with weekly grain",
+      "why_it_failed": "Empty weeks plot as 0 and pulled the auto range below 0; the test needs a span over 182 days for month grain"
+    }
+  ],
+  "assumptions": [
+    "Donut slices use the same barCursor class toggle; it has no visible effect there because the CSS targets .nsewdrag",
+    "monitor.csv and survey.csv pages are empty stubs for now, so the no-score check there is trivially true until their templates land"
+  ],
+  "open_questions": [
+    "Not checked: Explorer bar hover in a screenshot and the 375 px Business screenshot (I read only 1280). The hover is covered by the browser test."
+  ],
+  "lessons": [
+    {
+      "lesson": "When a Plotly line test needs an auto range, use data spanning over 182 days (month grain) or empty periods plot as 0",
+      "when": "Testing Business trend y-range",
+      "evidence": "app/business.py grain(); tests/test_explorer_cursor_range.py"
+    },
+    {
+      "lesson": "Use python3, not python, in this environment",
+      "when": "Running scripts or pytest in the sandbox",
+      "evidence": "bash: python: command not found"
+    }
+  ],
+  "problems": []
+}

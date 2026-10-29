@@ -7,7 +7,7 @@
 {% include "_filters.html" %}
 {% if charts %}
 <div class="charts">{% for c in charts %}
-  {{ figure(c) }}{% endfor %}
+  {{ figure(c, false, true) }}{% endfor %}
 </div>
 {% else %}
 <div class="empty">No charts for this dataset</div>
