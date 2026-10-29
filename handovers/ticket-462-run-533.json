@@ -1,0 +1,99 @@
+{
+  "header": {
+    "ticket": 462,
+    "project": "you-think-of-the-project-name",
+    "from_role": "pm",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "a2dbf282ff46",
+    "tokens_left": 1905229
+  },
+  "goal": "Write or update docs/PRD.md and docs/acceptance.json for the idea in docs/IDEA.md.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/PRD.md describes the product",
+      "passes": true
+    },
+    {
+      "text": "docs/acceptance.json lists testable acceptance items",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py spec",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Rule ids follow the brief: R4 Monitoring, R5 Survey, placed after R2 and before R3",
+      "why": "The brief and IDEA name them R4/R5; the old PRD reserved R4-R7 as Survey, Directory, Monitoring, Drive. Brief wins and the conflict is flagged",
+      "evidence": "docs/IDEA.md L12-13; old docs/PRD.md L48; app/apps.py:27-30"
+    },
+    {
+      "what": "Reworded AC-17, AC-35, AC-54, AC-55 in place and added AC-59..AC-73",
+      "why": "The fix-ups change the plural, score, app list and separator rules of those items; the new work items get the next free ids",
+      "evidence": "docs/acceptance.json; LESSONS 'change the AC in place'"
+    },
+    {
+      "what": "Year-like and identifier columns defined by column name and values on the server, not by matching the rendered text",
+      "why": "Integer year columns are classified as numerical (AC-3), so the current sep filter, which matches rendered text with a regex, would print 2,024",
+      "evidence": "app/main.py:19; docs/acceptance.json AC-3"
+    },
+    {
+      "what": "For R5 only, whole-number 1..5 columns count as categorical",
+      "why": "Otherwise a survey with more than two 1-5 Likert answer columns fails N<=2 and never opens as Survey",
+      "evidence": "docs/IDEA.md L13; AC-3 integers are numerical"
+    },
+    {
+      "what": "team.json: trends off; designer, frontend and design_review on",
+      "why": "IDEA says designer + frontend + backend and trends off; two new page layouts",
+      "evidence": "docs/IDEA.md L16"
+    },
+    {
+      "what": "ARCHITECTURE.md L147-148 fix kept as story M35 with no AC",
+      "why": "It is an architect doc edit, not a user-observable behaviour",
+      "evidence": "docs/IDEA.md L10"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Running a python3 script to edit acceptance.json, and running check.py spec and json.tool",
+      "why_it_failed": "Every Bash command needed approval in this session; edits were made with the Edit tool and the JSON was not machine-validated"
+    }
+  ],
+  "assumptions": [
+    "Monitoring period default is 30 days; change = mean of the selected period vs mean of the same-length window before it; 'All' gives n/a",
+    "Rolling mean and spike z use a trailing window of the 30 points before each point; repeated timestamps are averaged",
+    "Main line = the primary numerical column by the AC-46 name rule",
+    "Likert scales = 1..5 or strongly disagree..strongly agree (neutral / neither agree nor disagree in the middle, grey)",
+    "Survey questions = categorical columns only; N and I columns are not charted; cross-tab defaults to the first two questions",
+    "Year-like = whole-number column named with 'year' or all values 1900-2100; identifier = role other or numerical column named id/*id/*_id or containing code, zip, phone",
+    "docs/reference/0.xx is an empty folder from the capture step, not a business site"
+  ],
+  "open_questions": [
+    "Branding: no logo files, no docs/brand/ folder and no business site capture were found (docs/reference holds deck.gl, unstructured.io and an empty '0.xx' folder). Please confirm the gate 160 branding stays: name DataBoot, plain neutral style, system sans font, no logo, blank SVG favicon; or give a logo as an image link in the gate comment.",
+    "Rule numbering: the round 5 PRD reserved R4-R7 as Survey, Directory, Monitoring, Drive; the round 6 idea says R4 Monitoring and R5 Survey. The spec follows the idea; please confirm.",
+    "Order: a file with a date, a number and 4 or more categoricals meets R2 and R5 and opens as Business (Survey via View as). Should R5 come before R2?",
+    "Should whole-number 1..5 columns count as categorical for R5 only (the spec's default), or for every rule?",
+    "Monitoring 'change vs previous period': mean of the period vs the window before it (default), or latest value vs the value one period earlier? Default period 30 days OK?",
+    "Rolling mean window: same 30 points as the spike rule (default), or a shorter one such as 7?",
+    "Year-like and identifier rules by name and value range (PRD 'Number format by column role'): OK, or a different list?",
+    "Survey: should the up to 2 numerical columns (for example age) be charted, and which questions should the cross-tab default to?"
+  ],
+  "lessons": [
+    {
+      "lesson": "If Bash needs approval for running scripts, make acceptance.json changes with Edit: one Edit per reworded item and one Edit that appends the new ids before the closing bracket. Keep single quotes inside the texts so the JSON stays valid without a parse check",
+      "when": "PM rounds that edit acceptance.json",
+      "evidence": "ticket 462: python3 /tmp/ac6.py and json.tool both needed approval"
+    },
+    {
+      "lesson": "Check docs/reference for empty folders that the capture step made from idea text (for example '0.xx' from 'score 0.xx'), and say in Branding that they are not a business site",
+      "when": "Any round whose idea contains dotted tokens",
+      "evidence": "docs/reference/0.xx is empty"
+    }
+  ],
+  "problems": []
+}

@@ -1,6 +1,6 @@
 {
-  "trends": {"run": false, "why": "Board said trends off (gate 175: team setting only); plain neutral style chosen in gate 160"},
-  "designer": {"run": true, "why": "Board named the designer: new Business and Map layouts and the global chart rules go into DESIGN.md"},
-  "frontend": {"run": true, "why": "Board named frontend: View-as switch, drill-down breadcrumb, map side panel, 3D and table toggles"},
-  "design_review": {"run": true, "why": "Two new page layouts and a table toggle on every chart need the final screenshot review"}
+  "trends": {"run": false, "why": "IDEA round 6 says trends off; plain neutral style chosen in gate 160"},
+  "designer": {"run": true, "why": "IDEA names the designer: Monitoring and Survey layouts, DESIGN.md AC-39 cursor and line y-range wording"},
+  "frontend": {"run": true, "why": "IDEA names frontend: tiles, period selector, spike labels, Likert bars, cross-tab picker, Explorer bar cursor"},
+  "design_review": {"run": true, "why": "Two new web page layouts and page-wide fix-ups need the final screenshot review"}
 }
