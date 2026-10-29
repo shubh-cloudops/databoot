@@ -1,0 +1,98 @@
+{
+  "header": {
+    "ticket": 469,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1927199
+  },
+  "goal": "Survey figures (SU1): app/survey.py with questions, Likert scales, question bars with Other, Likert and cross-tab kinds, Respondents histograms, export list (Board gate 183 scales agree/satisfied/likely/frequency/1-5/1-7 and Respondents; gate 184 amount guard and full scale with zero counts)",
+  "acceptance_criteria": [
+    {
+      "text": "survey.questions(columns, mapping, typed) returns the categorical columns plus the whole-number 1..5/1..7 answer columns in column order; time, identifier and other numerical columns are not questions",
+      "passes": true
+    },
+    {
+      "text": "survey.scale(values) returns (levels, neutral index) or None: ['Agree','neutral'] is the agree scale, [1,3,7] the 1..7 scale, ['Never','Often'] the frequency scale, ['yes','no'] gives None; all levels are kept even with a count of 0, in the data's own spelling when present",
+      "passes": true
+    },
+    {
+      "text": "A non-Likert question gives a kind 'bar' dict with orientation 'h', counts per value sorted count desc then name, top 10 then one 'Other' (other: true); on survey_rows() city gives city00..city03 4, city04..city09 3, Other 6; gender female 14, male 13, other 13",
+      "passes": true
+    },
+    {
+      "text": "A Likert question gives kind 'likert' with data levels, counts, pct (unrounded, sums to 100) and neutral index; q_service counts 6,6,6,16,6 and pct 15,15,15,40,15; q_visits 9,9,9,9,4",
+      "passes": true
+    },
+    {
+      "text": "survey.pick(questions, row, col) returns the two names from the URL when both are questions, else the first two; the cross-tab dict kind 'crosstab' has x column levels, y row levels, z counts and row pct (each row sums to 100); gender x region gives female 3,4,3,4 (21.4, 28.6, 21.4, 28.6%), male 3,3,4,3, other 4,3,3,3; levels in scale order for Likert questions else count desc then name",
+      "passes": true
+    },
+    {
+      "text": "Respondents: up to 2 numerical columns that are not answers and not plain (identifier/year-like), as histograms; survey.csv has age only (respondent_id is an identifier)",
+      "passes": true
+    },
+    {
+      "text": "survey.export(view) returns one bar per question (Likert as a bar of counts in scale order), then the cross-tab as a table chart, then the Respondents histograms; payload has charts in order questions, cross-tab, Respondents with ids chart-1..N plus questions and pick; tests/test_survey.py checks the hand values recomputed from survey_rows()",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-68, AC-69, AC-70, AC-71 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 20%]\n........................................................................ [ 41%]\n........................................................................ [ 62%]\n........................................................................ [ 83%]\n........................................................                 [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n344 passed, 108 warnings in 396.35s (0:06:36)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "survey.questions returns column names and computes the 1..5/1..7 answer columns itself (_answers) with the amount guard",
+      "why": "pick() takes no columns so questions must be names; apps.roles has no L role yet",
+      "evidence": "app/survey.py _answers, questions; docs/ARCHITECTURE.md L145-147"
+    },
+    {
+      "what": "Absent Likert levels use the first spelling in SCALES (lower case); present ones use the data's spelling",
+      "why": "Ticket says data's own spelling when present, all levels kept",
+      "evidence": "app/survey.py _scale; tests/test_survey.py::test_scale_known_cases_and_none"
+    },
+    {
+      "what": "Cross-tab levels are only those observed, in scale order for Likert, else count desc then name",
+      "why": "Keeps each row summing to 100 (no empty rows)",
+      "evidence": "app/survey.py _order/_crosstab; test_pick_and_crosstab"
+    },
+    {
+      "what": "view() parameter named chosen instead of pick",
+      "why": "Avoid shadowing the module-level pick() used for the default",
+      "evidence": "app/survey.py view"
+    },
+    {
+      "what": "Reused business._ranked/TOP/_table and rules._histogram/_chart",
+      "why": "Same top-10-plus-Other, table and histogram builders as other apps",
+      "evidence": "app/survey.py imports"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Numeric Likert levels are ints (q_score levels [1..5]) in both the likert data and the export bar x",
+    "Respondents and plain are computed against base_typed (unfiltered) so filters do not change them, histograms use filtered rows",
+    "The amount guard excludes only other numerical columns matching apps.MEASURE; the answer column itself is not checked"
+  ],
+  "open_questions": [
+    "Should absent Likert levels be capitalised (e.g. 'Strongly disagree') for display? Currently the literal first spelling from the architecture table.",
+    "apps.roles/detect still need the L role (ticket 5); should it call survey._answers to avoid duplicate logic?"
+  ],
+  "lessons": [
+    {
+      "lesson": "Tool output from Bash can come back garbled/compressed for source files; re-read exact ranges with sed -n before relying on it",
+      "when": "reading app/business.py and app/rules.py via a multi-command Bash call",
+      "evidence": "first grep of _ranked/_histogram returned mangled code; second sed -n read was clean"
+    }
+  ],
+  "problems": []
+}
