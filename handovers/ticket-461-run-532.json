@@ -1,0 +1,64 @@
+{
+  "header": {
+    "ticket": 461,
+    "project": "you-think-of-the-project-name",
+    "from_role": "router",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "medium",
+    "prompt_version": "775d10f51fce",
+    "tokens_left": 1981340
+  },
+  "goal": "Read docs/IDEA.md with no history and write docs/BRIEF.md: what this round asks for.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/BRIEF.md has the sections Asked, Deliverable, Done when, Unclear and Not asked",
+      "passes": true
+    },
+    {
+      "text": "It restates only what docs/IDEA.md says",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py brief",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Brief treats the round as seven fix-ups followed by two new app types (R4 Monitoring, R5 Survey), not as a new project",
+      "why": "The idea says part 1 fix-ups come first, part 2 adds apps, and earlier work and branding are kept",
+      "evidence": "docs/IDEA.md L3 'FIX-UPS (do first)', L11 'NEW APPS', L18 'Keep everything the earlier rounds built'"
+    },
+    {
+      "what": "Product type left unstated in Deliverable",
+      "why": "The idea names no product kind, only its features and docs",
+      "evidence": "docs/IDEA.md L1-18 (no website/CLI/library named)"
+    },
+    {
+      "what": "Trends and zero baselines on line charts listed under Not asked",
+      "why": "The idea says trends off and zero baseline is for bars only",
+      "evidence": "docs/IDEA.md L16 'trends off'; L8 'zero baseline is bars only'"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "T, N and C are column-type counts (presumably temporal, numeric, categorical); flagged under Unclear, not relied on"
+  ],
+  "open_questions": [
+    "What do T, N and C stand for in the rule table?",
+    "Where do R4 and R5 sit relative to the existing rules R1-R3?",
+    "What does the View-as switch switch between?",
+    "What does a bar click do, and what is the bar-click class/pointer?",
+    "How are year-like columns detected without regex?",
+    "What are the week and year grain tests about?",
+    "How is change vs previous period computed, including for 'all'?",
+    "What counts as Likert beyond agree/disagree or 1-5?",
+    "What does 'trends off' mean?",
+    "Which export formats do the new apps need?"
+  ],
+  "lessons": [],
+  "problems": []
+}
