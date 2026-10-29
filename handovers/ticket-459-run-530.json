@@ -1,0 +1,98 @@
+{
+  "header": {
+    "ticket": 459,
+    "project": "you-think-of-the-project-name",
+    "from_role": "qa",
+    "phase": "qa",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "e14d1b175e03",
+    "tokens_left": 1840674
+  },
+  "goal": "Write or extend tests/test_acceptance.py with one test per acceptance item and run them.",
+  "acceptance_criteria": [
+    {
+      "text": "One test per acceptance item, named after its id",
+      "passes": true
+    },
+    {
+      "text": "Failures are reported, not hidden",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa",
+    "passed": true,
+    "output_tail": "........................................................................ [ 23%]\n........................................................................ [ 46%]\n........................................................................ [ 69%]\n........................................................................ [ 92%]\n........................                                                 [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 2 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n312 passed, 107 warnings in 387.81s (0:06:27)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Wrote AC-43..AC-58 as self-contained tests with copied helpers (_browse, _bar_centre, _click_bar, _click_point, _figure_rules)",
+      "why": "Lesson: keep each acceptance test self-contained; expected values hand-computed from conftest.shop_rows() and the places fixture",
+      "evidence": "tests/test_acceptance.py after the AC-42 test"
+    },
+    {
+      "what": "AC-42 row-count assertion restored as card sums (amount, qty for November) over 200,000 rows",
+      "why": "The Business page has no row count, so the cards are the only place all rows show up",
+      "evidence": "tests/test_acceptance.py test_AC_42"
+    },
+    {
+      "what": "AC-55 checks page text with the .plot elements hidden, and checks axis ticks, bar labels and tooltips separately",
+      "why": "Plotly date ticks such as 'Jan 2024' are years, not amounts, and must not count as bare 4-digit numbers (gate 181 item 1)",
+      "evidence": "test_AC_55"
+    },
+    {
+      "what": "AC-54 builds its own folder (archetypes plus sales.csv) and one server instead of using the live and arch fixtures together",
+      "why": "Both fixtures call make_client, so the second one repoints DATABOOT_DATA and the first server then serves the wrong folder",
+      "evidence": "test_AC_54"
+    },
+    {
+      "what": "AC-46 'down' and 'no change' cases use a mini.csv spanning 198 days",
+      "why": "Grain is month only above 182 days; a 90-day span gave week grain and wrong period values",
+      "evidence": "app/business.py:16-18; test_AC_46"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First AC-46 mini fixture spanning 90 days",
+      "why_it_failed": "Week grain, not month, so the latest period was a different one; my arithmetic was wrong, not the app"
+    },
+    {
+      "what": "AC-54 with both arch and live fixtures",
+      "why_it_failed": "The second make_client call repointed DATABOOT_DATA, so the Business page never drew"
+    },
+    {
+      "what": "Reading main text with innerText on a cloned node",
+      "why_it_failed": "A detached clone loses table cell spacing, so cells ran together into fake 5-digit numbers"
+    }
+  ],
+  "assumptions": [
+    "AC-57 is a DESIGN.md rules item; I tested what is observable: donut only for 2-5 parts through the charts API, hole 0.55, at most 3 traces on Map figures, a two-colour sequential scale, no second y-axis and a table toggle on every figure. Palette order beyond the donut colours and legend rules are not asserted.",
+    "AC-47 grain other than month is checked only for day (20-day fixture); week and year grain are not tested",
+    "AC-53 'Other' beyond 10 regions is covered by the same builder as the AC-48 leaderboard test (12 categories); the Map regions 'Other' case is covered by tests/test_map_page.py, not a test_AC_53 copy"
+  ],
+  "open_questions": [
+    "Gate 181 fix-ups are not in the code. Captions on Map and Business still print 'score 0.xx', and Explorer bars have no bar-click class. Pluralising ('1 point') and the PPTX file-name second line were not probed. Was the fix-up ticket scheduled?",
+    "AC-45 and AC-44 cover the shop, places and measures fixtures only; no 'Explorer qualifies alone, Business app param' PPTX/XLSX case exists beyond AC-56's explorer check",
+    "I did not tab through at 800 px or check the 3D toggle focus ring at 375 px"
+  ],
+  "lessons": [
+    {
+      "lesson": "Do not combine two fixtures that each call make_client in one test; build one folder and one server",
+      "when": "A test needs files from archetypes_dir and data_dir together",
+      "evidence": "test_AC_54 timeout when live and arch were both requested"
+    },
+    {
+      "lesson": "Read page text with the .plot elements temporarily hidden (display none, restore after) when checking for bare 4-digit numbers; Plotly date ticks contain years",
+      "when": "Number-format checks on pages that draw date axes",
+      "evidence": "test_AC_55; first run matched 'Jan 2024'"
+    },
+    {
+      "lesson": "Business grain thresholds are day <=60 days, week <=182, month <=1096, year above; give fixtures a span above 182 days to get month periods",
+      "when": "Writing a Business-app fixture with latest and previous periods",
+      "evidence": "app/business.py:16-18; test_AC_46 mini.csv"
+    }
+  ],
+  "problems": []
+}

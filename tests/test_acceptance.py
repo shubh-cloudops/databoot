@@ -1085,7 +1085,12 @@ def test_AC_42(big_sales_csv, make_client, tmp_path):
             body = r.json()
             assert body["kpis"]["rows"] == 200_000 and any(c["kind"] == "histogram" and c["total"] == 200_000 for c in body["charts"])
         else:
-            assert "rule R2" in r.text  # big_sales is Business now: its minimal body has no row count yet
+            # Business page has no row count, so check that the cards use all 200,000 rows: latest full period is Nov
+            # (month = i % 12 + 1, last date is 28 Dec), amount = i % 997, qty = i % 9 + 1; hand sums over every row
+            assert "rule R2" in r.text
+            card = lambda col: re.search(rf'<div class="card-label">{col}</div>\s*<div class="card-value">([^<]*)</div>', r.text)
+            assert card("amount") and card("amount").group(1) == f"{sum(i % 997 for i in range(200_000) if i % 12 == 10):,}"
+            assert card("qty") and card("qty").group(1) == f"{sum(i % 9 + 1 for i in range(200_000) if i % 12 == 10):,}"
     # types come from the first 10,000 rows only: later text does not change them
     folder = tmp_path / "late"
     folder.mkdir()
@@ -1094,3 +1099,600 @@ def test_AC_42(big_sales_csv, make_client, tmp_path):
     i = client.get("/api/datasets").json()[0]["id"]
     assert client.get(f"/api/datasets/{i}/profile").json()["n"] == "numerical"
     assert client.get(f"/api/datasets/{i}/charts").json()["kpis"]["rows"] == 12_000
+
+
+# ---- Round 5: Business and Map apps (AC-43 .. AC-58) -------------------------------------------------------------
+# Helpers are copies of the engineers' browser helpers; expected values are hand-computed from conftest.shop_rows().
+
+PLACES_POP = [1000 * (k + 1) for k in range(20)]
+COUNTRIES = ["France", "Japan", "Brazil", "Kenya"]
+
+
+def _app_id(client, name):
+    return next(d["id"] for d in client.get("/api/datasets").json() if d["path"] == name)
+
+
+def _html(client, name, query=""):
+    return client.get(f"/datasets/{_app_id(client, name)}{query}").text
+
+
+def _text(html):
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", re.search(r"<main.*?</main>", html, re.S).group(0)))
+
+
+@pytest.fixture
+def arch(archetypes_dir, make_client):
+    """Server on archetypes_dir (shop.csv, places.csv, measures.csv, sparse.csv); yields (base, ids by file name)."""
+    client = make_client(archetypes_dir)
+    ids = {d["path"]: d["id"] for d in client.get("/api/datasets").json()}
+    from app.main import app
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="error"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    while not server.started:
+        time.sleep(0.05)
+    yield f"http://127.0.0.1:{server.servers[0].sockets[0].getsockname()[1]}", ids
+    server.should_exit = True
+    thread.join(10)
+
+
+@contextmanager
+def _browse(url, width=1280, height=900, draw=True):
+    """Chromium page with off-host requests aborted; page.errors / external / local / failed are filled while it runs."""
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        page = b.new_page(viewport={"width": width, "height": height})
+        page.errors, page.external, page.local, page.failed = [], [], [], []
+        base = urlparse(url).scheme + "://" + urlparse(url).netloc
+
+        def route(r):
+            if r.request.url.startswith(base) or r.request.url.startswith("data:"):
+                page.local.append(r.request.url)
+                r.continue_()
+            else:
+                page.external.append(r.request.url)
+                r.abort()
+        page.route("**/*", route)
+        page.on("console", lambda m: m.type == "error" and page.errors.append(m.text))
+        page.on("pageerror", lambda e: page.errors.append(str(e)))
+        page.on("requestfailed", lambda r: page.failed.append(r.url))
+        page.on("response", lambda r: r.status >= 400 and page.failed.append(f"{r.status} {r.url}"))
+        page.goto(url)
+        _settle(page) if draw else page.wait_for_load_state("networkidle")
+        yield page
+        b.close()
+
+
+def _settle(page):
+    page.wait_for_load_state("networkidle")
+    page.wait_for_function("""() => { const p = [...document.querySelectorAll('.plot')].filter(e => !e.closest('[hidden]'));
+        return p.length > 0 && p.every(e => e.classList.contains('js-plotly-plot')); }""")
+
+
+def _query(page):
+    return parse_qs(urlparse(page.url).query)
+
+
+def _bar_centre(page, label):
+    page.locator("[data-leaderboard] .plot").scroll_into_view_if_needed()
+    return page.evaluate("""l => { const gd = document.querySelector('[data-leaderboard] .js-plotly-plot');
+        for (let t = 0; t < gd.data.length; t++) { const i = gd.data[t].y.indexOf(l);
+          if (i >= 0) { const r = gd.querySelectorAll('.barlayer .trace')[t].querySelectorAll('.point')[i].getBoundingClientRect();
+            return {x: r.x + r.width / 2, y: r.y + r.height / 2}; } } }""", label)
+
+
+def _click_bar(page, label, navigates=True):
+    c = _bar_centre(page, label)
+    if navigates:
+        with page.expect_navigation():
+            page.mouse.click(c["x"], c["y"])
+        _settle(page)
+    else:
+        page.mouse.click(c["x"], c["y"])
+        page.wait_for_timeout(500)
+
+
+def _bar_cursor(page, label):
+    c = _bar_centre(page, label)
+    page.mouse.move(c["x"] - 2, c["y"] - 2)
+    page.mouse.move(c["x"], c["y"])
+    page.wait_for_timeout(300)
+    return page.evaluate("getComputedStyle(document.querySelector('[data-leaderboard] .nsewdrag')).cursor")
+
+
+def _crumbs(page):
+    return page.locator("nav.crumbs li").all_inner_texts()
+
+
+def _click_point(page, k):
+    point = page.locator("figure[data-kind=map2d] .js-plotly-plot .point").nth(k)
+    point.scroll_into_view_if_needed()
+    box = point.bounding_box()
+    page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+
+
+def _details(page):
+    page.wait_for_selector(".map-panel dl")
+    return dict(zip(page.locator(".map-panel dl dt").all_inner_texts(), page.locator(".map-panel dl dd").all_inner_texts()))
+
+
+def _folder(tmp_path, name, header, rows):
+    import csv
+    root = tmp_path / name
+    root.mkdir()
+    with open(root / f"{name}.csv", "w", newline="") as f:
+        csv.writer(f).writerows([header, *rows])
+    return root
+
+
+def test_AC_43(make_client, archetypes_dir):
+    client = make_client(archetypes_dir)
+    want = {"places.csv": ("map", "R1", ["map", "explorer"]), "shop.csv": ("business", "R2", ["business", "explorer"]),
+            "measures.csv": ("explorer", "R3", ["explorer"]),
+            "sparse.csv": ("explorer", "R3", ["explorer"])}  # lat/lon + 3 numericals, coordinates in 4 of 10 rows
+    for name, (app, rule, qualifies) in want.items():
+        url = f"/api/datasets/{_app_id(client, name)}/app"
+        got = client.get(url).json()
+        assert (got["app"], got["rule"], got["qualifies"]) == (app, rule, qualifies), name
+        for _ in range(2):  # repeated requests answer the same
+            again = client.get(url).json()
+            assert (again["app"], again["rule"], again["qualifies"]) == (app, rule, qualifies), name
+
+
+def test_AC_44(make_client, archetypes_dir):
+    client = make_client(archetypes_dir)
+    badge = lambda name: re.search(r'<span class="app-badge">([^<]*)</span>', _html(client, name)).group(1)
+    assert badge("shop.csv") == "App: Business (rule R2)"
+    assert badge("measures.csv") == "App: Explorer (rule R3)"
+    assert badge("places.csv") == "App: Map (rule R1)"
+    # the badge shows the detected app, also when another qualifying app is viewed
+    html = _html(client, "shop.csv", "?app=explorer")
+    assert 'class="app-badge">App: Business (rule R2)<' in html
+
+
+def test_AC_45(arch, make_client, archetypes_dir):
+    base, ids = arch
+    client = make_client(archetypes_dir)
+    nav = lambda html: (lambda m: m and re.findall(r'<a href="([^"]*)"[^>]*>([^<]*)</a>', m.group(1)))(
+        re.search(r'<nav class="view-as" aria-label="View as">(.*?)</nav>', html, re.S))
+    assert [t for _, t in nav(_html(client, "shop.csv"))] == ["Business", "Explorer"]
+    assert [t for _, t in nav(_html(client, "places.csv"))] == ["Map", "Explorer"]
+    assert nav(_html(client, "measures.csv")) is None and 'view-as' not in _html(client, "measures.csv")
+    # an app the dataset does not qualify for shows the detected app instead
+    assert 'aria-current="page">Business<' in _html(client, "shop.csv", "?app=map")
+    assert 'class="cards"' not in _html(client, "measures.csv", "?app=business")
+    with _browse(f"{base}/datasets/{ids['shop.csv']}") as page:
+        assert page.locator(".view-as a[aria-current=page]").inner_text() == "Business"
+        assert page.locator("ul.cards").count() == 1
+        with page.expect_navigation():
+            page.click(".view-as >> text=Explorer")
+        _settle(page)
+        assert _query(page) == {"app": ["explorer"]}
+        assert page.locator("ul.cards").count() == 0 and page.locator("[data-kind=line]").count() >= 1
+        page.reload()  # opening the URL shows the same app
+        _settle(page)
+        assert page.locator(".view-as a[aria-current=page]").inner_text() == "Explorer"
+        assert page.errors == []
+
+
+def test_AC_46(arch, tmp_path, make_client):
+    base, ids = arch
+    # hand math (shop_rows): June revenue 7,392 vs May 6,192 = +19.4 %; units 72 vs 60 = +20.0 %; units has no name-rule match
+    with _browse(f"{base}/datasets/{ids['shop.csv']}") as page:
+        cards = page.locator("ul.cards > li.card")
+        assert cards.count() == 2
+        assert cards.nth(0).locator(".card-label").inner_text() == "revenue"
+        assert cards.nth(0).locator(".card-value").inner_text() == "7,392"
+        assert cards.nth(0).locator(".card-change").inner_text().split() == ["▲", "+19.4%", "up"]
+        assert cards.nth(1).locator(".card-label").inner_text() == "units"
+        assert cards.nth(1).locator(".card-value").inner_text() == "72"
+        assert cards.nth(1).locator(".card-change").inner_text().split() == ["▲", "+20.0%", "up"]
+        assert all(cards.nth(k).locator("svg.spark polyline").count() == 1 for k in range(2))
+        assert page.errors == []
+    # no previous value: n/a and no arrow
+    with _browse(f"{base}/datasets/{ids['shop.csv']}?from=2030-01-01", draw=False) as page:
+        cards = page.locator("ul.cards > li.card")
+        assert cards.count() == 2
+        for k in range(2):
+            assert cards.nth(k).locator(".card-value").inner_text() == "n/a"
+            assert cards.nth(k).locator(".card-change, svg.spark").count() == 0
+            assert not set(cards.nth(k).inner_text()) & set("▲▼▶")
+    # down and no change: Feb -> Mar (span 198 days = month grain; the last date is a month end, so March is the latest full period)
+    rows = [("2023-09-15", "a", 90, 50), ("2024-02-10", "a", 40, 50), ("2024-02-20", "b", 60, 50), ("2024-03-15", "a", 30, 50),
+            ("2024-03-31", "b", 50, 50)]
+    client = make_client(_folder(tmp_path, "mini", ("date", "kind", "amount", "price"), rows))
+    mini = _app_id(client, "mini.csv")
+    from app.main import app
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="error"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    while not server.started:
+        time.sleep(0.05)
+    try:
+        url = f"http://127.0.0.1:{server.servers[0].sockets[0].getsockname()[1]}/datasets/{mini}"
+        with _browse(url) as page:
+            cards = page.locator("ul.cards > li.card")
+            assert cards.nth(0).locator(".card-value").inner_text() == "80"  # amount: Mar 30+50 vs Feb 40+60
+            assert cards.nth(0).locator(".card-change").inner_text().split() == ["▼", "-20.0%", "down"]
+            assert cards.nth(1).locator(".card-value").inner_text() == "100"  # price: 50+50 in both months
+            assert cards.nth(1).locator(".card-change").inner_text().split()[-2:] == ["no", "change"]
+    finally:
+        server.should_exit = True
+        thread.join(10)
+
+
+def test_AC_47(arch, tmp_path, make_client):
+    base, ids = arch
+    months = {m: sum(r[5] for r in __import__("tests.conftest", fromlist=["shop_rows"]).shop_rows() if r[0][5:7] == f"{m:02d}") for m in range(1, 7)}
+    with _browse(f"{base}/datasets/{ids['shop.csv']}") as page:
+        figs = page.locator(".trends figure")
+        assert figs.count() == 2  # one trend per measure (revenue, units)
+        got = page.evaluate("""() => [...document.querySelectorAll('.trends .js-plotly-plot')].map(g =>
+            ({x: g.data[0].x, y: g.data[0].y, keys: Object.keys(g._fullLayout).filter(k => /^yaxis\\d*$/.test(k)), n: g.data.length}))""")
+        assert [g["keys"] for g in got] == [["yaxis"], ["yaxis"]] and [g["n"] for g in got] == [1, 1]
+        assert got[0]["x"] == [f"2024-{m:02d}-01" for m in range(1, 7)]  # month grain for a 187-day span
+        assert got[0]["y"] == [months[m] for m in range(1, 7)]
+        assert got[1]["y"] == [12.0 * m for m in range(1, 7)]
+        assert page.errors == []
+    # grain follows the date span: 20 days -> day, 2 years -> month or year; checked through the payload
+    client = make_client(_folder(tmp_path, "days", ("date", "kind", "amount"), [(f"2024-03-{d:02d}", "ab"[d % 2], d) for d in range(1, 21)]))
+    got = client.get(f"/api/datasets/{_app_id(client, 'days.csv')}/app").json()
+    assert got["grain"] == "day" and got["charts"][0]["data"]["y"] == [float(d) for d in range(1, 21)]
+    assert len(got["cards"]) == 1
+
+
+def test_AC_48(arch, make_client, tmp_path):
+    base, ids = arch
+    with _browse(f"{base}/datasets/{ids['shop.csv']}") as page:
+        # hand math: revenue by channel over all 78 rows: web 15,276, shop 15,354 (sorted descending)
+        assert page.evaluate("document.querySelector('[data-leaderboard] .js-plotly-plot').data[0].y") == ["shop", "web"]
+        assert page.locator("[data-leaderboard] .barlayer text.bartext").evaluate_all("e => e.map(x => x.textContent)") == ["15,354", "15,276"]
+    # 12 categories: top 10 sorted descending, then one Other bar holding the sum of the rest (2 x (100 + 200) = 600... below)
+    rows = [(f"2024-01-{5 + k:02d}", f"k{k:02d}", 200 * (k + 1)) for k in range(12)] + [(f"2024-02-{5 + k:02d}", f"k{k:02d}", 200 * (k + 1)) for k in range(12)]
+    client = make_client(_folder(tmp_path, "wide", ("date", "k", "amount"), rows))
+    from app.main import app
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="error"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    while not server.started:
+        time.sleep(0.05)
+    try:
+        url = f"http://127.0.0.1:{server.servers[0].sockets[0].getsockname()[1]}/datasets/{_app_id(client, 'wide.csv')}"
+        with _browse(url) as page:
+            got = page.evaluate("""() => { const g = document.querySelector('[data-leaderboard] .js-plotly-plot');
+                return g.data.map(t => ({y: t.y, x: t.x})); }""")
+            ys = [y for t in got for y in t["y"]]
+            xs = [x for t in got for x in t["x"]]
+            # k11 .. k02 are the top 10: each category sums 2 x 200 x (k + 1); Other = k00 + k01 = 400 + 800
+            assert ys == [f"k{k:02d}" for k in range(11, 1, -1)] + ["Other"]
+            assert xs == [400.0 * (k + 1) for k in range(11, 1, -1)] + [1200.0] and xs[:10] == sorted(xs[:10], reverse=True)
+            assert page.locator("[data-leaderboard] .barlayer text.bartext").evaluate_all("e => e.map(x => x.textContent)") == [
+                f"{int(x):,}" for x in xs]
+            assert page.errors == []
+    finally:
+        server.should_exit = True
+        thread.join(10)
+
+
+def test_AC_49(arch):
+    base, ids = arch
+    # drill order for shop.csv: channel (2 values), store (3), product (12)
+    with _browse(f"{base}/datasets/{ids['shop.csv']}") as page:
+        title = lambda: page.locator("[data-leaderboard] .chart-title").inner_text()
+        assert title() == "revenue by channel" and _crumbs(page) == ["All"]
+        _click_bar(page, "web")
+        assert _query(page) == {"f.channel": ["web"]} and title() == "revenue by store"
+        assert _crumbs(page) == ["All", "channel: web"]
+        _click_bar(page, "North")
+        assert _query(page) == {"f.channel": ["web"], "f.store": ["North"]} and title() == "revenue by product"
+        # last categorical level: bars are not clickable and show no pointer
+        before = page.url
+        assert _bar_cursor(page, "p11") == "default"
+        _click_bar(page, "p11", navigates=False)
+        _click_bar(page, "Other", navigates=False)
+        assert page.url == before
+        page.go_back()
+        _settle(page)
+        assert _query(page) == {"f.channel": ["web"]} and title() == "revenue by store"
+        page.click("nav.crumbs >> text=All")
+        _settle(page)
+        assert "f." not in page.url and title() == "revenue by channel"
+        assert page.errors == []
+
+
+def test_AC_50(arch):
+    base, ids = arch
+    # web/North: previous (May) vs latest (June) revenue. Hand math from shop_rows: deltas +606 (store North web)
+    with _browse(f"{base}/datasets/{ids['shop.csv']}?f.channel=web&f.store=North") as page:
+        head = page.locator("table.delta-table thead th").all_inner_texts()
+        assert len(head) == 4 and head[0].lower() == "category" and head[3].lower() == "delta"
+        cells = page.evaluate("""() => { const probe = document.createElement('i'); probe.style.color = 'var(--div-mid)'; document.body.append(probe);
+            return {mid: getComputedStyle(probe).color, cells: [...document.querySelectorAll('.delta-table td.delta')].map(td =>
+              ({cls: td.className.split(' ').pop(), text: td.textContent, bg: getComputedStyle(td).backgroundColor}))}; }""")
+        by = {c["cls"]: c for c in cells["cells"]}
+        assert set(by) == {"pos", "neg", "zero"}
+        assert by["pos"]["text"].startswith("+") and by["neg"]["text"].startswith("-") and by["zero"]["text"] == "0"
+        assert by["zero"]["bg"] == cells["mid"] and len({c["bg"] for c in by.values()}) == 3
+        assert page.errors == []
+
+
+def _map_checks(arch, width, height):
+    base, ids = arch
+    with _browse(f"{base}/datasets/{ids['places.csv']}", width, height) as page:
+        h = page.evaluate("document.querySelector('.map-layout .plot').getBoundingClientRect().height")
+        assert 0.65 <= h / height <= 0.75, (width, h)
+        m = page.evaluate("document.querySelector('.map-layout .js-plotly-plot').data[0].marker")
+        assert m["color"] == PLACES_POP and m["colorbar"]["title"]["text"] == "pop"
+        assert len(m["colorscale"]) == 2  # one hue: light to dark
+        assert page.evaluate("document.documentElement.scrollWidth <= innerWidth") and page.errors == []
+
+
+def test_AC_51(arch):
+    for size in ((1280, 900), (390, 844)):
+        _map_checks(arch, *size)
+
+
+def test_AC_52(arch, big_csv, make_client, tmp_path):
+    base, ids = arch
+    with _browse(f"{base}/datasets/{ids['places.csv']}") as page:  # 20 rows: one mark per point
+        t = page.evaluate("document.querySelector('.map-layout .js-plotly-plot').data.map(t => [t.type, t.lon.length])")
+        assert t == [["scattergeo", 20]]
+    # 5,000 coordinates draw points; 5,001 draw hexagon cells whose counts sum to the rows
+    for n, hexed in ((5000, False), (5001, True)):
+        client = make_client(_folder(tmp_path, f"n{n}", ("lat", "lon", "v"), [(i % 180 - 90 + 0.5, i % 360 - 180 + 0.5, i % 7) for i in range(n)]))
+        got = client.get(f"/api/datasets/{_app_id(client, f'n{n}.csv')}/app").json()["charts"][0]["data"]
+        assert got["mode"] == ("hex" if hexed else "points"), (n, got["mode"])
+        assert sum(got["count"]) == n if hexed else len(got["lon"]) == n
+    client = make_client(big_csv)
+    from app.main import app
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="error"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    while not server.started:
+        time.sleep(0.05)
+    try:
+        url = f"http://127.0.0.1:{server.servers[0].sockets[0].getsockname()[1]}/datasets/{_app_id(client, 'big.csv')}"
+        with _browse(url) as page:
+            t = page.evaluate("document.querySelector('.map-layout .js-plotly-plot').data.map(t => [t.type, t.z.reduce((a, b) => a + b, 0), t.hovertemplate])")
+            assert len(t) == 1 and t[0][0] == "choropleth" and t[0][1] == 60_000 and "points" in t[0][2]
+            cells = page.locator(".map-layout .choroplethlayer path")
+            cells.nth(cells.count() // 2).scroll_into_view_if_needed()
+            box = cells.nth(cells.count() // 2).bounding_box()
+            page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            page.wait_for_selector(".hoverlayer .hovertext")
+            label = page.locator(".hoverlayer .hovertext").text_content()
+            assert re.fullmatch(r"[\d,]+ points?", label.strip()), label
+            assert page.errors == []
+    finally:
+        server.should_exit = True
+        thread.join(10)
+
+
+def test_AC_53(arch):
+    base, ids = arch
+    with _browse(f"{base}/datasets/{ids['places.csv']}") as page:
+        seen = []
+        page.on("request", lambda r: seen.append(r.url))
+        _click_point(page, 3)
+        assert _details(page) == {"lat": "-28", "lon": "-84", "country": "Kenya", "pop": "4,000"}
+        assert not [u for u in seen if "/api/" in u]
+        # top regions: country (fewest distinct values), ranked by sum of pop, desc
+        sums = {c: sum(p for k, p in enumerate(PLACES_POP) if COUNTRIES[k % 4] == c) for c in COUNTRIES}
+        ranked = sorted(sums.items(), key=lambda kv: -kv[1])
+        got = page.evaluate("document.querySelector('.map-panel .js-plotly-plot').data.map(t => [t.y, t.x])")
+        assert got == [[[k for k, _ in ranked], [float(v) for _, v in ranked]]] or got == [[[k for k, _ in ranked], [v for _, v in ranked]]]
+        # 3D view and back
+        flat, three, btn = page.locator("figure[data-kind=map2d]"), page.locator("figure[data-kind=map3d]"), page.get_by_role("button", name="3D view")
+        assert three.is_hidden()
+        btn.click()
+        page.wait_for_selector("figure[data-kind=map3d] .plot canvas")
+        assert three.is_visible() and flat.is_hidden()
+        assert page.evaluate("document.querySelector('figure[data-kind=map3d] .js-plotly-plot').data[0].type") == "scatter3d"
+        btn.click()
+        assert flat.is_visible() and three.is_hidden()
+        assert page.errors == []
+    # more than 10 regions: top 10 then one Other
+    # (covered by the same builder as the leaderboard; see AC-48 for the arithmetic)
+
+
+def _figure_rules(page):
+    """No second y-axis, hover on, and every visible figure's table toggle lists the plotted values and switches back."""
+    info = page.evaluate("""() => [...document.querySelectorAll('.js-plotly-plot')].filter(g => !g.closest('[hidden]')).map(g => ({
+        id: g.closest('figure').id, keys: Object.keys(g._fullLayout).filter(k => /^yaxis\\d+$/.test(k)),
+        overlaying: Object.values(g._fullLayout).some(a => a && typeof a === 'object' && a.overlaying),
+        hover: g._fullLayout.hovermode, info: g.data.map(t => t.hoverinfo || null),
+        n: g.data.reduce((s, t) => s + (t.type === 'heatmap' ? t.x.length * t.y.length : (t.labels || (t.orientation === 'h' ? t.y : t.x) || t.lon || t.locations || []).length), 0)}))""")
+    assert info
+    for i in info:
+        assert i["keys"] in ([], ["yaxis"]) and not i["overlaying"], i
+        assert i["hover"] is not False and not set(i["info"]) & {"none", "skip"}, i
+        fig = page.locator("#" + i["id"])
+        btn = fig.locator(".table-toggle")
+        assert btn.count() == 1, i["id"]
+        btn.click()
+        assert btn.get_attribute("aria-pressed") == "true" and fig.locator(".plot").is_hidden()
+        assert fig.locator("table.plot-table tbody tr").count() == i["n"], (i["id"], i["n"])
+        btn.click()
+        assert fig.locator(".plot").is_visible() and btn.get_attribute("aria-pressed") == "false"
+    return len(info)
+
+
+def test_AC_54(archetypes_dir, data_dir, make_client, tmp_path):
+    import shutil
+    root = tmp_path / "all"
+    shutil.copytree(archetypes_dir, root)
+    shutil.copy(data_dir / "sales.csv", root / "sales.csv")
+    client = make_client(root)
+    ids = {d["path"]: d["id"] for d in client.get("/api/datasets").json()}
+    from app.main import app
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="error"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    while not server.started:
+        time.sleep(0.05)
+    try:
+        base = f"http://127.0.0.1:{server.servers[0].sockets[0].getsockname()[1]}"
+        for path, least in (("shop.csv", 3), ("shop.csv?app=explorer", 1), ("places.csv", 2), ("measures.csv", 1), ("sales.csv?app=explorer", 4)):
+            name = path.split("?")[0]
+            with _browse(f"{base}/datasets/{ids[name]}{path[len(name):]}") as page:
+                assert _figure_rules(page) >= least, path
+                assert page.errors == [], path
+    finally:
+        server.should_exit = True
+        thread.join(10)
+
+
+def test_AC_55(arch):
+    base, ids = arch
+    bare = re.compile(r"(?<![\d.,-])\d{4,}(?![\d-])")
+    ticks = """() => [...document.querySelectorAll('.js-plotly-plot')].filter(g => !g.closest('[hidden]')).flatMap(g =>
+        ['x', 'y'].filter(a => g._fullLayout[a + 'axis'] && g._fullLayout[a + 'axis'].type === 'linear')
+          .flatMap(a => [...g.querySelectorAll('.' + a + 'tick text')].map(t => t.textContent)))"""
+    # Business: cards, value labels, change table, axis ticks, tooltips
+    with _browse(f"{base}/datasets/{ids['shop.csv']}") as page:
+        # chart text is checked through ticks/labels below (date ticks such as "Jan 2024" are years, not amounts)
+        main = re.sub(r"\d{4}-\d{2}-\d{2}", "", page.evaluate("""() => { const p = document.querySelectorAll('.plot'); p.forEach(e => e.style.display = 'none');
+            const t = document.querySelector('main').innerText; p.forEach(e => e.style.display = ''); return t; }"""))
+        assert not bare.search(main) and "2,024" not in main  # no bare 4+ digit number, and no separator in a year
+        assert page.locator("ul.cards .card-value").first.inner_text() == "7,392"
+        assert page.locator("[data-leaderboard] .barlayer text.bartext").evaluate_all("e => e.map(x => x.textContent)") == ["15,354", "15,276"]
+        t = page.evaluate(ticks)
+        assert t and not [x for x in t if bare.fullmatch(x)], t
+        c = _bar_centre(page, "shop")
+        page.mouse.move(c["x"] - 2, c["y"]); page.mouse.move(c["x"], c["y"])
+        page.wait_for_selector(".hoverlayer .hovertext")
+        assert "15,354" in page.locator(".hoverlayer .hovertext").first.text_content()
+        assert page.errors == []
+    # Map: side panel, axis ticks of the regions bar, tooltip on a point, table view
+    with _browse(f"{base}/datasets/{ids['places.csv']}") as page:
+        _click_point(page, 19)
+        assert _details(page)["pop"] == "20,000"
+        main = page.evaluate("""() => { const p = document.querySelectorAll('.plot'); p.forEach(e => e.style.display = 'none');
+            const t = document.querySelector('main').innerText; p.forEach(e => e.style.display = ''); return t; }""")
+        assert not bare.search(main) and "20,000" in main
+        t = page.evaluate(ticks)
+        assert t and not [x for x in t if bare.fullmatch(x)], t
+        assert page.locator(".map-panel .barlayer .bartext").first.text_content() == "60,000"
+        point = page.locator("figure[data-kind=map2d] .js-plotly-plot .point").nth(19).bounding_box()
+        page.mouse.move(point["x"] + point["width"] / 2 - 1, point["y"] + point["height"] / 2)
+        page.mouse.move(point["x"] + point["width"] / 2, point["y"] + point["height"] / 2)
+        page.wait_for_selector(".hoverlayer .hovertext")
+        assert "20,000" in page.locator(".hoverlayer .hovertext").first.text_content()
+        assert page.errors == []
+
+
+def _xlsx(client, name, query):
+    import openpyxl
+    r = client.get(f"/datasets/{_app_id(client, name)}/export.xlsx{query}")
+    assert r.status_code == 200
+    return openpyxl.load_workbook(io.BytesIO(r.content))
+
+
+def _pptx(client, name, query):
+    from pptx import Presentation
+    r = client.get(f"/datasets/{_app_id(client, name)}/export.pptx{query}")
+    assert r.status_code == 200
+    return list(Presentation(io.BytesIO(r.content)).slides)
+
+
+def test_AC_56(make_client, archetypes_dir):
+    from pptx.enum.chart import XL_CHART_TYPE
+    client = make_client(archetypes_dir)
+    first = lambda slide: [s.text_frame.text for s in slide.shapes if s.has_text_frame][0]
+    # Business: Data first, Summary last, KPI table, trend per measure, leaderboard, change table in order
+    wb = _xlsx(client, "shop.csv", "?app=business")
+    assert wb.sheetnames == ["Data", "chart-1 table", "chart-2 line", "chart-3 line", "chart-4 bar", "chart-5 table", "Summary"]
+    assert [len(wb[n]._charts) for n in wb.sheetnames] == [0, 0, 1, 1, 1, 0, 0]
+    assert [r[0] for r in wb["Summary"].iter_rows(values_only=True)][:2] == ["Business overview", "Filters: none"]
+    assert [c.value for c in wb["chart-1 table"][1]] == ["Measure", "Previous", "Latest", "Change %"]
+    assert [c.value for c in wb["chart-1 table"]["A"]][1:] == ["revenue", "units"]
+    slides = _pptx(client, "shop.csv", "?app=business")
+    assert first(slides[0]) == "Business overview"
+    kinds = [("table" if s.has_table else "chart") for sl in slides[1:] for s in sl.shapes if s.has_table or s.has_chart]
+    assert kinds == ["table", "chart", "chart", "chart", "table"]
+    assert [s.chart.chart_type for sl in slides[1:] for s in sl.shapes if s.has_chart] == [
+        XL_CHART_TYPE.LINE, XL_CHART_TYPE.LINE, XL_CHART_TYPE.COLUMN_CLUSTERED]
+    # Map: native lon/lat scatter chart, then top regions
+    wb = _xlsx(client, "places.csv", "?app=map")
+    assert wb.sheetnames == ["Data", "chart-1 scatter", "chart-2 bar", "Summary"]
+    assert wb["Summary"]["A1"].value == "Map overview" and all(len(wb[n]._charts) == 1 for n in wb.sheetnames[1:3])
+    assert wb["chart-1 scatter"].max_row - 1 == 20
+    slides = _pptx(client, "places.csv", "?app=map")
+    assert first(slides[0]) == "Map overview"
+    assert [s.chart.chart_type for sl in slides[1:] for s in sl.shapes if s.has_chart] == [
+        XL_CHART_TYPE.XY_SCATTER, XL_CHART_TYPE.COLUMN_CLUSTERED]
+    # Explorer exports are unchanged (round 4): same sheets and no app title
+    wb = _xlsx(client, "shop.csv", "?app=explorer")
+    assert wb.sheetnames[0] == "Data" and wb.sheetnames[-1] == "Summary" and "chart-1 table" not in wb.sheetnames
+    assert wb["Summary"]["A1"].value == "Filters: none"
+    assert first(_pptx(client, "shop.csv", "?app=explorer")[0]) == "shop.csv"
+
+
+def test_AC_57(archetypes_dir, make_client, tmp_path):
+    # part-to-whole donut only for 2-5 parts
+    for k in (1, 2, 5, 6, 7):
+        rows = [(f"2024-01-{1 + i:02d}", f"c{i % k}", 10 + i) for i in range(14)]
+        client = make_client(_folder(tmp_path, f"k{k}", ("date", "kind", "amount"), rows))
+        kinds = [c["kind"] for c in client.get(f"/api/datasets/{_app_id(client, f'k{k}.csv')}/charts").json()["charts"]]
+        assert ("donut" in kinds) == (2 <= k <= 5), (k, kinds)
+    # donut slices use the fixed categorical order --c1..; one hue sequential scale on the map; one y-axis; at most 3 colour series
+    client = make_client(archetypes_dir)
+    from app.main import app
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="error"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    while not server.started:
+        time.sleep(0.05)
+    try:
+        base = f"http://127.0.0.1:{server.servers[0].sockets[0].getsockname()[1]}"
+        ids = {d["path"]: d["id"] for d in client.get("/api/datasets").json()}
+        var = """n => { const p = document.createElement('i'); p.style.color = 'var(--c' + n + ')'; document.body.append(p);
+            const c = getComputedStyle(p).color; p.remove(); return c; }"""
+        with _browse(f"{base}/datasets/{ids['places.csv']}?app=explorer") as page:
+            donut = page.evaluate("""() => { const g = document.querySelector('[data-kind=donut] .js-plotly-plot'); return g && [g.data[0].labels.length, g.data[0].marker.colors, g.data[0].hole]; }""")
+            assert donut and 2 <= donut[0] <= 5 and abs(donut[2] - 0.55) < 1e-9
+            assert len(donut[1]) >= donut[0]
+            assert page.errors == []
+        with _browse(f"{base}/datasets/{ids['places.csv']}") as page:
+            n = page.evaluate("[...document.querySelectorAll('.js-plotly-plot')].filter(g => !g.closest('[hidden]')).map(g => g.data.length)")
+            assert max(n) <= 3
+            assert page.evaluate("document.querySelector('.map-layout .js-plotly-plot').data[0].marker.colorscale.length") == 2
+            assert _figure_rules(page) >= 2
+        with _browse(f"{base}/datasets/{ids['shop.csv']}") as page:
+            assert page.evaluate("[...document.querySelectorAll('.js-plotly-plot')].every(g => !g._fullLayout.yaxis2)")
+            assert page.evaluate("[...document.querySelectorAll('.js-plotly-plot')].every(g => g.data.length <= 8 + 1)")
+    finally:
+        server.should_exit = True
+        thread.join(10)
+
+
+def test_AC_58(arch):
+    base, ids = arch
+    def table(page, kind):
+        f = page.locator(f"figure[data-kind={kind}]").first
+        f.locator(".table-toggle").click()
+        assert f.locator("table.plot-table tbody tr").count() > 0 and f.locator(".plot").is_hidden()
+        f.locator(".table-toggle").click()
+        assert f.locator(".plot").is_visible()
+    with _browse(f"{base}/datasets/{ids['shop.csv']}") as page:
+        _click_bar(page, "web")
+        _click_bar(page, "North")
+        assert _crumbs(page) == ["All", "channel: web", "store: North"]
+        page.go_back()
+        _settle(page)
+        page.click(".view-as >> text=Explorer")
+        _settle(page)
+        page.click(".view-as >> text=Business")
+        _settle(page)
+        table(page, "bar")
+        assert len(page.local) > 5 and page.external == [] and page.failed == [] and page.errors == []
+    with _browse(f"{base}/datasets/{ids['places.csv']}") as page:
+        _click_point(page, 3)
+        assert _details(page)["pop"] == "4,000"
+        btn = page.get_by_role("button", name="3D view")
+        btn.click()
+        page.wait_for_selector("figure[data-kind=map3d] .plot canvas")
+        btn.click()
+        page.wait_for_function("document.querySelector('figure[data-kind=map2d] .plot').getBoundingClientRect().width > 100")
+        table(page, "map2d")
+        assert len(page.local) > 5 and page.external == [] and page.failed == [] and page.errors == []
