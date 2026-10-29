@@ -1,8 +1,35 @@
-# Architecture: DataBoot (round 5)
+# Architecture: DataBoot (round 6)
 
 DataBoot scans one mounted folder or drive letter, profiles every dataset with fixed rules and draws the
-charts those rules pick, fully offline. Sources: docs/PRD.md (round 5), docs/acceptance.json (AC-1..AC-58),
-Board gates 160-179 (graphify-out/memory.md). Round 5 keeps everything rounds 1 to 4 built (that page is now the
+charts those rules pick, fully offline. Sources: docs/PRD.md (round 6), docs/acceptance.json (AC-1..AC-73),
+Board gates 160-183 (graphify-out/memory.md). **Round 6** keeps everything below and adds: the seven gate 181
+fix-ups (number format by column role, plurals, Explorer bar cursor, score only in Explorer, line y-range, PPTX
+title slide, the hexagon text at "Round 5: Map app") and two apps, **Monitoring** (R4) and **Survey** (R5), in the
+same rule table, page shell, JSON route and exports. No new dependency, no new page path, no new route: two new
+query params (`period`, and `row`/`col` for the cross-tab), so no sitemap or NAV change. Sections "Round 6: ..."
+come first; the round 1-5 sections after them still hold unless a round 6 section says otherwise.
+
+No docs/TRENDS.md this round (docs/team.json: trends off; gate 183: "trends off" is the team setting), so I used no
+trend advice.
+
+**Gate 183 overrides the PRD on six points; I reworded AC-59, AC-64, AC-67, AC-68 and AC-69 (same ids).**
+(a) Evaluation order **R1 Map, R5 Survey, R2 Business, R4 Monitoring, R3 Explorer** (PRD: R1, R2, R4, R5, R3), so a
+survey with a date and an age column opens as Survey, with Business in View as. (b) Rolling mean = **7-point**
+trailing (PRD: 30); the spike z still uses the 30 points before each point. (c) Likert scales: agree, satisfied,
+likely, frequency (never..always), 1..5 and **1..7** (PRD: agree and 1..5); whole-number 1..5 and 1..7 columns count
+as C for R5 only. (d) Year-like name rule: the name contains `year` **or `yr`**. (e) Survey adds a **Respondents**
+section: up to 2 numerical columns (not identifiers, not 1..7 answers) as histograms. (f) Exports: XLSX and PPTX
+for both apps (as PRD S2).
+**Architect addition to (a)/(c), found by probe:** with Survey walked before Business, the round 5 `shop.csv`
+(date, store, channel, product, `units` = 1..7, revenue) would open as Survey, because `units` counts as a 1..7
+answer and makes C = 4 of 6 columns. AC-64 says every round 5 fixture keeps its app, so **1..5/1..7 columns count as
+C only when no other numerical column matches the AC-46 amount name rule** (`apps.MEASURE`). A sales file has an
+amount; the Board's survey example (timestamp + age) has none. Reworded into AC-64; asked in open questions.
+**Gate 181 item 6 vs AC-56 "Explorer exports unchanged":** every PPTX title slide now has a title line and the file
+name under it (AC-63); Explorer has no app title, so its first line is `Explorer` (not "... overview", AC-73).
+Its XLSX is unchanged.
+
+Round 5 keeps everything rounds 1 to 4 built (that page is now the
 **Explorer** app) and adds an ordered rule table that picks a **Map**, **Business** or **Explorer** app per
 dataset, a badge, a "View as" switch, the Business and Map layouts, global chart rules (table toggle, tooltips,
 separators, donut 2-5, one y-axis) and app-aware exports. No new dependency, no new page path: one new JSON route
@@ -30,6 +57,214 @@ slide line starts `Rows: M` unfiltered and `Rows: N of M` filtered (N filtered r
 **Gate 175 overrides the PRD on AC-38 and AC-39.** The PRD had C2 (second click removes the filter) as a Could and
 no chips; the Board said "build C2 now" and "each active filter shows as a removable chip, plus Clear filters". I
 reworded AC-38 (chips) and AC-39 (second click removes) in acceptance.json and moved C2 into PRD M13. Ids unchanged.
+
+## Round 6 changes at a glance
+| # | Change | Files | AC |
+|---|---|---|---|
+| F1 | Number format by column role: `apps.plain`, `apps.sep`; `_plain(d)` cache; `plain` axis key on chart dicts; First rows, Map panel rows, tooltips, table views | `app/apps.py`, `app/main.py`, `app/geo.py`, `_tables.html`, `dashboard.js` | AC-59, AC-55 |
+| F2 | Plurals: `apps.plural`, Jinja `plural`; figure count, PPTX count line, hex hover text | `app/apps.py`, `app/main.py`, `_figure.html`, `app/export.py`, `dashboard.js` | AC-60, AC-17 |
+| F3 | Explorer (and Survey) bars and donuts get the `bar-click` cursor whenever a click filters; DESIGN.md Cross-filter text | `dashboard.js` `barCursor`, DESIGN.md (Designer) | AC-61 |
+| F4 | `· score` only in Explorer captions: `figure(c, score=true)` from `app_explorer.html` only | `_figure.html`, `app_explorer.html` | AC-35 |
+| F5 | Line charts auto y-range: delete the `.trends` `rangemode = "tozero"` line; bars keep `tozero`; DESIGN.md | `dashboard.js` `render`, DESIGN.md (Designer) | AC-62 |
+| F6 | PPTX title slide: title line (app title, or `Explorer`), then the file name in a smaller box | `app/export.py` `pptx` | AC-63 |
+| F7 | "Round 5: Map app" hexagon text says choropleth cells (gate 180) | this document (done) | M35 |
+| D2 | Rule table order R1, R5, R2, R4, R3; `roles` gains `L` (1..7 answer columns, amount guard) and `cols`; `NAMES`, `TITLES` | `app/apps.py`, `app/main.py` | AC-64 |
+| P2 | `pick` (period, cross-tab row/col) in `_appview`, page links and exports | `app/main.py` | AC-66, AC-70 |
+| MO1 | Monitoring figures: points per timestamp, period windows, tiles, main line with 7-point mean and 30-point spikes; export list | `app/monitoring.py` (new, empty) | AC-65..AC-67, AC-71 |
+| MO2 | Monitoring page: tiles (SVG sparkline), period links, `monitor` builder | `app_monitoring.html`, `dashboard.js`, CSS (Designer) | AC-65..AC-67, AC-54 |
+| SU1 | Survey figures: questions, Likert scales, question bars, Likert bars, cross-tab, Respondents histograms; export list | `app/survey.py` (new, empty) | AC-68..AC-71 |
+| SU2 | Survey page: question grid, cross-tab form, Respondents, `likert` and `crosstab` builders | `app_survey.html`, `dashboard.js`, CSS (Designer) | AC-68..AC-70, AC-54 |
+| Q6 | Week and year grain, Explorer-only exports, "2,024" never shown, offline walk of the new apps | tests only | AC-72, AC-73, AC-59, AC-9 |
+| T3 | `round6_dir` fixture (monitor, quiet, survey, orders) with `monitor_rows()`, `survey_rows()`; roles test (done by the architect) | `tests/conftest.py`, `tests/test_archetype_fixtures.py` | AC-59, AC-64..AC-71 |
+
+Order of tickets: F1-F6 first (gate 182), then D2 + P2 (they change `main.py` and the default app), then MO1/SU1
+(backend), then MO2/SU2 (frontend, after the Designer's layouts), then QA.
+
+## Round 6: detection (`app/apps.py`)
+- `roles(...)` gains `cols = len(columns)` and `L` = numerical column indexes whose non-empty typed values are all
+  whole numbers in 1..7 (at least one value), **set to `[]` when any other numerical column matches `MEASURE`**
+  (architect guard, see the top). R1, R2 and R4 keep counting `L` columns as N.
+- Rule table (the walker `detect` does not change; `qualifies` follows this order, so View-as lists e.g. Survey,
+  Business, Explorer):
+  ```python
+  RULES = [("R1", "map", ...unchanged...),
+           ("R5", "survey", lambda r: (c := len(r["C"]) + len(r["L"])) >= 4 and c >= 0.6 * r["cols"] and len(r["N"]) - len(r["L"]) <= 2),
+           ("R2", "business", ...unchanged...),
+           ("R4", "monitoring", lambda r: bool(r["T"] and r["N"] and not r["C"])),
+           ("R3", "explorer", lambda r: True)]
+  NAMES |= {"monitoring": "Monitoring", "survey": "Survey"}
+  ```
+  `main.TITLES |= {"monitoring": "Monitoring overview", "survey": "Survey overview"}`.
+- Probe (ticket 463, a throwaway test over every fixture with these conditions): `data_dir`, `archetypes_dir`,
+  `big_csv`, `big_sales_csv` keep their round 5 app and rule (shop.csv stays business/R2 only because of the guard);
+  `round6_dir`: monitor.csv and quiet.csv `monitoring/R4` (qualifies monitoring, explorer), survey.csv `survey/R5`
+  (qualifies survey, business, explorer), orders.csv `explorer/R3`.
+
+## Round 6: number format by role (F1, AC-59, AC-55)
+- `apps.plain(columns, mapping, typed) -> frozenset` of numerical column indexes that never get separators:
+  identifier = name (lower-cased, stripped) is `id` or ends in `id` / `_id`, or contains `code`, `zip` or `phone`;
+  year-like = name contains `year` or `yr`, or every non-empty value is a whole number in 1900..2100 (gate 183).
+  Temporal and other columns are not numerical, so they never get separators anyway.
+- `main._plain(d)` = `lru_cache(maxsize=4)` of `apps.plain` on the **unfiltered** typed rows (`_base`): a filter
+  never changes a column's format. `make_client` must clear it (add `"_plain"` to the cache list in conftest).
+- `apps.sep(v)` = today's `sep` lambda moved out of main.py (adds separators to the integer part of a number text);
+  main registers it as the Jinja filter. It is only ever called for a column that is numerical and not in `plain`:
+  - `_tables.html` First rows: `v|sep if types[col] == "numerical" and loop.index0 not in plain else v` (`plain`
+    passed to the template).
+  - Map side panel: `geo.view(..., settings, plain=frozenset())` writes `rows` cells through `apps.sep` for
+    numerical non-plain columns; dashboard.js drops its own `sep()` regex and prints the cells as sent.
+- Charts: `_appview` sets `c["plain"] = [axis letters]` on every chart dict (and `map3d`) whose `x_label`,
+  `y_label` or `z_label` is a column in `plain` (`"x"`, `"y"`, `"z"`; `z` covers the map colour). dashboard.js:
+  for a plain axis `hoverformat = ""` (no `,`), geo/3D/colour `hovertemplate` uses `%{z}` instead of `%{z:,}`, and
+  `tableOf` prints `String(v)` for that column. Sums and counts the app computes (bar values, KPIs, tiles of
+  non-plain columns) keep separators.
+- orders.csv (`order_id` 10045.., `year` 2023/2024, `amount` 12,345..): First rows prints `10045`, `2024`,
+  `12,345`; the Explorer histogram of `order_id` (first numerical) has `plain == ["x"]`.
+
+## Round 6: fix-ups F2-F6
+- **F2 plurals**: `apps.plural(n, word) = f"{n:,} {word}" + ("" if n == 1 else "s")`; Jinja filter
+  `plural`. Figure count: `{{ c.shown|num }} of {{ c.total|plural(unit) }}`, where the unit (`point` for map3d,
+  line, scatter, monitor; else `row`) follows M (AC-17: "1 of 1 row", "0 of 5 rows"). `export.pptx` count line the
+  same way. Hex hover: map2d trace gets `text` = `plural(count, "point")` per cell (built in JS with the same rule),
+  `hovertemplate: "%{text}<extra></extra>"`.
+- **F3 cursor**: one JS helper `clickable(c)` = the condition `crossFilter` uses today (bar or donut, `c.drill !==
+  false`, a `form.filters select[name="f.<x_label>"]` exists). `barCursor` runs for every clickable chart, not only
+  for a boolean `c.drill`; it sets `bar-click` over a clickable point and `no-pointer` over the Other trace
+  (`c.other && curveNumber > 0`).
+- **F4 score**: `figure(c, hidden=false, score=false)`; only `app_explorer.html` calls `figure(c, score=true)`.
+  Chart dicts keep their `score` key (the API is unchanged; test_rules L22).
+- **F5 y-range**: delete `dashboard.js` L377 (`.trends` lines `rangemode = "tozero"`). Bars keep `rangemode
+  "tozero"` from the bar builder (L93). No line builder (line, monitor) sets `rangemode`.
+- **F6 title slide**: box 1 = `title or "Explorer"` (40 pt bold), box 2 = file name (+ ` - sheet`) at 24 pt, then
+  the Rows line and the Filters line as today (both move down one box height; keep inside the slide).
+
+## Round 6: request flow (P2)
+```python
+def _pick(d, shown, params):      # validated, hashable, part of the cache key
+    if shown == "monitoring": return params.get("period") if params.get("period") in ("7", "30", "90", "all") else "30"
+    if shown == "survey":                                      # defaults: the first two questions
+        _, mapping, typed, _ = _base(d)
+        return survey.pick(survey.questions(d.columns, mapping, typed), params.get("row"), params.get("col"))
+    return None
+
+@lru_cache(maxsize=8)
+def _appview(d, f, app, app_param=None, pick=None):
+    ...as round 5...
+    if app == "monitoring": return monitoring.view(d.columns, v["typed"], v["mapping"], pick, config.get())
+    if app == "survey":     return survey.view(d.columns, v["typed"], v["mapping"], _base(d)[2], pick, config.get())
+```
+- `dashboard`, `/app` and `_export` all pass `_pick(d, shown, request.query_params)`, so the page, its JSON and the
+  exports show the same period / cross-tab (PRD constraint: deterministic).
+- Like `appq`, `pickq` = the request's own `period` (or `row`, `col`) pairs **only when the URL had them**; chips,
+  Clear filters and export links carry `f + appq + pickq`; View-as links carry `f` and the new app only (a period
+  means nothing to another app). The filter form gets hidden inputs for `app` (as today) and for `pickq`.
+- `survey.view` needs the unfiltered typed rows (`_base(d)[2]`) only to decide which questions are Likert and their
+  levels, so a filter never changes a question's chart kind or its segment order.
+
+## Round 6: Monitoring app (`app/monitoring.py`)
+`view(columns, typed, mapping, period, settings)` on the filtered typed rows (the round 4 date range applies; there
+are no category filters since C = 0). `export(view)` gives the export list.
+- **Points**: time column = first T; rows with an empty time are dropped; rows with the same timestamp are averaged
+  per numerical column (over that column's non-empty values); sorted by time. `last` = the latest timestamp.
+- **Windows**: period `N` days (`"7"|"30"|"90"`): current = `t > last - N days`, previous = `last - 2N days < t <=
+  last - N days` (half-open, no overlap); `"all"` = every point and no previous window.
+- **Tiles** (one per numerical column, column order): `{"column", "latest", "min", "max", "mean", "previous",
+  "pct", "dir", "spark"}`; `latest` = the column's value at the latest point in the current window that has one;
+  `min`/`max` over the current window; `pct = round(100 * (mean - previous) / abs(previous), 1)` of the window means;
+  `"all"`, an empty previous window or `previous == 0` give `pct = None` and the page prints `n/a` and no arrow;
+  `dir` and the arrow + signed % + word rendering are exactly the Business card's (template code shared via a macro).
+  `spark` = the current window's values stride-sampled to at most 60 (`rules._sample`), drawn as the same inline SVG
+  as Business (`business.spark`). Tiles of a `plain` column print values without separators.
+- **Main line** (primary = `apps.measures(...)[0]`): over **all** points (before the period cut): `mean[i]` =
+  mean of `y[max(0, i - 6) .. i]` (7-point trailing, partial at the start, gate 183); `spike[i]` when `i >= 30`,
+  `sd = pstdev(y[i-30:i]) > 0` and `|y[i] - fmean(y[i-30:i])| / sd > 3`. Use running sums of y and y² over the
+  30-window (O(n); 200,000 rows must stay inside AC-42's 5 s). Then cut to the current window and stride-sample to
+  `chart_cap`, always keeping the spike points.
+  Chart dict: `_chart("monitor", f"{m} by {t}", t, m, f"temporal {t} + numerical {m}: line, 7-point rolling mean,
+  spike |z| > 3 over 30 points", shown, total, {"x": [iso], "y": [...], "mean": [...], "spike": [positions in x]},
+  score)`; `shown`/`total` = points drawn / points in the window. dashboard.js `monitor` builder: three traces on
+  one y-axis: the value line (`--c1`), the rolling mean (muted, dashed, named `7-point mean`), and the spikes as
+  `mode: "markers+text"`, `text: "spike"`, `textposition: "top center"` (marker + label, never colour alone).
+  Legend on (2+ series). `tableOf`: columns time, value, 7-point mean, spike (`spike` or empty).
+- **Payload**: `{"tiles": [...], "charts": [monitor], "period": "30", "periods": ["7", "30", "90", "all"],
+  "latest": "2024-04-29T00:00:00"}`. No primary (cannot happen under R4, N >= 1) or no dated row: no chart, tiles
+  `n/a`.
+- **Page** (`app_monitoring.html`): tiles `<ul class="tiles">` (like `.cards`, no `<p>`), period links
+  `<nav class="periods" aria-label="Period">` (`7 days`, `30 days`, `90 days`, `All`; current `aria-current`;
+  each href = current `f` + `appq` + `period=`), the filter form (date range), the main line figure, Columns, First
+  rows. Plain GET links: the URL is the state and Back works (decision 15).
+- **Export** (`monitoring.export(view)`): `[tiles table (Column, Latest, Min, Max, Change %), line chart of the
+  main line (kind "line", data x/y only)]`, ids `chart-1..`; title `Monitoring overview`.
+- **Hand values** (monitor.csv, period 30; window 2024-03-31..2024-04-29, 30 points): temperature latest 20.0, min
+  20.0, max 60.0, mean 24.2667 vs previous 23.1 -> `▲ +5.1% up`; humidity latest 54, min 50, max 54, 52.0 vs 52.0
+  -> `▶ 0.0% no change`; quiet.csv temperature 23.0 vs 23.1 -> `▼ -0.4% down`. Spikes: monitor.csv exactly
+  2024-04-10 (row 100); quiet.csv none. 7-point mean at 2024-04-10: 28.4286; at 2024-04-29: 23.0. Values from the
+  ticket 463 probe; QA recomputes them by hand in the test from `monitor_rows()`.
+
+## Round 6: Survey app (`app/survey.py`)
+`view(columns, typed, mapping, base_typed, pick, settings)` on the filtered typed rows; `questions(columns,
+mapping, typed) -> [index]`; `pick(questions, row, col) -> (row name, col name)`; `export(view)`.
+- **Questions** = C columns plus the `roles` `L` columns (computed on the unfiltered rows), in column order. T, I and other N columns are not
+  questions.
+- **Likert** (`scale(values) -> (levels, neutral index) | None`, on `base_typed`): all non-empty values, compared
+  lower-cased and stripped, lie on one known scale and there are at least 2 distinct values:
+  ```python
+  SCALES = [("strongly disagree", "disagree", ("neutral", "neither agree nor disagree"), "agree", "strongly agree"),
+            ("very dissatisfied", "dissatisfied", ("neutral", "neither satisfied nor dissatisfied"), "satisfied", "very satisfied"),
+            ("very unlikely", "unlikely", ("neutral", "neither likely nor unlikely"), "likely", "very likely"),
+            ("never", "rarely", "sometimes", "often", "always"),
+            (1, 2, 3, 4, 5), (1, 2, 3, 4, 5, 6, 7)]   # numbers: whole numbers; the first scale that holds every value wins
+  ```
+  `levels` = the scale's labels in order (the data's own spelling when present, else the first spelling above),
+  all levels kept even with a count of 0; neutral = the middle level.
+- **Non-Likert question**: `bar` dict, counts per `str(value)` over the view rows, `business._ranked` (top 10 by
+  count desc, ties by name, then one `Other`), `"orientation": "h"`, `"other": bool`, no `drill` key, so the
+  Explorer click filter (round 4) and the F3 cursor apply; `x_label` = the question column, `y_label` = `count`.
+- **Likert question**: kind `"likert"`, data `{"levels": [...], "counts": [...], "pct": [...], "neutral": i}`;
+  `pct` unrounded (sums to 100), shown with 1 decimal. JS `likert` builder: one horizontal stacked bar
+  (`barmode: "stack"`, one trace per level, x = pct, y = [question]), colours: levels before neutral from
+  `--div-neg` (strongest first), neutral `--div-mid` (grey), after it `--div-pos`; x axis 0..100 with `%` suffix;
+  hover `level: count (pct%)`. Not clickable (numeric answers have no dropdown; a word Likert column does, but a
+  100% bar has one category per trace, so no `crossFilter`).
+- **Cross-tab**: `pick` = the two question names from the URL when both are questions, else the first two; kind
+  `"crosstab"`, data `{"x": col levels, "y": row levels, "z": counts [[...]], "pct": row % [[...]] unrounded}`;
+  levels in scale order for Likert questions, else by count desc then name (all values, no Other). JS `crosstab`
+  builder: one `heatmap` trace, sequential one-hue scale on z, `text` = `count (pct%)` with 1 decimal,
+  `texttemplate: "%{text}"`, colour bar titled `count`. Form `<form class="crosstab" method="get">` with two
+  labelled selects `row` and `col` (options = questions), hidden inputs for `f`, `appq`; a change submits (JS) and an
+  Apply button works without JS. Fewer than 2 questions: no cross-tab (cannot happen under R5).
+- **Respondents**: up to 2 N columns that are not in `L` and not in `plain`, in column order, each
+  `rules._histogram(columns, typed, {columns[i]: "numerical"}, settings)` (the rule picks the only numerical
+  column), under `<h2>Respondents</h2>`. None: no section.
+- **Ids and page order**: questions grid (bars and Likert bars in column order), cross-tab, Respondents; `chart-1..N`
+  in that order. Payload `{"charts": [...], "questions": [names], "pick": [row, col]}`.
+- **Page** (`app_survey.html`): filter form + chips (categorical dropdowns, date range when T exists), `<div
+  class="questions">` grid (two per row at desktop, one at phone: Designer), cross-tab section with its form and
+  figure, Respondents section, Columns, First rows.
+- **Export** (`survey.export(view)`): one native `bar` per question (a Likert question becomes a bar of its counts
+  in scale order, no Other), then the cross-tab as a `table` chart (head: row question, then the column levels;
+  rows: counts), then the Respondents histograms; title `Survey overview`.
+- **Hand values** (survey.csv, 40 rows, no filter): questions `gender, region, city, q_service, q_easy, q_visits,
+  q_score`; bars: gender female 14, male 13, other 13; region East, North, South, West 10 each; city city00..city03
+  4 each, city04..city09 3 each, then `Other` 6 (city10 + city11). Likert: q_service (satisfied scale) 6, 6, 6, 16,
+  6 (15/15/15/40/15%); q_easy (agree) 8 each (20%); q_visits (frequency) 9, 9, 9, 9, 4; q_score (1..5) 5, 5, 5,
+  15, 10. Cross-tab default gender x region (columns East, North, South, West): female 3, 4, 3, 4 (21.4, 28.6,
+  21.4, 28.6%), male 3, 3, 4, 3 (23.1, 23.1, 30.8, 23.1%), other 4, 3, 3, 3. Respondents: `age` only
+  (`respondent_id` is an identifier). From the ticket 463 probe; QA recomputes them from `survey_rows()`.
+
+## Round 6: JSON contract additions (`GET /api/datasets/{id}/app`, fetched once on load, no polling)
+- Every app: chart dicts may carry `"plain": ["x" | "y" | "z"]` (F1). New kinds: `monitor` (data `x`, `y`,
+  `mean`, `spike`), `likert` (`levels`, `counts`, `pct`, `neutral`), `crosstab` (`x`, `y`, `z`, `pct`). They never
+  reach the export writers (the `export` functions turn them into `line`, `bar` and `table`).
+- Monitoring adds `tiles`, `period`, `periods`, `latest`; Survey adds `questions`, `pick`. Example:
+  ```json
+  {"dataset": "9c1e...", "app": "survey", "rule": "R5", "qualifies": ["survey", "business", "explorer"],
+   "shown": "survey", "filters": [], "questions": ["gender", "region", "..."], "pick": ["gender", "region"],
+   "charts": [{"id": "chart-1", "kind": "bar", "orientation": "h", "other": false, "...": "..."},
+              {"id": "chart-4", "kind": "likert", "data": {"levels": ["Very dissatisfied", "..."], "counts": [6, 6, 6, 16, 6],
+               "pct": [15.0, 15.0, 15.0, 40.0, 15.0], "neutral": 2}}]}
+  ```
+- `/api/datasets/{id}/charts` is unchanged (Explorer only).
 
 ## Round 5 changes at a glance
 | # | Change | Files | AC |
@@ -144,9 +379,10 @@ def _appview(d, f, app):          # the shown app's figures under filters f
 - `> 5000`: `"mode": "hex"`. Cell size `s = (max lon - min lon) / 40` (1.0 when the span is 0); pointy-top axial
   coordinates on the lon/lat plane: `q = (sqrt(3)/3 * lon - lat/3) / s`, `r = (2/3 * lat) / s`, cube-rounded; centre
   `lon = s * sqrt(3) * (q + r/2)`, `lat = s * 1.5 * r`. Data `{"lon", "lat", "count", "size": s}` sorted by `(q, r)`;
-  `sum(count) == len(pts)`. JS (dashboard.js) draws the cells as one GeoJSON `choropleth` of hexagons built from the
-  server's centres and `size` (not hexagon markers: Board gate 180), colour = count on the sequential scale, hover
-  `N points`; a click shows the count in the panel. big_csv (60,000) is the test case.
+  `sum(count) == len(pts)`. JS (dashboard.js) draws **hexagon choropleth cells**: one GeoJSON `choropleth` trace
+  whose features are hexagon polygons built from the server's centres and `size` (clockwise rings, clamped to
+  lon +-180 / lat +-90; not hexagon markers: Board gate 180), colour = count on the sequential scale, hover
+  `N points` (`1 point`, round 6 F2); a click shows the count in the panel. big_csv (60,000) is the test case.
 - `shown`/`total` = `len(pts)` / `len(rows)` in both modes, printed `N of M rows` (rows with coordinates of view
   rows; AC-17 form). The template's `points` set does not include `map2d`.
 - **Top regions** (gate 179): the country column (name in `rules.COUNTRY`, categorical or other) if any, else the C
@@ -465,11 +701,19 @@ Round 5: new `app/apps.py` (rule table, roles, `detect`, `measures`), `app/busin
 `table` kind; templates split per app; `dashboard.js` fetches `/app`, adds `map2d`, value labels, drill, table
 toggle, 3D toggle. `profile`, `filters`, `score`, readers, catalog, launcher and config are unchanged.
 
+Round 6: new `app/monitoring.py` (`view`, `export`) and `app/survey.py` (`SCALES`, `scale`, `pick`, `view`,
+`export`), created empty by the architect; `app/apps.py` gains the R5/R4 rows, `L`/`cols` roles, `plain`, `sep`,
+`plural`; `app/main.py` gains `_plain`, `_pick`, the `pick` cache key, `pickq` links and two `TITLES`; `geo.view`
+takes `plain`; `export.pptx` title slide; templates `app_monitoring.html`, `app_survey.html`, `_figure.html`
+(`score` flag, `plural`), `_tables.html` (`plain`); `dashboard.js` gains `monitor`, `likert`, `crosstab` builders,
+`clickable`, plain axes, hex text, and loses the trends `tozero` and its `sep` regex. Readers, catalog, profile,
+filters, score, xlsx, launcher and config are unchanged.
+
 ## Routes (sitemap: two pages, no nav beyond a "DataBoot" home link; unchanged)
 | Method, path | Returns |
 |---|---|
 | GET `/` | Home: datasets table, "Could not be read" table, "Other files" table |
-| GET `/datasets/{id}` | Dashboard page; 404 for unknown id; round 4: filter query params (see "Round 4: filters") |
+| GET `/datasets/{id}` | Dashboard page; 404 for unknown id; round 4: filter query params (see "Round 4: filters"); round 5 `app`; round 6 `period` (Monitoring), `row`/`col` (Survey cross-tab), also on `/app` and both exports |
 | GET `/api/datasets` | `[{"id","path","sheet","kind","rows","columns"}]` (columns = count) |
 | GET `/api/datasets/{id}/profile` | `{column: type}` (AC-2), also writes `<out>/profiles/{id}.json` |
 | GET `/api/datasets/{id}/charts` | chart contract below (Explorer charts; unchanged in round 5) |
@@ -480,7 +724,8 @@ toggle, 3D toggle. `profile`, `filters`, `score`, readers, catalog, launcher and
 | `/static/...` | StaticFiles mount |
 
 No page or route is added in round 4 (only query params), so no sitemap or NAV change. Round 5 adds the `app`
-query param on the page and both exports, and the `/app` JSON route; still two pages, no NAV change.
+query param on the page and both exports, and the `/app` JSON route; still two pages, no NAV change. Round 6 adds
+only query params (`period`, `row`, `col`); no route, no NAV change.
 
 ## Data access
 - `scan(folder)`: `os.walk` (no symlink follow), skip names starting with `.`; sorted by relative path. Missing
@@ -722,7 +967,7 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
 | AC-14 | readers + pyarrow `parquet.read` (R4) | tsv/json/jsonl/geojson counts; **9** parquet fixtures (zstd now reads) at 40x6; profile and charts equal flat.csv |
 | AC-15 | `others` list, home "Other files" table | manual.pdf `pdf 9 <date>`, old.xls `xls 2`; no `<a ` in that table; `.hidden.csv` absent |
 | AC-16 | rules table above, 8-chart cap; round 5: donut only for 2 to 5 values (`rules._donut`) | donut, histogram, scatter, heatmap, country map values; many.csv ≤ 8 figures; a 5-value column gives a donut, a 6-value one none |
-| AC-17 | figcaption has one `.chart-rule` and one `.chart-count` | per figure regex; no `<p>` in main except the folder path |
+| AC-17 | figcaption has one `.chart-rule` and one `.chart-count`; round 6 F2 `plural` on M | per figure regex `[\d,]+ of [\d,]+ (points?\|rows?)` with the singular exactly when M is 1; no `<p>` in main except the folder path; a 1-row file shows `1 of 1 row` |
 | AC-18 | xlsxwriter (R1) and python-pptx (R2) | openpyxl: first sheet `Data`, header = columns, `sum(len(ws._charts)) > 0`; python-pptx: `len(slides) == 1 + len(charts)`, some `shape.has_chart` |
 | AC-19 | titles and h1 in templates | home `<title>DataBoot</title>`, dashboards `… - DataBoot`, no `DataOS` |
 | AC-20 | pyarrow error -> `not a valid parquet file` (R4, R7) | corrupt `bad.parquet` (magic + zeros + footer length) in the "Could not be read" table with that reason; sales.csv still opens |
@@ -740,7 +985,7 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
 | AC-32 | S1: `app/score.py` helpers called inside each rule on the full (filtered) data; `score` on every chart | `data_dir` sales.csv API: line 0.89, histogram 0.34, bar 0.23, donut 0.22 (hand values in "Round 4: interest score"); points.tsv map3d 0.6; unit tests of `score.gini([16, 23, 7])` ≈ 0.2319, `score.skew` of 10, 20, 5, 7, 3, 1 ≈ 0.3415, constant or 1-value inputs give 0, a scatter on y = 2x gives 1.0 |
 | AC-33 | S2: round, cut to 8 in rule order, stable sort by `-score`, renumber ids | sales.csv kinds `["line", "histogram", "bar", "donut"]`, ids `chart-1..4`; a tie case keeps rule order (file `k\na\nb\na\nb\n`: bar and donut both score 0, so `["bar", "donut"]`); two requests give equal JSON; page `data-kind` order equals the API order |
 | AC-34 | P1 grid CSS (`:first-child` spans `1 / -1`); First rows table after `.charts` in the template | Playwright at 1280 px: first figure width ≈ `.charts` width, figures 2 and 3 share a `top` and are each about half; at 390 px every figure is full width; in the HTML the `data-table` comes after the last `</figure>` |
-| AC-35 | P1 caption `rule · score 0.NN` | per figure: `.chart-rule` text ends with `f" · score {c['score']:.2f}"` for the API chart at the same position |
+| AC-35 | P1 caption `rule · score 0.NN`; round 6 F4: only `app_explorer.html` passes `score=true` | Explorer: per figure `.chart-rule` ends with `f" · score {c['score']:.2f}"` for the API chart at the same position; shop (Business), places (Map), monitor.csv, survey.csv default pages: no `.chart-rule` contains `score` |
 | AC-36 | K1 `rules.kpis`; `<dl class="kpis">` | sales.csv: Rows 6, Columns 3, Missing 0.0%, amount (sum) 46; with `?f.region=North`: 3 and 16; `big_csv`: figures with separators (`60,000`) and test_AC_21 still green |
 | AC-37 | F1 `filters.parse/apply/options`; form in the template | sales.csv page has `<select name="f.region">` with North/South/East and `type="date"` inputs `from`/`to`; notes.csv has no select; API with `f.region=North`: every `total` smaller than unfiltered, `kpis.rows == 3`; `from=2024-01-03&to=2024-01-05`: `kpis.rows == 3`; the page with the same params shows the same counts as the API |
 | AC-38 | server-rendered filtered page; GET navigation; chips; Clear filters link | `/datasets/{id}?f.region=North`: `<option value="North" selected>`, chip `region = North`, KPI 3 rows; Playwright: pick South in the select, URL gains `f.region=South`, `page.go_back()` returns to the North URL and its KPI 3; click the chip's link, then `Clear filters`: URL has no `f.`, KPI 6 |
@@ -759,11 +1004,26 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
 | AC-51 | M1 map2d points; M2 70vh | places.csv: `map2d` trace is `scattergeo`, colour data = `pop`, colorbar title `pop`, colorscale two stops on `--seq`; Playwright at 1280x900 and 390x844: plot height / viewport height in 0.65..0.75; `topojsonURL` local |
 | AC-52 | M1 hexbin | big_csv `/app`: `mode == "hex"`, `len(count) < 60000`, `sum(count) == 60000`; places.csv `mode == "points"` with 20 marks; Playwright: hover a cell shows `N points` with separators |
 | AC-53 | M1 regions, rows; M2 panel, 3D toggle | places.csv: regions bar on `country`, x sums of `pop` per country descending; Playwright: click a point -> `.map-panel` shows its `country` and `pop` values; `3D view` -> `[data-kind=map3d]` visible with a WebGL canvas and the 2D figure hidden, press again -> back |
-| AC-54 | G1 table toggle, hover, no second axis | Playwright on shop (Business), places (Map) and sales (`app=explorer`): for every `.js-plotly-plot`, `Object.keys(gd._fullLayout)` has no `yaxis2` and no axis with `overlaying`; `hovermode !== false` and no trace `hoverinfo` in `none`/`skip`; each figure has one `.table-toggle`; clicking shows a `table.plot-table` whose row count equals the trace's point count, clicking again shows the plot |
-| AC-55 | G1 separators | Business and Map pages: no unseparated 4+ digit number in `main` text (the AC-21 regex), nor in `.bartext`, tick labels or a hover label; shop values `7,392`, places `20,000` |
+| AC-54 | G1 table toggle, hover, no second axis; round 6: `monitor`, `likert`, `crosstab` builders and `tableOf` cases | Playwright on shop (Business), places (Map), sales (`app=explorer`), monitor.csv and survey.csv (round 6): for every `.js-plotly-plot`, `Object.keys(gd._fullLayout)` has no `yaxis2` and no axis with `overlaying`; `hovermode !== false` and no trace `hoverinfo` in `none`/`skip`; each figure has one `.table-toggle`; clicking shows a `table.plot-table` whose row count equals the trace's point count, clicking again shows the plot |
+| AC-55 | G1 separators; round 6 F1 exceptions by role | Business and Map pages: no unseparated 4+ digit number in `main` text (the AC-21 regex), nor in `.bartext`, tick labels or a hover label, except text of `plain` columns and date ticks; shop values `7,392`, places `20,000` |
 | AC-56 | E2 `title`, `table` kind, `business.export`, `geo.export` | shop `export.xlsx?app=business`: sheets `Data`, `chart-1 table`, `chart-2 line`, `chart-3 line`, `chart-4 bar`, `chart-5 table`, `Summary`; Summary A1 `Business overview`, A2 `Filters: none`; PPTX slide 1 has `Business overview`, then table, line, line, bar (has_chart), table slides; places `?app=map`: `Map overview`, an XY scatter then a bar; sales.csv `?app=explorer` export equals the round 4 sheet list and Summary A1 `Filters: none` (Explorer unchanged) |
 | AC-57 | Designer: DESIGN.md "Global chart rules" | text check: the section heading exists and lists each rule phrase in AC-57 |
-| AC-58 | all assets local (AC-9); `/app` same origin | Playwright with `page.route("**/*")` counting non-`127.0.0.1` requests: open shop and places, drill, switch View-as, toggle 3D and a table: count 0 |
+| AC-58 | all assets local (AC-9); `/app` same origin | Playwright with `page.route("**/*")` counting non-`127.0.0.1` requests: open shop and places, drill, switch View-as, toggle 3D and a table: count 0; round 6 adds monitor.csv (pick each period, table toggle) and survey.csv (change the cross-tab, click a question bar) with the same count 0 (AC-9) |
+| AC-59 | F1 `apps.plain`, `apps.sep`, `_plain`, `plain` axis key, geo rows formatted on the server | unit: `apps.plain` on orders.csv = {order_id, year}; names `yr_built`, `zip`, `phone_no`, `customer_code`, `ID` plain, `amount`, `paid` not; a `founded` column of 1990..2020 plain; orders.csv page (Explorer) First rows shows `10045`, `2024`, `12,345` and no `2,024`/`10,045`; Playwright: the order_id histogram hover and table view show `10045`-style text; a Map fixture with a `year` column: side panel shows `2024`; no page of round6_dir contains `2,024` |
+| AC-60 | F2 `apps.plural`, `plural` filter, hex `text`, PPTX count | unit: `plural(1, "point") == "1 point"`, `plural(0, "point") == "0 points"`, `plural(1200, "row") == "1,200 rows"`; a 1-row CSV page shows `1 of 1 row`; a 5,001-point hex map with a 1-point cell hovers `1 point`; no page or PPTX text matches `\b1 (points\|rows)\b` |
+| AC-61 | F3 `clickable(c)` + `barCursor` for Explorer bars; DESIGN.md (Designer) | Playwright on sales `app=explorer`: hover a bar -> the figure has class `bar-click` and the computed `cursor` of the drag layer is `pointer`; Business leaderboard same; DESIGN.md Cross-filter section text contains `Explorer` and `bar-click` (or "pointer") |
+| AC-62 | F5 delete the trends `tozero`; bar builder keeps it; DESIGN.md (Designer) | Playwright: a Business file with month sums 14,000..16,000 (inline fixture): trend `_fullLayout.yaxis.range[0] > 0` and `rangemode` not `tozero`; the leaderboard `range[0] == 0`; monitor.csv main line `range[0] > 0`; DESIGN.md Global chart rules has "zero baseline" with "bars only" |
+| AC-63 | F6 two boxes on slide 1 | python-pptx: slide 0 texts start `[title, file name]` for sales `app=explorer` (`Explorer`, `sales.csv`), shop `app=business` (`Business overview`, `shop.csv`), book.xlsx Revenue default (`Business overview`, `book.xlsx - Revenue`); font size of box 2 run < box 1 run |
+| AC-64 | D2 rule order, `L`, amount guard | `/app`: monitor.csv and quiet.csv `monitoring`/`R4`, survey.csv `survey`/`R5` with `qualifies == ["survey", "business", "explorer"]`; badges `App: Monitoring (rule R4)`, `App: Survey (rule R5)`; every `data_dir`, `archetypes_dir`, `big_csv`, `big_sales_csv` dataset keeps its round 5 app/rule (shop.csv `business`/`R2`); inline: survey.csv without `submitted` still R5; 4 categoricals among 7 columns (57%) not R5; shop.csv with `revenue` removed (units 1..7 then counts as C: 4 of 5 columns) gives R5, which proves the guard |
+| AC-65 | MO1 tiles; MO2 template | monitor.csv `/app` tiles (hand values in "Round 6: Monitoring app"): temperature 20.0 / 20.0 / 60.0, pct 5.1 up; humidity 0.0 no change; quiet.csv temperature -0.4 down; page shows `▲`, `+5.1%`, `up`, an `<svg>` per tile; `?period=all` every tile `n/a`, no arrow |
+| AC-66 | P2 `_pick`, period links | monitor.csv page: 4 period links, `30 days` `aria-current`; `?period=7`: tile min/max and the main line `total` cover 7 points; reopening the URL keeps it; `?period=bad` shows 30; Playwright: click `90 days` -> URL has `period=90`, Back returns |
+| AC-67 | MO1 main line; `monitor` builder | monitor.csv `/app` chart `monitor`: `spike == [index of 2024-04-10]`, `mean` at it 28.4286 and last 23.0 (2 decimals); quiet.csv `spike == []`; Playwright: one trace text `spike`, one y-axis, 2 line traces; quiet page has no `spike` text in the plot |
+| AC-68 | SU1 question bars, Respondents; SU2 grid | survey.csv `/app`: bar counts as in the hand values (city Other 6); `orientation == "h"`; Playwright at 1280 px two question figures share a `top`, at 375 px one per row; `<h2>Respondents</h2>` with one histogram of `age` |
+| AC-69 | SU1 `scale`, `likert` kind; JS `likert` builder | unit: `scale` of `["Agree", "neutral"]` is the agree scale, `[1, 3, 7]` the 1..7 scale, `["Never", "Often"]` frequency, `["yes", "no"]` None; survey.csv `likert` dicts levels in scale order, `sum(pct) == 100`; Playwright: neutral trace colour equals `--div-mid`, the first and last level colours differ in hue |
+| AC-70 | SU1 cross-tab, `pick`; SU2 form | survey.csv `/app` crosstab gender x region counts and row % as hand values, each row of `pct` sums to 100 (1e-9); `?row=q_easy&col=gender` gives that pair; bad names fall back to the first two; Playwright: change the col select -> URL has `col=`, heatmap text shows `count (pct%)` with 1 decimal |
+| AC-71 | MO1/SU1 `export`; `TITLES` | monitor.csv `export.xlsx?app=monitoring`: sheets `Data`, `chart-1 table`, `chart-2 line`, `Summary`; Summary A1 `Monitoring overview`; PPTX slide 1 `Monitoring overview`, a LINE chart slide; survey.csv `?app=survey`: 7 bar sheets (`has_chart`), a table, a histogram, `Summary` A1 `Survey overview` |
+| AC-72 | round 5 grain (unchanged code) | QA inline files: daily sales over 100 days -> `grain == "week"`, trend x are Mondays, sums equal hand per-ISO-week sums, latest/previous cards match; monthly rows over 2020-01..2024-06 (> 1,096 days) -> `grain == "year"`, x `2020-01-01`..`2023-01-01` (2024 partial left out), sums per year |
+| AC-73 | Explorer path of `_export` | measures.csv (Explorer only): XLSX sheets start `Data`, end `Summary`, Summary A1 `Filters: none` (no `overview`), a chart sheet with `ws._charts`; PPTX `len(slides) == 1 + len(/charts)`, each chart slide `has_chart` (or a table for a heatmap), slide 1 has no `overview` text |
 
 ## Work items without AC ids: explicit checks
 - **W-1 Unreadable.sheet (gate 162)**: a workbook where one sheet fails lists `book.xlsx - <sheet>` in "Could not
@@ -778,7 +1038,34 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
   README's install line names `requirements-dev.txt`. `test_AC_23` still finds the four library pins in
   requirements.txt. QA may add a text test for these lines.
 
+- **W-6 hexagon text (M35, gate 180)**: "Round 5: Map app" says `hexagon choropleth cells` and no longer describes
+  hexagon markers (`grep -n "choropleth cells" docs/ARCHITECTURE.md`). Done in ticket 463.
+- **W-7 DESIGN.md (Designer, F3/F5)**: Cross-filter section names Explorer bars and the click cursor (AC-61);
+  Global chart rules say the zero baseline is for bars only and lines keep the auto range (AC-62); the Monitoring
+  and Survey layouts are described (tiles, period links, question grid, cross-tab, Respondents).
+
 ## Tests that must change with the code (name them in the tickets)
+Round 6 (each edit goes in the ticket that changes the behaviour; grep before relying on line numbers):
+- **F1**: `tests/conftest.py` `make_client` cache list gains `"_plain"`. `tests/test_geo.py` L32 rows stay
+  (values < 1,000). `tests/test_map_page.py` tests that read the panel through the JS `sep` keep passing only if the
+  server now sends `20,000` for `pop`: re-run `test_no_bare_four_digit_number_in_main_on_the_map_page`.
+- **F2**: `tests/test_map_page.py` L81 (`"%{z:,}" in hovertemplate`) -> the hex trace has `text` and
+  `"%{text}"`; L96 `label.split()[1] == "points"` holds for counts != 1. `tests/test_pages.py` L64/L82 and
+  `tests/test_acceptance.py` L237, L393, L458, L912 keep `points`/`rows` (M > 1). test_AC_52 L1464 regex already
+  allows `points?`.
+- **F4**: `tests/test_pages.py` L66 and `tests/test_filter_ui.py::test_score_in_caption_matches_api` run with
+  `app=explorer` already (check); any Business/Map page test that expects `· score` in a caption (grep `score` in
+  test_business_page.py, test_map_page.py) flips to "no score".
+- **F5**: a Business trend test asserting `rangemode == "tozero"` on `.trends` (grep `tozero`, `rangemode` in
+  test_business_page.py, test_acceptance.py) flips; `tests/test_table_toggle.py` L56-62 (bar starts at 0) stays.
+- **F6**: `tests/test_export_pptx.py` L64, L137, L149 slide 0 texts gain the title first: `["Explorer",
+  "sales.csv", "Rows: 6, 3 columns", "Filters: none"]` etc.; `tests/test_export_apps.py` L31 (`[0] ==
+  "sales.csv"` -> `[1]`), L47 (`[1]` Rows -> `[2]`), L89 (`"My title"` stays `[0]`); `tests/test_acceptance.py`
+  L1055 (`texts(p.slides[0])` of AC-40: the Rows/Filters lines move one index), L1610, L1621 stay.
+- **D2**: no round 5 fixture changes app (probe above); `tests/test_apps.py` tests that list `RULES` or `NAMES`
+  exactly (grep `RULES`, `NAMES`) gain the new rows. `test_AC_43` qualifies lists stay.
+- **MO/SU**: new test files only (`tests/test_monitoring.py`, `tests/test_survey.py`, their page tests).
+
 Round 5 (each edit goes in the ticket that changes the behaviour):
 - **A1/A2 ticket (default app switch)**: these fixtures change app: `sales.csv`, `sub/book.xlsx` Revenue, `staff.csv`
   and `big_sales_csv` become Business (R2); `points.tsv`, `sub/cities.geojson` and `big_csv` become Map (R1).
@@ -868,6 +1155,14 @@ with `shop.csv` (`shop_rows()`: date, store 3, channel 2, product 12, units, rev
 lon, country 4 values, pop), `measures.csv` (a, b, c numerical), `sparse.csv` (lat/lon in 4 of 10 rows + a, b, c).
 `big_csv` (60,000 points) is the hexbin case. `make_client` already clears `_detected` and `_appview` when they
 exist. QA writes any extra edge file inline (as test_AC_18 does with num.csv).
+Round 6 (added by the architect, roles checked by `tests/test_archetype_fixtures.py::test_round6_fixture_roles`):
+`round6_dir` -> folder with `monitor.csv` (`monitor_rows()`: time, temperature, humidity; 120 daily rows from
+2024-01-01; temperature 20 + i % 7 with 60.0 planted at 2024-04-10; humidity 50 + i % 5), `quiet.csv`
+(`monitor_rows(spike=False)`), `survey.csv` (`survey_rows()`, 40 rows: submitted, respondent_id 1001.., age,
+gender 3, region 4, city 12, q_service / q_easy / q_visits on the satisfied / agree / frequency scales
+(`SURVEY_LEVELS`), q_score 1..5) and `orders.csv` (order_id 10045.., year 2023/2024, region 2, amount 12,345..;
+12 rows, Explorer). Hand values are in "Round 6: Monitoring app" and "Round 6: Survey app". Week/year grain files
+(AC-72) and the 14,000..16,000 trend (AC-62) are small enough for QA to write inline.
 
 ## Decisions
 1. Office files on xlsxwriter (write), python-pptx (write) and openpyxl `read_only=True` (read), Parquet on
@@ -937,3 +1232,19 @@ exist. QA writes any extra edge file inline (as test_AC_18 does with num.csv).
     chart rule). Its rows still count in the leaderboard, which covers all view rows (PRD).
 30. (Round 5) The Map 3D toggle reuses the Explorer `map3d` chart with z = the primary numeric (Board gate 180);
     `rules._map3d` takes an optional `z` index, so Explorer (z = first numerical, AC-6, AC-27) is unchanged.
+31. (Round 6) Number format is decided once per column from its role on the unfiltered rows (`apps.plain`) and
+    carried as data (`plain` columns, `plain` axes), not by matching rendered text: the Board asked for role, not
+    regex (gate 181), and the browser cannot tell a year 2024 from an amount 2024.
+32. (Round 6) The amount guard on 1..7 answer columns: without it the R5-before-R2 order (gate 183) turns the round 5
+    shop.csv (a `units` 1..7 column) into a Survey, which AC-64 forbids; an amount column is the one signal a sales
+    file has and a survey does not. `# ponytail:` name heuristic; a survey that also holds an amount-named column
+    (for example `price_paid`) does not count its 1..7 answers and opens as Survey only if its text questions alone
+    meet R5. Board asked in open questions.
+33. (Round 6) Period and cross-tab picks are plain GET params in the URL, rendered by the server like filters
+    (decision 15): Back, shared links and exports work without client state. They join the `_appview` cache key.
+34. (Round 6) Rolling mean (7) and spike window (30) are different windows on purpose (gate 183): the mean smooths,
+    the spike test needs enough history. Running sums keep both O(n) on 200,000 rows (AC-42).
+35. (Round 6) New figure kinds (`monitor`, `likert`, `crosstab`) live only on the page; each app's `export`
+    maps them to the kinds the writers already know (`line`, `bar`, `table`), so xlsx.py needs no change.
+36. (Round 6) Likert levels and kinds are decided on the unfiltered rows: a filter that leaves only "Agree" must not
+    turn the question into a plain bar or reorder its segments.

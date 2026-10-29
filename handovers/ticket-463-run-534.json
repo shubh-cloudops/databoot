@@ -1,0 +1,101 @@
+{
+  "header": {
+    "ticket": 463,
+    "project": "you-think-of-the-project-name",
+    "from_role": "architect",
+    "phase": "architecture",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "4acf784af3ed",
+    "tokens_left": 1766560
+  },
+  "goal": "Write or update docs/ARCHITECTURE.md and adapt the scaffold for the approved spec.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/ARCHITECTURE.md explains how every acceptance item will be met",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py architecture",
+    "passed": true,
+    "output_tail": "........................................................................ [ 23%]\n........................................................................ [ 46%]\n........................................................................ [ 69%]\n........................................................................ [ 92%]\n.........................                                                [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 2 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n313 passed, 107 warnings in 410.55s (0:06:50)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Rule order R1, R5, R2, R4, R3 with roles gaining L (whole-number 1..7 columns) and cols; L is emptied when another numerical column matches apps.MEASURE",
+      "why": "Gate 183 order; without the guard the round 5 shop.csv (units 1..7) opens as Survey, breaking AC-64",
+      "evidence": "throwaway probe over data_dir/archetypes_dir/big_csv/big_sales_csv/round6_dir; docs/ARCHITECTURE.md 'Round 6: detection'"
+    },
+    {
+      "what": "Reworded AC-59, AC-64, AC-67, AC-68, AC-69 in place and noted the gate 183 override at the top of ARCHITECTURE.md",
+      "why": "Gate 183 changes the rolling-mean window, Likert scales, year name rule and adds Respondents; check.py plan only forces tickets for changed ids",
+      "evidence": "graphify-out/memory.md gate 183; LESSONS (reword AC same id)"
+    },
+    {
+      "what": "Number format decided by role: apps.plain on unfiltered rows (cached _plain), apps.sep only for numerical non-plain columns, 'plain' axis letters on chart dicts, Map panel rows formatted on the server",
+      "why": "Gate 181 item 1: by role, not regex; the browser cannot tell a year from an amount",
+      "evidence": "app/main.py:19 sep lambda; app/static/js/dashboard.js:345 sep regex; app/templates/_tables.html:11"
+    },
+    {
+      "what": "period and row/col are GET query params in the _appview cache key, carried in links only when the URL had them (like appq)",
+      "why": "Same server-rendered URL-state pattern as filters (decision 15): Back, shared links and exports match the page",
+      "evidence": "app/main.py:52 appq; ARCHITECTURE.md decision 15"
+    },
+    {
+      "what": "New page-only kinds monitor, likert, crosstab; each app's export maps them to line, bar, table",
+      "why": "xlsx.py and export.py writers need no change",
+      "evidence": "app/xlsx.py:96 _CHART; app/export.py:15 _TYPES"
+    },
+    {
+      "what": "PPTX title slide: box 1 = title or 'Explorer', box 2 = file name at 24 pt",
+      "why": "AC-63 covers every export; Explorer has no app title and AC-73 forbids an 'overview' title",
+      "evidence": "app/export.py:112; docs/acceptance.json AC-63, AC-73"
+    },
+    {
+      "what": "Added round6_dir fixture (monitor, quiet, survey, orders) plus monitor_rows/survey_rows and a roles test; created empty app/monitoring.py and app/survey.py",
+      "why": "Shared fixtures with hand values now (QA: one fixture per archetype)",
+      "evidence": "tests/conftest.py; tests/test_archetype_fixtures.py::test_round6_fixture_roles"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Survey fixture city = SURVEY_CITIES[(i*i) % 12] and q_score = 1 + (i*i) % 5",
+      "why_it_failed": "Squares mod 12 / mod 5 hit only 4 / 3 values, so there was no top-10 + Other case and no full 1..5 scale; switched to i % 12 and a fixed 8-value pattern"
+    },
+    {
+      "what": "Gate 183 rules taken literally (1..7 columns always count as categorical for R5)",
+      "why_it_failed": "Probe showed round 5 shop.csv flips from business/R2 to survey/R5"
+    }
+  ],
+  "assumptions": [
+    "The 7-point rolling mean includes the current point and is partial for the first 6 points; the spike z uses population stdev of the 30 points before (current excluded)",
+    "Monitoring windows are half-open: current t > last - N days, previous last - 2N < t <= last - N",
+    "Explorer PPTX title line reads 'Explorer'",
+    "Likert levels show the full scale (zero counts kept), with the data's own spelling when present",
+    "Cross-tab row percents are stored unrounded (sum to 100) and shown with 1 decimal",
+    "Monitoring shows a tile for every numerical column, not only the first 3"
+  ],
+  "open_questions": [
+    "Amount guard: 1..5/1..7 columns count as Survey answers only when no other numerical column has an amount-style name (needed so shop.csv stays Business under the gate 183 order). OK, or should the guard be different (e.g. at least 2 such columns)?",
+    "Explorer PPTX title slide first line: 'Explorer' (my default), 'DataBoot', or something else?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When a round reorders or adds detection rules, run a throwaway test that evaluates the new conditions on every old fixture folder and prints old vs new app before writing the spec",
+      "when": "Architect tickets that change apps.RULES or column roles",
+      "evidence": "Ticket 463 probe: shop.csv flipped to survey/R5 under the literal gate 183 rules"
+    },
+    {
+      "lesson": "Bash output of docs is compressed or garbled; dump JSON to a temp file and Read it, and edit acceptance.json with a small script that writes one item per line to keep the diff minimal",
+      "when": "Reading or rewording acceptance items",
+      "evidence": "acceptance.json texts showed as <<ccr:...>> in Bash; the script diff was 5 lines"
+    }
+  ],
+  "problems": []
+}

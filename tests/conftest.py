@@ -5,6 +5,7 @@ Tests never touch a real drive or /live: point the app at `data_dir` through the
 import csv
 import json
 import zipfile
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -172,6 +173,55 @@ def archetypes_dir(tmp_path):
     (root / "measures.csv").write_text("a,b,c\n" + "".join(f"{i},{(i * 7) % 11},{2 * i + 1}\n" for i in range(12)))
     (root / "sparse.csv").write_text("lat,lon,a,b,c\n" + "".join(
         (f"{10 + i},{20 + i}" if i < 4 else ",") + f",{i},{i * 2},{i % 3}\n" for i in range(10)))
+    return root
+
+
+def monitor_rows(spike=True):
+    """monitor.csv rows: time, temperature, humidity (Monitoring, rule R4; ARCHITECTURE.md "Round 6").
+
+    One reading a day from 2024-01-01 for 120 days; temperature 20 + i % 7, humidity 50 + i % 5. With spike, day 100
+    (2024-04-10) reads 60.0: the only point with |z| > 3 against the 30 readings before it.
+    """
+    return [((date(2024, 1, 1) + timedelta(days=i)).isoformat(), 60.0 if spike and i == 100 else 20.0 + i % 7,
+             50 + i % 5) for i in range(120)]
+
+
+SURVEY_LEVELS = {"q_service": ("Very dissatisfied", "Dissatisfied", "Neutral", "Satisfied", "Very satisfied"),
+                 "q_easy": ("Strongly disagree", "Disagree", "Neither agree nor disagree", "Agree", "Strongly agree"),
+                 "q_visits": ("Never", "Rarely", "Sometimes", "Often", "Always")}
+SURVEY_CITIES = tuple(f"city{k:02d}" for k in range(12))
+
+
+def survey_rows():
+    """survey.csv rows (Survey, rule R5): submitted (date), respondent_id, age, gender, region, city, q_service,
+    q_easy, q_visits (word Likert scales), q_score (1..5, Likert, counts as C for R5 only). 40 respondents.
+
+    C = gender, region, city + 3 word scales (6; q_score makes 7 for R5) of 10 columns; N = respondent_id, age.
+    The date makes R2 true too, so it also proves R5 is walked before R2 (gate 183). city has 12 values: top 10 + Other.
+    """
+    return [(f"2024-03-{i % 28 + 1:02d}", 1001 + i, 18 + (i * 7) % 50, ("female", "male", "other")[i % 3],
+             ("North", "South", "East", "West")[i % 4], SURVEY_CITIES[i % 12],
+             SURVEY_LEVELS["q_service"][(i * 3) % 5 if i % 4 else 3], SURVEY_LEVELS["q_easy"][i % 5],
+             SURVEY_LEVELS["q_visits"][min(4, i // 9)], (1, 2, 3, 4, 5, 4, 4, 5)[i % 8]) for i in range(40)]
+
+
+@pytest.fixture
+def round6_dir(tmp_path):
+    """Round 6 archetypes: monitor.csv -> monitoring/R4 (one planted spike), quiet.csv -> monitoring/R4 (no spike),
+    survey.csv -> survey/R5, orders.csv -> explorer/R3 with an identifier (order_id) and a year column (AC-59)."""
+    root = tmp_path / "r6"
+    root.mkdir()
+    head = ("time", "temperature", "humidity")
+    with open(root / "monitor.csv", "w", newline="") as f:
+        csv.writer(f).writerows([head, *monitor_rows()])
+    with open(root / "quiet.csv", "w", newline="") as f:
+        csv.writer(f).writerows([head, *monitor_rows(spike=False)])
+    with open(root / "survey.csv", "w", newline="") as f:
+        csv.writer(f).writerows([("submitted", "respondent_id", "age", "gender", "region", "city", *SURVEY_LEVELS,
+                                  "q_score"), *survey_rows()])
+    with open(root / "orders.csv", "w", newline="") as f:
+        csv.writer(f).writerows([("order_id", "year", "region", "amount"),
+                                 *[(10045 + i, 2023 + i % 2, ("North", "South")[i % 2], 12345 + 100 * i) for i in range(12)]])
     return root
 
 
