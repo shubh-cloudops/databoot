@@ -1,0 +1,78 @@
+{
+  "header": {
+    "ticket": 465,
+    "project": "you-think-of-the-project-name",
+    "from_role": "techlead",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "38d349eb1f24",
+    "tokens_left": 1903496
+  },
+  "goal": "Write plan/tickets.json: the build tickets for the approved architecture and design.",
+  "acceptance_criteria": [
+    {
+      "text": "Every acceptance item is covered by a ticket",
+      "passes": true
+    },
+    {
+      "text": "Each ticket is small, testable and has a layer",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py plan",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Confirmed DESIGN.md already holds the Monitoring and Survey layouts, the AC-39/AC-61 cursor text and the zero-baseline-for-bars-only rule, so no designer ticket was added",
+      "why": "Gate 184 asked for this check first",
+      "evidence": "docs/DESIGN.md L258-260 (Cross-filter), L267-275 (Global chart rules 1-2), L393 (Monitoring and Survey round 6)"
+    },
+    {
+      "what": "Found changed ids by comparing acceptance.json with the 'New round' commit 47623d0 by id: AC-17, 35, 54, 55 changed and AC-59..73 new",
+      "why": "Lesson from earlier rounds: the diff finds the round's items",
+      "evidence": "/tmp/diff.py output; check.py plan listed the same uncovered ids before the rewrite"
+    },
+    {
+      "what": "Ticket 5 creates empty app_monitoring.html and app_survey.html while turning on the new rules",
+      "why": "dataset.html includes app_<shown>.html, which would raise TemplateNotFound for monitor.csv and survey.csv until the frontend tickets land",
+      "evidence": "app/templates/dataset.html include line; ARCHITECTURE.md Round 6 request flow"
+    },
+    {
+      "what": "Backend figure modules (tickets 3 and 4) come before the wiring ticket (5), which comes before the page tickets (8, 9)",
+      "why": "Backend tickets precede the frontend ones that depend on them; the architecture's table lists D2/P2 first, but wiring first would call empty modules",
+      "evidence": "docs/ARCHITECTURE.md 'Order of tickets' L80-81"
+    },
+    {
+      "what": "Gate 184 answers are written into ticket 3's criteria: tile cap of 8 with the note, mean includes the current point, spike stdev is population of the previous 30. The 'Data overview' PPTX title is not: the Explorer first line stays 'Explorer' in ticket 2.",
+      "why": "Gate 184 says the answers override earlier docs. However, the same gate's 'Data overview' title conflicts with AC-73 and ARCHITECTURE.md, which both say 'Explorer', and I did not resolve that.",
+      "evidence": "gate 184 text in the task prompt; docs/ARCHITECTURE.md L28-29; AC-73"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Round 5 precedent allows tickets to edit tests/test_acceptance.py where existing assertions must change, so tickets 2 and 5 list it",
+    "Week/year grain code in business.py already works; ticket 2 only verifies it and fixes it if a check fails"
+  ],
+  "open_questions": [
+    "Gate 184 says the Explorer PPTX title is 'Data overview', but AC-73 (no 'overview' title) and ARCHITECTURE.md (first line 'Explorer') disagree. Ticket 2 uses 'Explorer' as in the docs. If the Board wants 'Data overview', the architect must reword AC-63 and AC-73 first, since 'overview' conflicts with AC-73's wording.",
+    "Ticket count is 10, above the 3 to 8 preference, to keep each ticket under about 200 lines"
+  ],
+  "lessons": [
+    {
+      "lesson": "When new rules would route a dataset to a template that a later ticket creates, have the wiring ticket add empty template files so every ticket leaves the site rendering",
+      "when": "A backend rule table change precedes the frontend page tickets",
+      "evidence": "app/templates/dataset.html includes app_<shown>.html; plan/tickets.json ticket 5"
+    },
+    {
+      "lesson": "A Board answer that sets a title (here 'Data overview') can contradict an AC that forbids a word in that title; check it against acceptance.json before putting it in a ticket, and raise it as an open question",
+      "when": "A gate sets client-facing text that an AC also constrains",
+      "evidence": "gate 184 vs AC-73"
+    }
+  ],
+  "problems": []
+}
