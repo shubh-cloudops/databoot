@@ -177,7 +177,7 @@
         });
         return [[{ type: "choropleth", geojson: { type: "FeatureCollection", features: features }, featureidkey: "id",
           locations: features.map(function (f) { return f.id; }), z: d.count, customdata: d.lon.map(function (x, i) { return [x, d.lat[i]]; }),
-          colorscale: scale, marker: { line: { color: t["--bg"], width: 0.5 } }, hovertemplate: "%{z:,} points<extra></extra>",
+          colorscale: scale, marker: { line: { color: t["--bg"], width: 0.5 } }, text: d.count.map(function (n) { return plural(n, "point"); }), hovertemplate: "%{text}<extra></extra>",
           colorbar: bar("Points per cell") }], l];
       }
       var has = [], none = [];
@@ -197,14 +197,20 @@
   };
 
   // Global rules (DESIGN.md "Global chart rules" 9, 10): thousands separators in ticks and tooltips on every figure.
-  var HOVER = { pie: "%{label}<br>%{value:,}<extra></extra>", choropleth: "%{location}<br>%{z:,}<extra></extra>",
-    scatter3d: "%{x:,}, %{y:,}, %{z:,}<extra></extra>" };
-  function globalRules(data, l) {
+  // Plain axes (c.plain: identifier, code or year columns) print as they are, with no separator.
+  function plural(n, word) { return n.toLocaleString("en-US") + " " + word + (n === 1 ? "" : "s"); }
+  var HOVER = { pie: "%{label}<br>%{value:,}<extra></extra>", choropleth: "%{location}<br>%{z:,}<extra></extra>" };
+  function globalRules(data, l, c) {
     l.separators = ".,";
-    var sc = l.scene || {};
+    var sc = l.scene || {}, plain = c.plain || [];
     [l.xaxis, l.yaxis, sc.xaxis, sc.yaxis, sc.zaxis].forEach(function (a) {
-      if (a && a.type !== "date" && a.type !== "category") a.hoverformat = ",";
+      if (!a || a.type === "date" || a.type === "category") return;
+      var p = plain.some(function (k) { return c[k + "_label"] === a.title.text; });
+      a.hoverformat = p ? "" : ",";
+      if (p) a.tickformat = "";
     });
+    var at = function (k) { return "%{" + k + (plain.indexOf(k) < 0 ? ":," : "") + "}"; };
+    HOVER.scatter3d = at("x") + ", " + at("y") + ", " + at("z") + "<extra></extra>";
     data.forEach(function (tr) { if (HOVER[tr.type] && !tr.hovertemplate) tr.hovertemplate = HOVER[tr.type]; });
   }
 
@@ -258,13 +264,14 @@
         var made = tableOf(c, plot.data[0]);
         plot.data.slice(1).forEach(function (extra) { made[1] = made[1].concat(tableOf(c, extra)[1]); });
         var table = document.createElement("table"), tr = document.createElement("tr");
+        var raw = made[0].map(function (h) { return (c.plain || []).some(function (k) { return c[k + "_label"] === h; }); });
         table.className = "plot-table";
         made[0].forEach(function (h) { tr.appendChild(cell("th", h, "col")); });
         table.appendChild(document.createElement("thead")).appendChild(tr);
         var body = table.appendChild(document.createElement("tbody"));
         made[1].forEach(function (r) {
           var row = body.appendChild(document.createElement("tr"));
-          r.forEach(function (v, i) { row.appendChild(cell("td", v)); });
+          r.forEach(function (v, i) { row.appendChild(cell("td", raw[i] && v != null ? String(v) : v)); });
         });
         wrap = document.createElement("div");
         wrap.className = "plot-table-wrap";
@@ -373,7 +380,7 @@
       var made = build[c.kind](c, t, layout(t, c));
       if (c.kind === "line" && el.closest(".trends")) made[1].yaxis.rangemode = "tozero";  // DESIGN.md: Business trends start at 0
       if (c.kind === "bar" && el.closest(".map-panel")) { made[1].xaxis.nticks = 3; made[1].xaxis.tickangle = 0; }  // 340px box: three ticks fit flat
-      globalRules(made[0], made[1]);
+      globalRules(made[0], made[1], c);
       Plotly.newPlot(plot, made[0], made[1], c.kind === "map2d" ? Object.assign({}, CONFIG, { scrollZoom: false }) : CONFIG).then(function () { keyboardBar(plot); barCursor(plot, c); crossFilter(plot, c); mapPanel(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });
     } catch (e) { fail(plot); }
   }

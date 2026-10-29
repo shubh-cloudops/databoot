@@ -1,0 +1,87 @@
+{
+  "header": {
+    "ticket": 471,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1914598
+  },
+  "goal": "Number format and plural in templates and charts (F1, F2 front end; Board gate 181 items 1-2, gate 183 year rule): _tables.html, _figure.html count, hex hover text, plain axes in dashboard.js",
+  "acceptance_criteria": [
+    {
+      "text": "_tables.html First rows prints v|sep only when the column is numerical and not in plain (plain passed to the template); orders.csv First rows shows 10045, 2024 and 12,345 and the text '2,024' never appears on the page",
+      "passes": true
+    },
+    {
+      "text": "_figure.html count reads '{{ shown|num }} of {{ total|plural(unit) }}' with unit point for map3d, line, scatter and monitor, row otherwise: a 1-row CSV shows '1 of 1 row', a 5-row file with 0 shown reads '0 of 5 rows', and no page text matches \\b1 (points|rows)\\b",
+      "passes": true
+    },
+    {
+      "text": "dashboard.js drops its own sep() regex and prints the Map panel cells as the server sent them; a plain axis ('x'|'y'|'z' in c.plain) gets hoverformat '' and a %{z} hovertemplate (no ':,'), and tableOf prints String(v) for that column; sums and counts of non-plain columns keep separators",
+      "passes": true
+    },
+    {
+      "text": "The hex (map2d) trace gets per-cell text built with the same plural rule and hovertemplate '%{text}<extra></extra>', so a cell with 1 point hovers '1 point'",
+      "passes": true
+    },
+    {
+      "text": "Existing tests updated here: tests/test_map_page.py (hex hovertemplate now has text and '%{text}'; the no-bare-four-digit test still passes), tests/test_pages.py and tests/test_filter_ui.py captions; test_business_page.py and test_table_toggle.py still pass",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-59, AC-60, AC-55, AC-17, AC-54 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 19%]\n........................................................................ [ 39%]\n........................................................................ [ 59%]\n........................................................................ [ 78%]\n........................................................................ [ 98%]\n.....                                                                    [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n365 passed, 109 warnings in 398.69s (0:06:38)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Plain axes are matched by axis title text against c[letter+'_label'] for letters in c.plain",
+      "why": "Horizontal bars swap x and y, so matching by label is safer than matching by letter",
+      "evidence": "app/static/js/dashboard.js globalRules"
+    },
+    {
+      "what": "First rows caption uses plural('row')",
+      "why": "A 1-row CSV would otherwise show 'First 1 rows', which matches the banned \\b1 rows\\b",
+      "evidence": "app/templates/_tables.html:8"
+    },
+    {
+      "what": "Updated test_AC_52 in tests/test_acceptance.py",
+      "why": "It asserted 'points' inside the hex hovertemplate, which is now '%{text}'",
+      "evidence": "tests/test_acceptance.py:1458"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First edit script used the bare 'python' command",
+      "why_it_failed": "Only python3 exists in this shell, and the chained command short-circuited before the edit ran"
+    }
+  ],
+  "assumptions": [
+    "Heatmap, pie and choropleth need no plain handling because they have no numeric column axes"
+  ],
+  "open_questions": [
+    "Not checked in a screenshot: I did not run the Playwright MCP browser at 1280 and 375 wide. The browser tests pass with no console errors."
+  ],
+  "lessons": [
+    {
+      "lesson": "After changing hovertemplate text, grep tests for the old text, including test_acceptance.py, before the full run",
+      "when": "Changing chart tooltips or captions",
+      "evidence": "test_AC_52 failed on 'points' in hovertemplate"
+    },
+    {
+      "lesson": "Use python3 and the Edit tool; there is no 'python' binary here",
+      "when": "Scripted file edits",
+      "evidence": "bash: python: command not found"
+    }
+  ],
+  "problems": []
+}

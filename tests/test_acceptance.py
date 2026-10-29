@@ -1454,7 +1454,7 @@ def test_AC_52(arch, big_csv, make_client, tmp_path):
     try:
         url = f"http://127.0.0.1:{server.servers[0].sockets[0].getsockname()[1]}/datasets/{_app_id(client, 'big.csv')}"
         with _browse(url) as page:
-            t = page.evaluate("document.querySelector('.map-layout .js-plotly-plot').data.map(t => [t.type, t.z.reduce((a, b) => a + b, 0), t.hovertemplate])")
+            t = page.evaluate("document.querySelector('.map-layout .js-plotly-plot').data.map(t => [t.type, t.z.reduce((a, b) => a + b, 0), t.hovertemplate + t.text[0]])")
             assert len(t) == 1 and t[0][0] == "choropleth" and t[0][1] == 60_000 and "points" in t[0][2]
             cells = page.locator(".map-layout .choroplethlayer path")
             cells.nth(cells.count() // 2).scroll_into_view_if_needed()

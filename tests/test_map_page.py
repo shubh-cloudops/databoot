@@ -26,7 +26,7 @@ def big(big_csv, make_client):
 def traces(page):
     return page.evaluate("""() => { const g = document.querySelector('.map-layout .js-plotly-plot');
         return g.data.map(t => ({type: t.type, z: t.z, marker: t.marker, hovertemplate: t.hovertemplate,
-        customdata: t.customdata, n: (t.lon || t.locations).length, geojson: t.geojson && t.geojson.features.length})); }""")
+        customdata: t.customdata, text: t.text, n: (t.lon || t.locations).length, geojson: t.geojson && t.geojson.features.length})); }""")
 
 
 def test_points_are_coloured_by_the_primary_numeric(places, browser):
@@ -78,7 +78,8 @@ def test_big_csv_draws_hexagon_cells_as_one_choropleth(big, browser):
     assert tr[0]["marker"]["line"]["width"] == 0.5
     assert page.evaluate("document.querySelector('.map-layout .js-plotly-plot').data[0].colorbar.title.text") == "Points per cell"
     assert page.evaluate("document.querySelectorAll('.map-layout .scattergeo, .map-layout .point').length") == 0
-    assert "points" in tr[0]["hovertemplate"] and "%{z:,}" in tr[0]["hovertemplate"]
+    assert tr[0]["hovertemplate"] == "%{text}<extra></extra>" and tr[0]["text"][0].endswith((" point", " points"))
+    assert tr[0]["text"] == [f"{n:,} point" + ("" if n == 1 else "s") for n in tr[0]["z"]]
     assert page.locator("figure[data-kind=map2d] .chart-count").inner_text() == "60,000 of 60,000 rows"
     assert page.errors == []
 
@@ -244,3 +245,22 @@ def test_click_a_hex_cell_shows_the_points_in_it(big, browser):
     page.wait_for_function("document.querySelector('.map-panel .panel-detail').textContent.startsWith('Points in cell: ')")
     n = int(page.locator(".map-panel .panel-detail").inner_text().split(": ")[1].replace(",", ""))
     assert 1 <= n <= 60_000 and page.locator(".map-panel dl").count() == 0 and page.errors == []
+
+
+def test_plain_axes_print_without_separators(round6_dir, make_client, browser):
+    make_client(round6_dir)
+    with serve() as base:
+        i = _id(base, "orders.csv")
+        charts = json.load(urllib.request.urlopen(f"{base}/api/datasets/{i}/charts"))["charts"]
+        page = open_(browser, f"{base}/datasets/{i}?app=explorer")
+        got = page.evaluate("""() => [...document.querySelectorAll('.js-plotly-plot')].map(g => ({
+            x: g.layout.xaxis && [g.layout.xaxis.title.text, g.layout.xaxis.hoverformat],
+            y: g.layout.yaxis && [g.layout.yaxis.title.text, g.layout.yaxis.hoverformat]}))""")
+        plain = {c["x_label"] for c in charts if "x" in c.get("plain", [])}
+        assert plain and {"order_id", "year"} & plain
+        for g in got:
+            if g["x"] and g["x"][0] in plain:
+                assert g["x"][1] == ""
+            if g["x"] and g["x"][0] == "amount":
+                assert g["x"][1] == ","
+        assert any(g["x"] and g["x"][0] in plain for g in got) and page.errors == []

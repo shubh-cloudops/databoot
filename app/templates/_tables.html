@@ -5,8 +5,8 @@
     <tr><td class="path">{{ col }}</td><td><span class="badge">{{ types[col] }}</span></td></tr>{% endfor %}
   </tbody></table></div></section>
 <section class="block"><div class="table-wrap"><table class="data-table">
-  <caption><h2>First {{ rows|length|num }} rows</h2></caption>
+  <caption><h2>First {{ rows|length|plural("row") }}</h2></caption>
   <thead><tr>{% for col in d.columns %}<th scope="col">{{ col }}</th>{% endfor %}</tr></thead>
   <tbody>{% for r in rows %}
-    <tr>{% for v in r %}<td>{{ "" if v is none else (v|sep if types[d.columns[loop.index0]] == "numerical" else v) }}</td>{% endfor %}</tr>{% endfor %}
+    <tr>{% for v in r %}<td>{{ "" if v is none else (v|sep if types[d.columns[loop.index0]] == "numerical" and loop.index0 not in plain else v) }}</td>{% endfor %}</tr>{% endfor %}
   </tbody></table></div></section>

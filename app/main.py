@@ -58,7 +58,7 @@ def dashboard(request: Request, id: str):
     chips = [(label, url(*f[:i], *f[i + 1:], *appq, *pickq)) for i, label in enumerate(v["labels"])]
     view_as = [(apps.NAMES[a], url(*f, ("app", a)), a == shown) for a in det["qualifies"]] if det["qualifies"] != ["explorer"] else []
     return templates.TemplateResponse(request, "dataset.html", {
-        "title": f"{d.path} - DataBoot", "d": d, "types": v["mapping"], "rows": v["rows"][:20], "shown": shown,
+        "title": f"{d.path} - DataBoot", "d": d, "types": v["mapping"], "rows": v["rows"][:20], "plain": _plain(d), "shown": shown,
         "badge": f"App: {apps.NAMES[det['app']]} (rule {det['rule']})", "view_as": view_as, "appq": bool(appq),
         "charts": _appview(d, f, "explorer")["charts"] if shown == "explorer" else [],
         "biz": _appview(d, f, "business", shown if appq else None) if shown == "business" else {},

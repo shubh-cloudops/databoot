@@ -47,7 +47,7 @@ def test_every_dashboard_has_types_and_at_most_20_rows(make_client, data_dir):
         assert f"/datasets/{d.id}/export.pptx" in html and f"/datasets/{d.id}/export.xlsx" in html
         rows = html.split('class="data-table"')[1].split("<tbody>")[1].count("<tr>")
         assert 1 <= rows <= 20
-        assert re.search(r"<caption><h2>First [\d,]+ rows</h2></caption>", html)
+        assert re.search(r"<caption><h2>First [\d,]+ rows?</h2></caption>", html)
         assert not re.findall(r"<p[ >]", _main(html))
     assert client.get("/datasets/nope").status_code == 404
 
@@ -85,3 +85,23 @@ def test_big_csv_counts_have_separators(make_client, big_csv):
 
 def test_headers_keep_their_case():
     assert "uppercase" not in (config.ROOT / "app/static/css/databoot.css").read_text(encoding="utf-8")
+
+
+def test_orders_first_rows_keep_ids_and_years_plain(make_client, round6_dir):
+    client = make_client(round6_dir)
+    html = client.get(f"/datasets/{_ids(client)[('orders.csv', None)]}?app=explorer").text
+    cells = html.split('class="data-table"')[1].split("<tbody>")[1]
+    assert "<td>10045</td>" in cells and "<td>2024</td>" in cells and "<td>12,345</td>" in cells
+    assert "2,024" not in html and "10,045" not in html
+
+
+def test_counts_are_singular_at_one(make_client, tmp_path):
+    from app.main import templates
+    (tmp_path / "one.csv").write_text("a,b\n1,2\n")
+    client = make_client(tmp_path)
+    html = client.get(f"/datasets/{_ids(client)[('one.csv', None)]}?app=explorer").text
+    assert "<h2>First 1 row</h2>" in html and not re.search(r"\b1 (points|rows)\b", html)
+    fig = templates.get_template("_figure.html").module.figure
+    count = lambda kind, shown, total: re.search(r'chart-count">([^<]*)<', fig(dict(id="c", kind=kind, title="t", rule="r", shown=shown, total=total))).group(1)
+    assert count("bar", 1, 1) == "1 of 1 row" and count("line", 1, 1) == "1 of 1 point"
+    assert count("bar", 0, 5) == "0 of 5 rows" and count("monitor", 0, 5) == "0 of 5 points" and count("scatter", 2, 5) == "2 of 5 points"
