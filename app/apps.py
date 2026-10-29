@@ -41,3 +41,29 @@ def measures(columns, mapping):
     """Up to 3 numerical column indexes, name-rule matches first; [0] is the primary amount."""
     n = [i for i, c in enumerate(columns) if mapping.get(c) == "numerical"]
     return ([i for i in n if MEASURE.search(columns[i])] + [i for i in n if not MEASURE.search(columns[i])])[:3]
+
+
+def plain(columns, mapping, typed):
+    """Numerical column indexes that never get separators: identifiers, codes, years (name rule or values 1900..2100)."""
+    out = set()
+    for i, c in enumerate(columns):
+        if mapping.get(c) != "numerical":
+            continue
+        n = c.strip().lower()
+        vals = [r[i] for r in typed if r[i] not in (None, "")]
+        if (n.endswith("id") or any(w in n for w in ("code", "zip", "phone", "year", "yr"))
+                or (vals and all(v == int(v) and 1900 <= v <= 2100 for v in vals))):
+            out.add(i)
+    return frozenset(out)
+
+
+def sep(v):
+    """Thousands separators on the integer part of a number text; any other text stays as it is."""
+    t = str(v)
+    whole, dot, frac = t.partition(".")
+    return f"{int(whole):,}{dot}{frac}" if re.fullmatch(r"-?[1-9]\d{3,}(\.\d+)?", t) else t
+
+
+def plural(n, word):
+    """'1 point', '2 points', '1,200 rows'."""
+    return f"{n:,} {word}" + ("" if n == 1 else "s")

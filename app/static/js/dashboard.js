@@ -341,10 +341,7 @@
     });
   }
 
-  // Map app side panel: the clicked point's row from the payload (no request), or a hex cell's count.
-  function sep(v) {
-    return /^-?[1-9]\d{3,}(\.\d+)?$/.test(v) ? Number(v).toLocaleString("en-US", { maximumFractionDigits: 20 }) : v;
-  }
+  // Map app side panel: the clicked point's row from the payload (no request; numbers are formatted by the server), or a hex cell's count.
   function mapPanel(plot, c) {
     if (c.kind !== "map2d") return;
     var box = document.querySelector(".map-panel .panel-detail");
@@ -361,7 +358,7 @@
         node = document.createElement("dl");
         c.columns.forEach(function (name, i) {
           node.appendChild(cell("dt", name));
-          node.appendChild(cell("dd", sep(row[i])));
+          node.appendChild(cell("dd", row[i]));
         });
       }
       box.textContent = "";

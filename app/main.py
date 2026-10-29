@@ -1,6 +1,5 @@
 """Web app entry point. Run locally: uvicorn app.main:app --port 8000"""
 import json
-import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -16,7 +15,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.filters["num"] = "{:,}".format  # the one thousands-separator filter for every count (gate 161)
-templates.env.filters["sep"] = lambda v: (lambda t: f"{int(t.partition('.')[0]):,}" + t[len(t.partition('.')[0]):] if re.fullmatch(r"-?[1-9]\d{3,}(\.\d+)?", t) else t)(str(v))  # cell text of a numerical column
+templates.env.filters.update(sep=apps.sep, plural=apps.plural)  # sep: cell text of a numerical column
 templates.env.filters.update(fmt=business.fmt, signed=business.signed, spark=business.spark)  # Business page: floats, deltas, sparkline
 
 
@@ -97,6 +96,13 @@ def _view(d, f):
 
 
 @lru_cache(maxsize=4)
+def _plain(d):
+    """Plain numerical column indexes of one dataset, on the unfiltered rows: a filter never changes a column's format."""
+    _, mapping, typed, _ = _base(d)
+    return apps.plain(d.columns, mapping, typed)
+
+
+@lru_cache(maxsize=4)
 def _detected(d):
     """Detected app of one dataset, on the unfiltered rows so the same file gives the same app under any filter."""
     _, mapping, typed, _ = _base(d)
@@ -111,7 +117,16 @@ def _shown(d, params):
 
 @lru_cache(maxsize=8)
 def _appview(d, f, app, app_param=None):
-    """Figures of one app under filters f."""
+    """Figures of one app under filters f; each chart dict gets `plain`, the axis letters whose label is a plain column."""
+    out = _appview_figures(d, f, app, app_param)
+    names = {d.columns[i] for i in _plain(d)}
+    for c in [*out.get("charts", []), out.get("map3d")]:
+        if c:
+            c["plain"] = [a for a in "xyz" if c.get(a + "_label") in names]
+    return out
+
+
+def _appview_figures(d, f, app, app_param):
     if app == "explorer":
         v = _view(d, f)
         return {"charts": rules.charts(d.columns, v["typed"], v["mapping"], config.get())}

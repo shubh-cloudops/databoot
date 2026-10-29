@@ -239,7 +239,7 @@ def make_client(monkeypatch, tmp_path):
         catalog.load.cache_clear()
         from app import main
         main._base.cache_clear()
-        for cache in ("_view", "_detected", "_appview"):  # round 5 adds the last two (ARCHITECTURE.md "Round 5")
+        for cache in ("_view", "_detected", "_appview", "_plain"):  # round 5 adds the last two (ARCHITECTURE.md "Round 5")
             if hasattr(main, cache):
                 getattr(main, cache).cache_clear()
         app = main.app

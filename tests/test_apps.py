@@ -76,3 +76,29 @@ def test_app_explorer_charts_equal_charts_route(make_client, archetypes_dir):
 def test_app_unknown_id_is_404(make_client, archetypes_dir):
     client = make_client(archetypes_dir)
     assert client.get("/api/datasets/nope/app").status_code == 404
+
+
+def test_plain_on_orders_csv(make_client, round6_dir):
+    client = make_client(round6_dir)
+    d = next(d for d in catalog.scan(config.get().data).datasets if d.path == "orders.csv")
+    assert {d.columns[i] for i in main._plain(d)} == {"order_id", "year"}  # amount (12345..) is not plain
+    sid = _ids(client)["orders.csv"]
+    charts = client.get(f"/api/datasets/{sid}/app").json()["charts"]
+    hist = next(c for c in charts if c["kind"] == "histogram" and c["x_label"] == "order_id")
+    assert hist["plain"] == ["x"]
+    assert next(c for c in charts if c["kind"] == "scatter")["plain"] == ["x", "y"]
+
+
+def test_plain_name_and_value_rules():
+    cols = ["id", "zip_code", "Phone ", "fiscal_yr", "age", "n", "empty"]
+    mapping = dict.fromkeys(cols, "numerical")
+    typed = [[1, 12345.0, 5.0, 7.0, 30.0, 1999.0, None], [2, 54321.0, 6.0, 8.0, 40.0, 2024.0, None]]
+    assert apps.plain(cols, mapping, typed) == {0, 1, 2, 3, 5}  # n: all whole numbers in 1900..2100
+    assert apps.plain(["ident"], {"ident": "categorical"}, [["x"]]) == frozenset()
+
+
+def test_plural_and_sep():
+    assert [apps.plural(n, "point") for n in (1, 2, 0)] == ["1 point", "2 points", "0 points"]
+    assert apps.plural(1200, "row") == "1,200 rows"
+    assert [apps.sep(v) for v in ("20000", "-1234567.891", "999", "2024", "abc", "01234", "1,234", None)] == [
+        "20,000", "-1,234,567.891", "999", "2,024", "abc", "01234", "1,234", "None"]

@@ -130,3 +130,12 @@ def test_app_route_without_categorical_has_only_the_map(make_client, tmp_path):
     (tmp_path / "p.csv").write_text("lat,lon,v\n" + "".join(f"{i},{i},{i}\n" for i in range(10)))
     got = _app(make_client, tmp_path, "p.csv")
     assert [c["kind"] for c in got["charts"]] == ["map2d"] and got["map3d"]["z_label"] == "v"
+
+
+def test_panel_rows_format_numerical_non_plain_columns_only():
+    cols, mapping = ["lat", "lon", "pop", "year", "order_id", "name"], {"lat": "geospatial", "lon": "geospatial", "pop": "numerical",
+                                                                       "year": "numerical", "order_id": "numerical", "name": "categorical"}
+    raw = [["10", "20", "20000", "2024", "10045", "12345"], ["11", "21", "5", "2023", "10046", "x"]]
+    typed = [[10.0, 20.0, 20000.0, 2024.0, 10045.0, None], [11.0, 21.0, 5.0, 2023.0, 10046.0, None]]
+    c = geo.view(cols, raw, typed, mapping, SimpleNamespace(map_cap=50_000))["charts"][0]
+    assert c["rows"][0] == ["10", "20", "20,000", "2024", "10045", "12345"]  # text column untouched

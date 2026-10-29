@@ -9,6 +9,8 @@ from pptx.dml.color import RGBColor
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.util import Emu, Pt
 
+from app import apps
+
 _W, _H = 12192000, 6858000  # 16:9
 _X, _CW = 457200, 11277600  # left margin, content width
 _POINTS = {"map3d", "line", "scatter"}  # shown/total count points; the other kinds count rows
@@ -118,7 +120,7 @@ def pptx(dataset, charts, summary="Filters: none", rows_shown=None, title=None):
         _box(slide, 228600, 685800, c["title"], 28, True)
         (_table if c["kind"] in ("heatmap", "table") else _chart)(slide, c)
         _box(slide, 5943600, 400000, c["rule"], 14)
-        _box(slide, 6343600, 400000, f"{c['shown']:,} of {c['total']:,} {'points' if c['kind'] in _POINTS else 'rows'}", 14)
+        _box(slide, 6343600, 400000, f"{c['shown']:,} of {apps.plural(c['total'], 'point' if c['kind'] in _POINTS else 'row')}", 14)
     out = io.BytesIO()
     prs.save(out)
     return out.getvalue()

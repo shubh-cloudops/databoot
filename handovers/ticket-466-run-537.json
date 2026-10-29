@@ -1,0 +1,96 @@
+{
+  "header": {
+    "ticket": 466,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1934056
+  },
+  "goal": "Number format by column role and plurals on the server (F1, F2; Board gate 181 items 1-2, gate 183 year rule 'year' or 'yr', gate 184 all assumptions OK): apps.plain, apps.sep, apps.plural, cached _plain, plain axis keys, Map panel rows formatted server-side, PPTX count line singular at 1",
+  "acceptance_criteria": [
+    {
+      "text": "apps.plain(columns, mapping, typed) returns the frozenset of numerical column indexes that never get separators: name (lower-cased, stripped) is id or ends in id/_id or contains code, zip or phone; or name contains year or yr; or every non-empty value is a whole number in 1900..2100",
+      "passes": true
+    },
+    {
+      "text": "apps.sep(v) adds separators to the integer part of a number text and leaves other text alone (moved out of main.py; the Jinja filter 'sep' now uses it); apps.plural(n, word) gives '1 point', '2 points', '0 points', '1,200 rows'; main registers a 'plural' Jinja filter",
+      "passes": true
+    },
+    {
+      "text": "main._plain(d) is an lru_cache of apps.plain on the unfiltered typed rows (a filter never changes a column's format) and make_client in tests/conftest.py clears it with the other caches",
+      "passes": true
+    },
+    {
+      "text": "_appview sets c['plain'] = list of axis letters 'x'|'y'|'z' on every chart dict whose x_label, y_label or z_label is a plain column; on orders.csv the Explorer histogram of order_id has plain == ['x']",
+      "passes": true
+    },
+    {
+      "text": "geo.view writes its side-panel rows through apps.sep for numerical non-plain columns only, so a pop of 20000 is sent as '20,000' and a year or order_id value as '2024' / '10045'",
+      "passes": true
+    },
+    {
+      "text": "export.pptx count line uses plural: a 1-row file reads '1 of 1 row' semantics and no PPTX text matches \\b1 (points|rows)\\b",
+      "passes": true
+    },
+    {
+      "text": "Unit tests: plain on orders.csv (order_id, year plain; amount not), plural cases, sep cases, geo panel cell strings; tests/test_geo.py and tests/test_export_pptx.py still pass",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-59, AC-60, AC-55, AC-17 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 22%]\n........................................................................ [ 45%]\n........................................................................ [ 67%]\n........................................................................ [ 90%]\n..............................                                           [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 2 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n318 passed, 107 warnings in 389.40s (0:06:29)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "_appview now wraps the old body (renamed _appview_figures) and adds `plain` to every dict in out['charts'] plus out['map3d']",
+      "why": "One place covers Explorer, Business and Map charts, and the cached result is built once",
+      "evidence": "app/main.py _appview"
+    },
+    {
+      "what": "Removed the JS sep() in mapPanel and show row[i] as sent",
+      "why": "Server rows are already formatted; the old regex would turn the year '2024' into '2,024'",
+      "evidence": "app/static/js/dashboard.js mapPanel"
+    },
+    {
+      "what": "PPTX count line pluralises only the total: '{shown:,} of {plural(total, word)}'",
+      "why": "Gives '1 of 1 row' as the ticket asks and avoids any '1 rows' or '1 points' match",
+      "evidence": "app/export.py:121; tests/test_export_pptx.py::test_count_line_is_singular_at_one"
+    },
+    {
+      "what": "Name rule uses endswith('id') as the ticket says, which also matches names like 'paid'",
+      "why": "Followed the acceptance text literally",
+      "evidence": "app/apps.py plain"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The 'yr' name rule is a plain substring match, as the ticket's 'contains year or yr' says",
+    "A numerical column with no non-empty values is not plain by the value rule"
+  ],
+  "open_questions": [
+    "Name rule ends-with-id matches 'paid', 'valid' and similar; should it be limited to 'id' and '_id'?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When moving number formatting to the server, grep dashboard.js for a duplicate client-side formatter and remove it in the same ticket",
+      "when": "A server-side format replaces a browser one",
+      "evidence": "app/static/js/dashboard.js mapPanel sep()"
+    },
+    {
+      "lesson": "In a Explorer test, pick the chart by kind as well as x_label: order_id appears on a scatter first and the histogram later",
+      "when": "Asserting on a chart from the app route",
+      "evidence": "tests/test_apps.py::test_plain_on_orders_csv"
+    }
+  ],
+  "problems": []
+}

@@ -1,5 +1,6 @@
 import io
 import posixpath
+import re
 import zipfile
 from xml.etree import ElementTree as ET
 
@@ -158,3 +159,12 @@ def test_direct_call_defaults_and_filtered_rows_count():
     assert texts(list(prs.slides)[0])[1:] == ["Rows: 6, 1 columns", "Filters: none"]
     prs = Presentation(io.BytesIO(export.pptx(d, [], "Filters: a = 1", 1234)))
     assert texts(list(prs.slides)[0])[1:] == ["Rows: 1,234 of 6, 1 columns", "Filters: a = 1"]
+
+
+def test_count_line_is_singular_at_one():
+    d = Dataset("x", "a.csv", None, "csv", 1, ["a"])
+    c = {"id": "chart-1", "kind": "histogram", "title": "a", "x_label": "a", "y_label": "count", "rule": "r", "shown": 1,
+         "total": 1, "data": {"edges": [1, 2], "counts": [1]}}
+    slide = list(Presentation(io.BytesIO(export.pptx(d, [c, {**c, "kind": "scatter", "data": {"x": [1], "y": [1]}}]))).slides)
+    t = " ".join(" ".join(texts(s)) for s in slide)
+    assert "1 of 1 row" in t and "1 of 1 point" in t and not re.search(r"\b1 (points|rows)\b", t)

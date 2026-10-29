@@ -83,7 +83,9 @@ def view(columns, rows, typed, mapping, settings):
         data = {"mode": "points", "lon": lons, "lat": lats,
                 "color": [typed[i][prim] if prim is not None else None for i in pts], "row": pts}
         rule = f"geospatial {x} + {y}: map" + (f", colour = {name}" if name else "")
-        extra |= {"columns": list(columns), "rows": [["" if c is None else str(c) for c in rows[i]] for i in pts]}
+        fmt = {i for i, c in enumerate(columns) if mapping.get(c) == "numerical"} - apps.plain(columns, mapping, typed)
+        extra |= {"columns": list(columns), "rows": [["" if c is None else (apps.sep(c) if j in fmt else str(c))
+                                                       for j, c in enumerate(rows[i])] for i in pts]}
     chart = _chart("map2d", f"{name} by location" if name else "points", x, y, rule, len(pts), len(typed), data,
                    0.6 if len(pts) >= 2 else 0)
     charts = [{**chart, **extra, "id": "chart-1"}]
