@@ -100,21 +100,22 @@ def _chart(slide, c):
 
 
 def pptx(dataset, charts, summary="Filters: none", rows_shown=None, title=None):
-    """Presentation bytes: a title slide (name, "Rows: M" or "Rows: N of M" when filtered, filter summary), then one slide per chart.
+    """Presentation bytes: a title slide (title, file name, "Rows: M" or "Rows: N of M" when filtered, filter summary), then one slide per chart.
 
     Each chart slide has the title, a native chart (python-pptx embeds the workbook, so Edit Data works) and two last
     text boxes: the rule caption and "N of M". A heatmap or "table" slide holds a native table instead of a chart.
-    A title replaces the file name in the first box of the title slide.
+    The first box is the title ("Explorer" when none), the second the file name at a smaller size.
     """
     prs = Presentation()
     prs.slide_width, prs.slide_height = Emu(_W), Emu(_H)
     blank = prs.slide_layouts[6]
     name = Path(dataset.path).name + (f" - {dataset.sheet}" if dataset.sheet else "")
     slide = prs.slides.add_slide(blank)
-    _box(slide, 2286000, 1000000, name if title is None else title, 40, True)
+    _box(slide, 2286000, 1000000, title or "Explorer", 40, True)
+    _box(slide, 3286000, 600000, name, 24)
     of = "" if rows_shown is None else f"{rows_shown:,} of "
-    _box(slide, 3429000, 600000, f"Rows: {of}{dataset.rows:,}, {len(dataset.columns):,} columns", 20)
-    _box(slide, 4100000, 600000, summary, 20)
+    _box(slide, 4029000, 600000, f"Rows: {of}{dataset.rows:,}, {len(dataset.columns):,} columns", 20)
+    _box(slide, 4700000, 600000, summary, 20)
     for c in charts:
         slide = prs.slides.add_slide(blank)
         _box(slide, 228600, 685800, c["title"], 28, True)

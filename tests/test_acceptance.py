@@ -1053,6 +1053,7 @@ def test_AC_40(make_client, data_dir):
                     return sum(sh.chart.plots[0].series[0].values)
     p_full, p_cut = pptx(""), pptx(query)
     t_full, t_cut = texts(p_full.slides[0]), texts(p_cut.slides[0])
+    assert t_full == ["Explorer", "sales.csv", "Rows: 6, 3 columns", "Filters: none"]
     assert "Rows: 6, 3 columns" in t_full and "Filters: none" in t_full
     assert "Rows: 2 of 6, 3 columns" in t_cut and "Filters: none" not in " ".join(t_cut)
     assert all(label in " ".join(t_cut) for label in labels)
@@ -1625,7 +1626,7 @@ def test_AC_56(make_client, archetypes_dir):
     wb = _xlsx(client, "shop.csv", "?app=explorer")
     assert wb.sheetnames[0] == "Data" and wb.sheetnames[-1] == "Summary" and "chart-1 table" not in wb.sheetnames
     assert wb["Summary"]["A1"].value == "Filters: none"
-    assert first(_pptx(client, "shop.csv", "?app=explorer")[0]) == "shop.csv"
+    assert first(_pptx(client, "shop.csv", "?app=explorer")[0]) == "Explorer"
 
 
 def test_AC_57(archetypes_dir, make_client, tmp_path):

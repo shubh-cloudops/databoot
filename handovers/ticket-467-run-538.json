@@ -1,0 +1,94 @@
+{
+  "header": {
+    "ticket": 467,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1931846
+  },
+  "goal": "PPTX title slide (F6, Board gate 181 item 6; Explorer first line 'Explorer', Board gate 184) plus verify week/year grain and Explorer-only exports (AC-72, AC-73 from gate 182)",
+  "acceptance_criteria": [
+    {
+      "text": "export.pptx slide 0 box 1 is the title or 'Explorer' (40 pt bold), box 2 is the file name (with ' - <sheet>' for Excel) at a smaller run size (24 pt), then the Rows line and the Filters line move down one box height and stay inside the slide",
+      "passes": true
+    },
+    {
+      "text": "sales.csv with app=explorer gives slide 0 texts ['Explorer', 'sales.csv', 'Rows: 6, 3 columns', 'Filters: none']; shop.csv app=business starts ['Business overview', 'shop.csv'], book.xlsx Revenue default starts ['Business overview', 'book.xlsx - Revenue']; box 2 font size is smaller than box 1",
+      "passes": true
+    },
+    {
+      "text": "Existing tests updated in this ticket for the new slide 0 text order: tests/test_export_pptx.py slide 0 texts, tests/test_export_apps.py indexes for file name and Rows, tests/test_acceptance.py AC-40 slide 0 indexes",
+      "passes": true
+    },
+    {
+      "text": "AC-72 verify: an inline file of daily sales over 100 days gives grain 'week' with Monday x values and per-ISO-week sums equal to the hand values; monthly rows spanning more than 1,096 days give grain 'year' with the partial last year left out and per-year sums equal to hand values; KPI card sums match (tests/test_business.py); fix business.py only if a check fails",
+      "passes": true
+    },
+    {
+      "text": "AC-73 verify: measures.csv (Explorer only) XLSX sheets start 'Data' and end 'Summary', Summary A1 is 'Filters: none' (no 'overview'), at least one chart sheet; PPTX has 1 + number of /charts slides, each chart slide has a native chart or a table, slide 0 has no 'overview' text (tests/test_export_apps.py)",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-63, AC-72, AC-73 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 22%]\n........................................................................ [ 44%]\n........................................................................ [ 67%]\n........................................................................ [ 89%]\n..................................                                       [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n322 passed, 108 warnings in 387.30s (0:06:27)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Explorer PPTX title slide first line is 'Explorer' (title or 'Explorer')",
+      "why": "Ticket criteria and AC-73/ARCHITECTURE say 'Explorer'; gate 184's 'Data overview' conflicts with AC-73's no-'overview' rule",
+      "evidence": "app/export.py pptx(); docs/acceptance.json AC-73"
+    },
+    {
+      "what": "Rows/Filters boxes moved down by one box height (600000 EMU) to y=4029000 and 4700000",
+      "why": "Make room for the 24 pt file-name box and stay inside the 6858000 slide",
+      "evidence": "app/export.py pptx(); tests/test_export_apps.py::test_title_slide_second_line_is_file_name_in_smaller_size"
+    },
+    {
+      "what": "AC-72 verified with business.view on inline rows; no change to business.py",
+      "why": "Both week and year grain checks passed against hand-computed sums",
+      "evidence": "tests/test_business.py::test_week_grain_100_days_monday_x_and_iso_week_sums, test_year_grain_monthly_rows_leave_the_partial_year_out"
+    },
+    {
+      "what": "Also changed tests/test_acceptance.py line ~1629 (AC-56 explorer check) to expect 'Explorer'",
+      "why": "It asserted the old first line 'shop.csv' and failed after the change",
+      "evidence": "tests/test_acceptance.py:1629"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Ran two full pytest runs at once",
+      "why_it_failed": "Both were slow and load made test_AC_42 fail; run the full suite once, alone"
+    }
+  ],
+  "assumptions": [
+    "Board gate 184 'Data overview' title is overridden by the ticket's explicit 'Explorer' text and AC-73"
+  ],
+  "open_questions": [
+    "Gate 184 says the Explorer PPTX title is 'Data overview' but AC-73 forbids 'overview' and this ticket says 'Explorer'; does the Board want it changed (needs AC-63/AC-73 reworded first)?",
+    "test_AC_42 failed in two full-suite runs but passes alone with and without this change; is it order- or load-dependent?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When changing the PPTX title-slide text order, grep tests/test_acceptance.py for first(...)/texts(...) slide-0 helpers too, not only the AC-40 block (AC-56 had a hard-coded first line)",
+      "when": "Any change to slide 0 text of export.pptx",
+      "evidence": "tests/test_acceptance.py:1629"
+    },
+    {
+      "what": "python is not on PATH; use python3",
+      "lesson": "Use python3 -m pytest and python3 for scripted edits in this sandbox",
+      "when": "Running tests or scripts",
+      "evidence": "'python: command not found'"
+    }
+  ],
+  "problems": []
+}

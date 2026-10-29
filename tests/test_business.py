@@ -1,5 +1,5 @@
 """Business app figures part 1: grain, periods, KPI cards, trend lines (ARCHITECTURE.md "Round 5: Business app")."""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -158,3 +158,29 @@ def test_changes_none_without_previous_and_zero_deltas():
     typed = [[datetime.fromisoformat(d), k, a] for d, k, a in rows]
     got = business.view(COLS, rows, typed, MAP, (), {"kind": ["a", "b"]})
     assert [c["t"] for c in got["changes"]] == [0, 0] and got["charts"][-1]["data"]["y"] == [10, 6]
+
+
+def test_week_grain_100_days_monday_x_and_iso_week_sums():
+    # 2024-01-01 is a Monday; day i (0..99) has amount i + 1, so ISO week k (7 days) sums to 49k + 28
+    rows = [((date(2024, 1, 1) + timedelta(days=i)).isoformat(), "a", i + 1) for i in range(100)]
+    got = _view(rows)  # the last day, Tue 2024-04-09, is in a partial week, which is left out: 14 full weeks
+    assert (got["grain"], got["latest"], got["previous"]) == ("week", "2024-04-01", "2024-03-25")
+    x, y = got["charts"][0]["data"]["x"], got["charts"][0]["data"]["y"]
+    assert len(x) == 14 and all(date.fromisoformat(s).weekday() == 0 for s in x)
+    assert x[0] == "2024-01-01" and x[-1] == "2024-04-01"
+    assert y == [49 * k + 28 for k in range(14)] and y[:3] == [28, 77, 126] and y[-1] == 665
+    card = got["cards"][0]
+    assert (card["latest"], card["previous"], card["pct"], card["dir"]) == (665, 616, 8.0, "up")
+    assert card["spark"] == y[-12:]
+
+
+def test_year_grain_monthly_rows_leave_the_partial_year_out():
+    # 2021-01 .. 2024-03: 1,155 days; amount = 100 * (year - 2020) + month, so a full year sums to 1200 * (year - 2020) + 78
+    months = [(y, m) for y in range(2021, 2025) for m in range(1, 13) if (y, m) <= (2024, 3)]
+    got = _view([(f"{y}-{m:02d}-01", "a", 100 * (y - 2020) + m) for y, m in months])
+    assert (got["grain"], got["latest"], got["previous"]) == ("year", "2023-01-01", "2022-01-01")
+    assert got["charts"][0]["data"]["x"] == ["2021-01-01", "2022-01-01", "2023-01-01"]
+    assert got["charts"][0]["data"]["y"] == [1278, 2478, 3678]  # the 2024 months (Jan-Mar) are not a year
+    card = got["cards"][0]
+    assert (card["latest"], card["previous"], card["pct"], card["dir"]) == (3678, 2478, 48.4, "up")
+    assert card["spark"] == [1278, 2478, 3678]

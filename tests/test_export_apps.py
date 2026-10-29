@@ -28,7 +28,7 @@ def test_explorer_output_is_round_4(make_client, data_dir):
     assert xlsx.sheet_names(got) == ["Data", "chart-1 line", "chart-2 histogram", "chart-3 bar", "chart-4 donut", "Summary"]
     assert xlsx.read_sheet(got, "Summary")[0] == ["Filters: none"]
     slides = list(Presentation(_get(make_client, data_dir, "sales.csv", "pptx", "?app=explorer")).slides)
-    assert _texts(slides[0])[0] == "sales.csv"
+    assert _texts(slides[0])[:2] == ["Explorer", "sales.csv"]
 
 
 def test_business_xlsx(make_client, archetypes_dir):
@@ -44,7 +44,7 @@ def test_business_xlsx(make_client, archetypes_dir):
 
 def test_business_pptx(make_client, archetypes_dir):
     slides = list(Presentation(_get(make_client, archetypes_dir, "shop.csv", "pptx", "?app=business")).slides)
-    assert _texts(slides[0])[0] == "Business overview" and "Rows: 78, 6 columns" in _texts(slides[0])[1]
+    assert _texts(slides[0])[0] == "Business overview" and "Rows: 78, 6 columns" in _texts(slides[0])[2]
     assert [s.has_chart for sl in slides[1:] for s in sl.shapes if s.has_chart or s.has_table] == [False, True, True, True, False]
     charts = [s.chart.chart_type for sl in slides[1:] for s in sl.shapes if s.has_chart]
     assert charts == [XL_CHART_TYPE.LINE, XL_CHART_TYPE.LINE, XL_CHART_TYPE.COLUMN_CLUSTERED]
@@ -70,7 +70,7 @@ def test_filters_still_work_in_app_exports(make_client, archetypes_dir):
     assert xlsx.read_sheet(got, "Summary") == (["Business overview"], [["Filters: channel = web"]])
     slide = list(Presentation(_get(make_client, archetypes_dir, "shop.csv", "pptx", "?app=business&f.channel=web")).slides)[0]
     n = len(xlsx.read_sheet(got, "Data")[1])
-    assert _texts(slide)[1:] == [f"Rows: {n} of 78, 6 columns", "Filters: channel = web"]
+    assert _texts(slide)[2:] == [f"Rows: {n} of 78, 6 columns", "Filters: channel = web"]
 
 
 def test_default_app_is_the_detected_one(make_client, archetypes_dir):
@@ -98,3 +98,45 @@ def test_geo_export_samples_scatter_to_chart_cap():
     got = geo.export({"charts": []}, ["lat", "lon"], typed, {"lat": "geospatial", "lon": "geospatial"}, S())
     assert [c["id"] for c in got] == ["chart-1"] and (got[0]["shown"], got[0]["total"]) == (3, 10)
     assert business.export({"cards": [], "charts": [], "changes": None})[0]["data"]["rows"] == []
+
+
+def _id_sheet(client, name, sheet):
+    return next(d["id"] for d in client.get("/api/datasets").json() if d["path"] == name and d["sheet"] == sheet)
+
+
+def _first_runs(slide):
+    return [s.text_frame.paragraphs[0].runs[0].font for s in slide.shapes if s.has_text_frame]
+
+
+def test_title_slide_second_line_is_file_name_in_smaller_size(make_client, data_dir, archetypes_dir):
+    prs = Presentation(_get(make_client, data_dir, "sales.csv", "pptx", "?app=explorer"))
+    assert _texts(prs.slides[0]) == ["Explorer", "sales.csv", "Rows: 6, 3 columns", "Filters: none"]
+    fonts = _first_runs(prs.slides[0])
+    assert (fonts[0].size.pt, fonts[0].bold, fonts[1].size.pt) == (40, True, 24)
+    shapes = list(prs.slides[0].shapes)
+    assert all(a.top + a.height <= b.top for a, b in zip(shapes, shapes[1:]))  # no overlap
+    assert shapes[-1].top + shapes[-1].height <= prs.slide_height
+    slides = list(Presentation(_get(make_client, archetypes_dir, "shop.csv", "pptx", "?app=business")).slides)
+    assert _texts(slides[0])[:2] == ["Business overview", "shop.csv"]
+    client = make_client(data_dir)
+    r = client.get(f"/datasets/{_id_sheet(client, 'sub/book.xlsx', 'Revenue')}/export.pptx")
+    slide = Presentation(io.BytesIO(r.content)).slides[0]
+    assert _texts(slide)[:2] == ["Business overview", "book.xlsx - Revenue"]
+    assert _first_runs(slide)[1].size < _first_runs(slide)[0].size
+
+
+def test_explorer_only_dataset_exports_have_no_overview(make_client, archetypes_dir):
+    client = make_client(archetypes_dir)
+    i = _id(client, "measures.csv")
+    assert client.get(f"/api/datasets/{i}/app").json()["shown"] == "explorer"
+    book = io.BytesIO(client.get(f"/datasets/{i}/export.xlsx").content)
+    names = xlsx.sheet_names(book)
+    assert names[0] == "Data" and names[-1] == "Summary" and len(names) > 2
+    assert xlsx.read_sheet(book, "Summary") == (["Filters: none"], [])
+    from openpyxl import load_workbook
+    assert sum(len(ws._charts) for ws in load_workbook(book).worksheets) > 0
+    n = len(client.get(f"/api/datasets/{i}/charts").json()["charts"])
+    slides = list(Presentation(io.BytesIO(client.get(f"/datasets/{i}/export.pptx").content)).slides)
+    assert len(slides) == 1 + n and n > 0
+    assert all(any(s.has_chart or s.has_table for s in sl.shapes) for sl in slides[1:])
+    assert "overview" not in " ".join(_texts(slides[0])).lower()
