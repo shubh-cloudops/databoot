@@ -95,7 +95,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: var(--s5) var(--s4) var(
   overflow-wrap: anywhere; }
 
 /* filters: a plain GET form, native controls, no JS needed (dashboard.js only submits on change) */
-.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s3) var(--s4); margin: 0 0 var(--s4); }
+.filters, .crosstab { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s3) var(--s4); margin: 0 0 var(--s4); }
 .field { display: grid; gap: var(--s1); flex: 1 1 160px; max-width: 260px; min-width: 0; }
 .field label { font-size: var(--t-sm); font-weight: 600; color: var(--muted); overflow-wrap: anywhere; }
 .field select, .field input { width: 100%; min-width: 0; min-height: var(--tap); padding: 0 var(--s3); font: inherit;
@@ -144,23 +144,23 @@ section.block { margin-top: var(--s6); }
 .page-title { display: grid; gap: var(--s2); justify-items: start; min-width: 0; }
 .app-badge { display: inline-block; padding: 2px var(--s3); border: 1px solid var(--line-strong); border-radius: 999px;
   font-size: var(--t-sm); font-weight: 600; background: var(--surface); }
-.view-as { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin: 0 0 var(--s4); }
-.view-as .view-as-label { font-size: var(--t-sm); font-weight: 600; color: var(--muted); }
-.view-as ul { display: flex; flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
-.view-as a { display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 var(--s4); color: var(--fg);
+.view-as, .periods { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin: 0 0 var(--s4); }
+.view-as .view-as-label, .periods .view-as-label { font-size: var(--t-sm); font-weight: 600; color: var(--muted); }
+.view-as ul, .periods ul { display: flex; flex-wrap: wrap; list-style: none; margin: 0; padding: 0; }
+.view-as a, .periods a { display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 var(--s4); color: var(--fg);
   background: var(--surface); border: 1px solid var(--line-strong); margin-left: -1px; font-weight: 600; text-decoration: none;
   transition: background-color var(--dur) var(--ease); }
-.view-as li:first-child a { margin-left: 0; border-radius: var(--radius) 0 0 var(--radius); }
-.view-as li:last-child a { border-radius: 0 var(--radius) var(--radius) 0; }
-.view-as a:hover { background: var(--accent-soft); }
-.view-as a[aria-current="page"] { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent);
+.view-as li:first-child a, .periods li:first-child a { margin-left: 0; border-radius: var(--radius) 0 0 var(--radius); }
+.view-as li:last-child a, .periods li:last-child a { border-radius: 0 var(--radius) var(--radius) 0; }
+.view-as a:hover, .periods a:hover { background: var(--accent-soft); }
+.view-as a[aria-current="page"], .periods a[aria-current="page"] { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent);
   position: relative; z-index: 1; }
 .btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .table-toggle { font-size: var(--t-sm); }
 
 /* Business: KPI cards (article.card), sparkline, breadcrumb, delta table */
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s3); margin: 0 0 var(--s4); padding: 0; list-style: none; }
-.card { min-width: 0; padding: var(--s4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+.cards, .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--s3); margin: 0 0 var(--s4); padding: 0; list-style: none; }
+.card { min-width: 0; align-content: start; padding: var(--s4); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
   display: grid; gap: var(--s1); }
 .card .card-label { font-size: var(--t-sm); color: var(--muted); overflow-wrap: anywhere; }
 .card .card-value { font-size: var(--t-xl); font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
@@ -200,10 +200,26 @@ section.block { margin-top: var(--s6); }
 .map-panel dd { margin: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .map-panel .chart .plot { height: 360px; min-height: 360px; }
 
+/* round 6: Monitoring tiles and period links, Survey question grid, Likert and cross-tab figures. Markup: docs/DESIGN.md "Round 6".
+   `.tiles > li.card` reuses the Business card; `.periods` reuses the View as segmented links (selectors above). */
+.card .card-change.na { color: var(--muted); font-weight: 400; }
+.tile-range { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s4); margin: 0; font-size: var(--t-sm); }
+.tile-range > div { display: flex; gap: var(--s2); }
+.tile-range dt { color: var(--muted); }
+.tile-range dd { margin: 0; font-variant-numeric: tabular-nums; }
+.monitor-fig { margin: var(--s4) 0 0; }
+.chart[data-kind="monitor"] .plot { height: 360px; min-height: 360px; }
+.questions { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); align-items: start; margin: var(--s4) 0 0; }
+.questions > * { min-width: 0; }
+.chart[data-kind="likert"] .plot { height: 180px; min-height: 180px; }
+.crosstab { margin: var(--s3) 0 var(--s4); }
+.chart[data-kind="crosstab"] { overflow-x: auto; }  /* wide tables scroll inside their card; dashboard.js sets --plot-w */
+.chart[data-kind="crosstab"] .plot { min-width: var(--plot-w, 0); }
+
 /* view as table: replaces .plot (which gets hidden), same box */
 .plot-table-wrap { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: var(--radius); }
 .chart[data-kind="map2d"] .plot-table-wrap, .chart[data-kind="map3d"] .plot-table-wrap, .chart[data-kind="heatmap"] .plot-table-wrap,
-.chart[data-kind="country_map"] .plot-table-wrap { max-height: 420px; }
+.chart[data-kind="country_map"] .plot-table-wrap, .chart[data-kind="crosstab"] .plot-table-wrap { max-height: 420px; }
 .plot-table th { position: sticky; top: 0; }
 .plot-table td, .plot-table th { padding: var(--s2) var(--s3); }
 .plot-table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
@@ -220,7 +236,7 @@ section.block { margin-top: var(--s6); }
 .chart .chart-count { font-variant-numeric: tabular-nums; }
 .chart .plot { height: 320px; min-height: 320px; width: 100%; }
 .chart[data-kind="map3d"] .plot, .chart[data-kind="country_map"] .plot { height: 420px; }
-.chart[data-kind="heatmap"] .plot { height: 420px; }
+.chart[data-kind="heatmap"] .plot, .chart[data-kind="crosstab"] .plot { height: 420px; }
 .chart[data-kind="donut"] .plot { height: 300px; }
 .plot-error { color: var(--danger); font-size: var(--t-sm); padding: var(--s4); }
 /* skeleton is shown only while the real fetch is pending, and removed on success or error */
@@ -229,6 +245,7 @@ section.block { margin-top: var(--s6); }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
 @media (min-width: 900px) {
+  .questions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   main { padding: var(--s6) var(--s5) var(--s7); }
   .site-header .inner { padding: 0 var(--s5); }
   .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -241,16 +258,20 @@ section.block { margin-top: var(--s6); }
   h1 { font-size: 1.5rem; }
   .chart { padding: var(--s3); }
   .chart .plot { height: 280px; min-height: 280px; }
-  .chart[data-kind="map3d"] .plot, .chart[data-kind="country_map"] .plot, .chart[data-kind="heatmap"] .plot { height: 340px; }
+  .chart[data-kind="map3d"] .plot, .chart[data-kind="country_map"] .plot, .chart[data-kind="heatmap"] .plot, .chart[data-kind="crosstab"] .plot { height: 340px; }
   .actions .btn { flex: 1 1 100%; }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cards { grid-template-columns: minmax(0, 1fr); }
+  .cards, .tiles { grid-template-columns: minmax(0, 1fr); }
   .card .card-value { font-size: 1.5rem; }
   .trends .chart .plot { height: 240px; min-height: 240px; }
   .chart figcaption { grid-template-columns: minmax(0, 1fr); }
   .chart figcaption > .table-toggle { grid-column: 1; grid-row: auto; justify-self: start; }
   .map-layout .chart[data-kind="map2d"] .plot, .map-layout .chart[data-kind="map3d"] .plot { height: 70vh; min-height: 0; }
-  .view-as a { padding: 0 var(--s3); }
+  .view-as a, .periods a { padding: 0 var(--s3); }
+  .periods ul { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
+  .periods a { display: flex; justify-content: center; padding: 0 var(--s1); font-size: var(--t-sm); }
+  .chart[data-kind="likert"] .plot { height: 240px; min-height: 240px; }
+  .chart[data-kind="monitor"] .plot { height: 280px; min-height: 280px; }
   .field { flex: 1 1 100%; max-width: none; }
   .filters .btn { flex: 1 1 100%; }
   th, td { padding: var(--s2) var(--s3); }
@@ -262,4 +283,4 @@ section.block { margin-top: var(--s6); }
   .btn:active { transform: none; }
   .plot.is-loading { background: var(--line); }
 }
-@media print { .site-header, .actions, .skip, .filters, .chips-row, .view-as, .table-toggle { display: none; } }
+@media print { .site-header, .actions, .skip, .filters, .crosstab, .chips-row, .view-as, .periods, .table-toggle { display: none; } }

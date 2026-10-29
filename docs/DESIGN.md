@@ -1,4 +1,4 @@
-# Design: DataBoot (round 5)
+# Design: DataBoot (round 6)
 
 Stylesheet: `app/static/css/databoot.css` (all tokens and components below; linked by `app/templates/base.html`).
 Sources: docs/PRD.md, docs/ARCHITECTURE.md ("Pages", "Round 5"), Board gates 160, 165 and 179: **branding unchanged:
@@ -6,6 +6,22 @@ DataBoot, plain neutral style, system sans font, no logo, blank SVG favicon** (`
 as titles, axis labels, `N of M` counts and one rule caption. No docs/TRENDS.md this round (`team: -trends`), so no
 trend advice is used. No external fonts, images, icons or CDNs; no raster or SVG logo. The brand is the word
 "DataBoot" set in the system font. No docs/brand/ and no site capture exist, so no logo is copied.
+
+**Round 6 delta** (Board gates 181-183: **branding unchanged** (gate 160), "Trends off" is a team setting, so no docs/TRENDS.md
+and no trend advice is used; **no token change**: no new colour, size, space or motion value; no logo, font or image):
+1. Two new app bodies in the same shell: **Monitoring** (R4: period links, tiles with sparkline, one main line with a
+   7-point mean and spike markers) and **Survey** (R5: question grid, Likert stacked bars, cross-tab heatmap, Respondents).
+2. New components built from old ones: `ul.tiles > li.card` (the Business card plus a min/max row), `nav.periods` (the View as
+   links), `div.questions` (two-column figure grid), `form.crosstab` (the filter fields). New figure kinds `monitor`,
+   `likert`, `crosstab` (Charts).
+3. Gate 181 fix-ups that change this document: line charts keep Plotly's automatic y-range and only bars start at 0
+   (Global chart rules 1 and 2; this reverses ticket 458's zero baseline on Business trends); Explorer bars (and Survey bars)
+   carry the pointer cursor (Cross-filter); `· score 0.NN` is printed only in Explorer captions; counts read `1 point`, `1 of 1 row`;
+   numbers follow the column role: no separators on identifier, temporal or year-like columns (Type scale, rule 10); the `3D view`
+   button sits above the map figure (already documented since ticket 458).
+4. Rule order for the badge and View as: R1 Map, R5 Survey, R2 Business, R4 Monitoring, R3 Explorer (gate 183). A dataset that
+   qualifies for several apps lists them in that order.
+Everything else (Explorer, Business, Map, Home) is unchanged.
 
 **Round 5 delta** (Board gate 179: **branding unchanged**, "Trends off" is a team setting, so no docs/TRENDS.md and no
 trend advice is used; no logo, no new font, no image). Three apps share one shell, so there are new components but the
@@ -26,7 +42,7 @@ advice is used; **no token change**: no new colour, size, space or motion value)
    exists, `Apply`), then removable chips and `Clear filters` (`.chips-row`) only while a filter is active.
 3. Grid: the first chart (highest score) spans the full width, all others sit two per row from 900px, one per row
    below. The round 2 rule that made map3d, country map and heatmap span both columns is gone (AC-34).
-4. The rule caption ends in ` · score 0.NN`: same `.chart-rule` span and style, no new component. The score is
+4. (Round 6: Explorer only.) The rule caption ends in ` · score 0.NN`: same `.chart-rule` span and style, no new component. The score is
    text only: no meter, badge or colour scale, because the order of the grid already shows rank and a second
    encoding would repeat it.
 5. Clicking a bar or donut slice filters (AC-39); the keyboard equivalent is the dropdowns, which do the same thing.
@@ -88,7 +104,11 @@ System stack `--font`: `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica
 | `--t-sm` | 0.875rem | tables, `th` (650, `--muted`, original case), captions, notes |
 | `--t-xs` | 0.8125rem | badges |
 Numbers in tables and counts use `font-variant-numeric: tabular-nums` and right-align (`.num`). Thousands
-separators are used everywhere (Board gate 161), through the `num` filter.
+separators are used on counts and amounts (Board gate 161) through the `num` filter, but **by column role, not by the look of the
+text** (gate 181, AC-59): a numerical amount shows `12,345`; a year-like column (name contains `year` or `yr`, or whole numbers all
+1900-2100), an identifier (`id`, `*_id`, code, zip, phone) and a temporal column show `2024`, `10045`, never `2,024`. This holds in
+tables, the Map side panel, tooltips, axis ticks and the table view. The server decides once per column (`plain` letters on chart dicts);
+the browser never guesses from digits.
 
 ## Spacing, shape, layout
 4px grid: `--s1..--s7` = 4, 8, 12, 16, 24, 32, 48. Radius 6px. Max content width 1200px, centred. Page padding
@@ -116,10 +136,14 @@ Breakpoints: `<= 599px` phone (gate 175: "phone width" is this one), `600-899px`
 | `.btn[aria-pressed="true"]` | any toggle button (`View as table`, `3D view`): `--accent-soft` fill and a 2px `--accent` edge (inset, no layout shift). The label never changes; the pressed state says which view is on | hover, focus ring |
 | `button.btn.table-toggle` | `View as table`, last child of every Plotly `figcaption`, right-aligned at >= 600px, under the count at <= 599px (44px high). Pressed: `.plot` gets `hidden` and a `div.plot-table-wrap[tabindex="0"][role="region"][aria-label="<title> data"] > table.plot-table` takes its place, scrolling inside its own box (max 320px high, 420px for maps and heatmap), sticky header, numbers right-aligned with separators. Pressed again: the table is removed and the plot shown. No animation | hover, focus ring, pressed |
 | `.map-layout > figure.chart + aside.map-panel` | Map page body: map left, panel right (340px) from 900px, stacked below. Panel = `.panel-box` with `h2` `Selected point` and its `dl` (or `.panel-empty` text `Click a point to see its row.` / `Click a cell to see its count.`), then a `.panel-box` holding the top-regions figure. `aria-live="polite"` on the details box | none |
+| `nav.periods > .view-as-label + ul > li > a` | Monitoring period links `7 days`, `30 days`, `90 days`, `All`: the View as joined row (same CSS, 44px high, current is `aria-current="page"`). Plain GET links, so the URL holds the period and Back works. At <= 599px the four links share the width as a four-column grid (centred, `--t-sm`), so they never wrap into a ragged pair of rows | hover, focus ring, current |
+| `ul.tiles > li.card.tile` | Monitoring tile = the Business card (`.card-label` column name, `.card-value` latest value in `--t-xl`, `.card-change`) plus `dl.tile-range` (`Min 20.0  Max 60.0`: `dt` `--muted`, `dd` `--fg`, tabular) and `.card-period` (`latest 2024-04-29`), then `svg.spark` (same component as Business, the period's values). Change is `▲ +5.1% up`, `▼ -0.4% down`, `▶ 0.0% no change`, neutral `--fg`, never green or red. With no previous period (`All`, or too little history) `.card-change.na` reads `n/a` in `--muted`, no arrow; with no data in the period `.card-value` reads `n/a` and there is no sparkline. One tile per numerical column; grid `repeat(auto-fill, minmax(240px, 1fr))`, one per row at <= 599px. Cards align to the top, so a short tile is not stretched | none |
+| `div.questions > figure.chart` | Survey grid: two figures per row from 900px, one per row below, top aligned (a short Likert card is not stretched to the height of its neighbour). Used for question figures and for the Respondents histograms | as figure |
+| `form.crosstab` | Survey cross-tab form: two `.field` selects labelled `Row question` and `Column question` (native, 44px) and `Apply` (`.btn`), laid out exactly like `form.filters`. Changing a select submits (JS), `Apply` works without JS | hover, focus ring |
 | `.badge` | column type label (`numerical`, `categorical`, `temporal`, `geospatial`, `other`) in a pill, text always shown | |
 | `.note`, `.note-error` | left-bar message, used for fixed labels like `could not be read` | |
 | `.empty` | dashed box: "No charts for this dataset" style fixed label, only when `charts == []` | |
-| `figure.chart` | card: figcaption on top (`.chart-title`, `.chart-rule`, `.chart-count`), `.plot` below | loading, drawn, error |
+| `figure.chart` | card: figcaption on top (`.chart-title`, `.chart-rule`, `.chart-count`), `.plot` below. `.chart-rule` ends in ` · score 0.NN` **only in Explorer**; Business, Map, Monitoring and Survey print the rule alone (gate 181). `.chart-count` is `N of M points` or `N of M rows`, singular at exactly 1 (`1 of 1 row`, `1 point`) and plural at 0 (`0 of 5 rows`), in captions, tooltips and the Map panel | loading, drawn, error |
 | `.plot.is-loading` | skeleton while `/charts` is pending | removed on success or error |
 | `.plot-error` | fixed text `Chart could not be drawn` in `--danger` | |
 
@@ -167,7 +191,8 @@ the one source of truth, and passes a shared layout:
   on, `showframe` off, no base tiles.
 - Round 5 kinds (the global rules above apply; every builder also sets `hoverlabel`, `separators: ".,"`, `hoverformat`/
   `tickformat: ","`):
-  - **Trend** (Business) = the line above, `--c1` 2px, one y-axis titled with the measure, y from 0, plot 260px
+  - **Trend** (Business) = the line above, `--c1` 2px, one y-axis titled with the measure, **automatic y-range (not from 0**: gate 181
+    reverses ticket 458; a line shows change, and zero would flatten 14,000 to 16,000), plot 260px
     (240px at 375). Markers when `shown <= 40`. One chart per measure, never a second axis.
   - **Leaderboard** (`orientation: "h"`) = bars `--c1`, `yaxis.autorange: "reversed"` so the biggest is on top,
     `xaxis.rangemode: "tozero"`, `texttemplate: "%{x:,}"`, `textposition: "outside"`, `cliponaxis: false`, `automargin`
@@ -193,13 +218,46 @@ the one source of truth, and passes a shared layout:
   - **Top regions** = a leaderboard (same rules, plot 360px, `drill` false, so no pointer; in the 340px panel the value axis has
     3 flat ticks, because 8-digit sums rotated and overlapped). The 3D view is the
     round 2 `map3d` figure, 70vh, in the same place.
+  - **Monitor** (Monitoring main line, kind `monitor`, plot 360px, 280px at 375): one y-axis (automatic range, so a small drift is
+    visible), time on x. Traces in this order: the value line (`--c1` 2px, markers while `shown <= 40`); the **7-point mean**
+    (`--muted`, 2px, `dash: "dash"`, named `7-point mean`, a derived line so it is grey and dashed, never a second measure); the
+    **spikes** (`mode: "markers+text"`, diamond marker size 11 in `--c5` with a 1.5px `--surface` edge, `text: "spike"` in `--fg`,
+    `textposition: "top center"`, named `spike`). The spike trace exists **only when the server lists spike points**: a quiet series has
+    no `spike` text, no trace and no legend entry. Marker shape plus the word carry the meaning, not the colour. The legend is on
+    (2 or 3 series) at the bottom, horizontal; line-end labels are not drawn because the mean overlies the value line (exception to
+    Global rule 8, the legend names them). The mean and the spikes are computed over all points, the line is cut to the period, so
+    the first points of a period already have a full window: nothing is drawn that the data does not contain. Tooltip: `time`,
+    `value` (or `7-point mean`), separators by role.
+  - **Likert** (Survey, kind `likert`): one horizontal 100% stacked bar per question (`barmode: "stack"`, one trace per level, x =
+    share in percent, y = the question), x axis 0 to 100 with a `%` suffix, plot 180px (240px at 375 because the legend wraps).
+    Colours (diverging, gate 183): levels before the neutral one run from `--div-neg` (strongest at the end of the scale) to
+    lighter, the **neutral middle level is `--div-mid` (grey)**, levels after it run from lighter to `--div-pos`. The tint of a
+    level is `--div-neg` or `--div-pos` mixed into `--div-mid` by (distance from the neutral / largest distance), so a 5-point scale
+    has full and half tints and a 7-point scale thirds. Because `--div-mid` is almost the card colour in light mode, **every
+    segment has a 1px `--line-strong` edge**; the neutral segment stays visible and the segments are separated without colour.
+    Each segment prints its share (`40.0%`, one decimal) in black or white by computed contrast (>= 4.5:1, like heatmap cells) when it
+    is at least 8% wide; narrower ones print nothing (the tooltip `level: count (pct%)` and the table view have it). Legend at the
+    bottom, in scale order, every level listed even with count 0. The two sides use two hues and the sign is in the legend order and the
+    level words, so colour is never the only carrier. Not clickable, no cursor change.
+  - **Cross-tab** (Survey, kind `crosstab`): one `heatmap` of the counts, rows = the row question, columns = the column question,
+    one-hue sequential scale `--seq-lo` to `--seq-hi` on the count (this is a count, not a signed value, so no diverging scale and
+    no fixed range), every cell prints `count (pct%)` (the row percent, one decimal) in black or white by contrast, colour bar titled
+    `count`. Plot 420px (340px at 375). Levels in scale order for Likert questions, otherwise by count. Wide tables scroll
+    **inside their card** (`figure.chart` has `overflow-x: auto`; `dashboard.js` sets `--plot-w` on the plot to 120px + 88px per column so the
+    cell text always fits); at <= 599px the colour bar is horizontal under the plot (72px bottom margin), as on the phone map.
+    Cells with a count of 0 print `0 (0.0%)`. Not clickable.
+  - **Question bars** (Survey, kind `bar`): the Explorer bar (`--c1`, horizontal when labels are long, sorted by count) with the
+    leaderboard's `Other` rule: more than 10 values fold into one `Other` bar in `--muted` as its own trace, no pointer, clicks do
+    nothing. The other bars carry the `bar-click` class and click sets the category filter (Cross-filter).
   - **Phone map**: `dragmode: false` at <= 599px so a finger drag scrolls the page instead of panning the map; the mode
     bar's zoom and reset buttons still work. Desktop uses `pan`; wheel zoom stays off (`scrollZoom: false`).
 - Honest data: the point count shown in `.chart-count` is the server's `shown`/`total` (`N of M points` or `N of
   M rows`). When `shown < total` the caption says so and nothing else; no smoothing, no fake trend line. Plotly
   default transitions are off (`transition: {duration: 0}`), so no chart animates on load.
-- Cross-filter (AC-39): bar and donut categories are clickable (Plotly's own pointer cursor over a bar or slice is the
-  only hint; no text and no icon is added). Click sets `f.<x_label>=<category>` and reloads; a second click on the same
+- Cross-filter (AC-39, AC-61): bar and donut categories are clickable. Plotly shows no pointer itself over bars, so **every figure whose
+  bars filter (Explorer bars and Survey question bars) toggles the `bar-click` class** from `plotly_hover` / `plotly_unhover`
+  (CSS `cursor: pointer`), the same class and handler as the Business leaderboard; donut slices keep Plotly's own pointer. The `Other`
+  bar (Survey) and any bar that does not filter get `no-pointer`. No text and no icon is added. Click sets `f.<x_label>=<category>` and reloads; a second click on the same
   category removes it. With one value selected a donut drops out (its rule needs 2 to 5 slices), but a bar chart stays
   with the single remaining bar (seen in the ticket 437 review), which is the bar a second click un-filters; no
   "selected bar" style is drawn, the chip and the select already say what is applied. Mouse-only by nature; the dropdowns and chips are the keyboard and touch-reader route to the same result.
@@ -207,15 +265,18 @@ the one source of truth, and passes a shared layout:
   `aria-label` = `<title>: <rule caption>`; the data is also in the first-20-rows table above/below.
 
 ## Global chart rules
-Apply to every Plotly figure in every app (Explorer, Business, Map; AC-57). Each rule says what the code must do.
-1. **Magnitude = sorted bars from zero.** Bars sort descending (Business leaderboard: top 10, then `Other` last, in
+Apply to every Plotly figure in every app (Explorer, Business, Map, Monitoring, Survey; AC-57). Each rule says what the code must do.
+1. **Magnitude = sorted bars from zero (bars only).** Bars sort descending (Business leaderboard: top 10, then `Other` last, in
    `--muted` grey as its own trace with no pointer cursor, so it reads as the remainder, never a palette colour), the value axis starts at 0
    (`rangemode: "tozero"`), horizontal when labels are long, value printed on each bar in the leaderboard.
-2. **Change over time = line.** One line per chart, time on x; no bars for time and no smoothing. A partial last
-   period is not drawn (Business trend stops at the latest full period).
+2. **Change over time = line, automatic y-range.** One measure per chart, time on x; no bars for time. **Lines never get a forced
+   zero baseline** (gate 181, AC-62): the zero baseline is for bars only, so a 14,000 to 16,000 trend fills its plot. A derived line
+   is allowed only when it is named and visibly different: the Monitoring 7-point mean (grey dashed) sits on the same axis as the
+   data line; the data line itself is never smoothed. A partial last period is not drawn (Business trend stops at the latest full
+   period).
 3. **Part-to-whole = stacked bar; donut only for 2 to 5 parts.** With 6 or more parts no donut is drawn. A part-to-whole
    chart with 6 or more parts must be one stacked bar from zero (none exists yet; the rule is for the next one).
-4. **One y-axis always.** No `yaxis2`, no `overlaying`, no dual axis. Several measures make small multiples: one
+4. **One y-axis always** (the Monitoring mean shares the value axis). No `yaxis2`, no `overlaying`, no dual axis. Several measures make small multiples: one
    chart per measure (Business trends, one to three of them).
 5. **Fixed categorical palette order, at most 8, then `Other`.** `--c1..--c8` in that order, never reshuffled by
    data; more than 8 categories fold into one `Other` in `--muted`. One series is always `--c1`.
@@ -229,11 +290,11 @@ Apply to every Plotly figure in every app (Explorer, Business, Map; AC-57). Each
 9. **Every chart has a tooltip and a table toggle.** Tooltip (`hoverlabel`) on every mark, none of `hoverinfo: "none"`
    or `"skip"`; `View as table` (Components) shows the plotted values. The sparkline is not a chart, has no toggle
    and keeps its `<title>`.
-10. **Thousands separators everywhere.** Axis ticks (`separators: ".,"`, `tickformat: ","`), tooltips (`:,`), bar
+10. **Thousands separators on counts and amounts, by column role** (not on ids, years or dates, see Type scale). Axis ticks (`separators: ".,"`, `tickformat: ","`), tooltips (`:,`), bar
     labels (`%{x:,}`), cards, panel values, table cells and the table view; one decimal for percents (`+19.4%`).
 
 ## Motion rules
-1. Only two moving things exist: the loading shimmer (real pending fetch) and the 160ms colour transition on
+1. (Round 6: unchanged. Period links, tiles and the cross-tab form add no motion: each is a page load.) Only two moving things exist: the loading shimmer (real pending fetch) and the 160ms colour transition on
    buttons and View-as links. Drill, `View as`, `View as table` and `3D view` are instant swaps or page loads; the
    sparkline and cards do not animate. Nothing animates because data is "live"; the app does not poll.
 2. No scroll reveals, no count-up numbers, no entrance animation of charts.
@@ -248,6 +309,12 @@ Apply to every Plotly figure in every app (Explorer, Business, Map; AC-57). Each
   Explorer is as in round 4. A table view's scroll box is focusable (`tabindex="0"`) so the keyboard can scroll it.
   Leaderboard drill by keyboard: the filter dropdowns and the crumbs do the same (the `keyboardBar` of round 4 also
   works); the 3D toggle is a button.
+- Tab order (Monitoring): skip, brand, export links, View-as links, period links, date range and `Apply`, chips, then the line figure's
+  `View as table` button and mode-bar buttons, table links. (Survey): skip, brand, export links, View-as links, filter controls and
+  `Apply`, chips, then each question figure's `View as table` button and mode-bar buttons in grid order, the cross-tab's two selects and
+  `Apply`, its figure, the Respondents figures, table links. Every Survey bar click has the dropdowns as its keyboard route. The
+  tile's sparkline is a labelled image, not a stop. The cross-tab card scrolls sideways only inside itself; its scroll box is reached by
+  the mode-bar and the table view (a focusable `tabindex="0"` region), so the keyboard can read every column.
 - Tab order (round 4): skip link, brand, page actions, chart mode-bar buttons (visible, 28px, ring on focus), table links.
   Landmarks: `header`, `main#main`. Mode-bar buttons have an `aria-label`.
 - One `h1` per page, then `h2` per table (inside its `<caption>`), no skipped level; figures keep a figcaption
@@ -323,6 +390,29 @@ back; both have the same height so the page does not jump. Then Columns and Firs
 **Map, 375px**: the same order in one column: map (70vh, finger drags scroll the page), then the panel (details, then
 regions), then the tables. The caption buttons stack under the count. No horizontal scroll at any width.
 
+### Monitoring and Survey (round 6)
+Same shell (`.crumb`, `.page-head` with title, badge `App: Monitoring (rule R4)` or `App: Survey (rule R5)` and actions, `nav.view-as`
+when more than Explorer qualifies). Business and Survey list each other in View as when both qualify (a survey with a date and a
+number can be read as Business).
+
+**Monitoring, 1280px**, single column, in this order: (1) `nav.periods` (label `Period`, four links, `30 days` current by default);
+it sits above the tiles it controls, though the architecture text lists tiles first (nothing depends on the order); (2) `ul.tiles`,
+one tile per numerical column, three to four per row (`minmax(240px, 1fr)`); (3) `form.filters` with the date range only (there are
+no categorical columns under R4) and `Apply`, then `.chips-row` when a range is active; (4) the main line `figure.chart[data-kind="monitor"]`
+(`.monitor-fig`, full width, plot 360px, `View as table` in the caption); (5) Columns table; (6) First rows. No Business crumbs, no
+leaderboard. **375px**: same order in one column: crumb, h1, badge, stacked buttons, View as, period links as a four-column row (each
+>= 44px), tiles one per row (sparkline full width), the date fields stacked (44px), the figure (280px, legend below, wraps), Columns,
+First rows (scrolls in its box). `All` shows `n/a` on every tile and no arrow, the line shows all points.
+
+**Survey, 1280px**, in this order: (1) `form.filters` (a dropdown per categorical question, date range when a time column exists) and
+chips; (2) `div.questions`: one figure per question in column order, two per row, a `bar` for a plain question and a `likert` for
+a scale question, each with title, rule, `N of M rows`, `View as table`; there is no heading above the grid; (3) `section.block`
+with `<h2>Cross-tab</h2>`, `form.crosstab` and the heatmap card full width (420px); (4) `section.block` with `<h2>Respondents</h2>` and a
+`div.questions` of up to two histograms (`--c1`, as Explorer's); the section is absent when there are none; (5) Columns, First
+rows. **375px**: one column in the same order, filters stacked, question figures one per row (bars 280px, Likert 240px), the
+cross-tab selects stacked full width with `Apply` full width, the heatmap card scrolling sideways inside itself with a horizontal colour
+bar, Respondents histograms one per row. A Likert bar's legend sits under the plot and wraps; nothing overflows the page width.
+
 ## Honesty rules (for design review)
 - Skeleton shimmer only while a fetch is pending. No fake progress bars, no "live" dots, no sparkline filler.
 - The score is the server's number, printed as given; the order is the order of the data, not a styled ranking. Chips and
@@ -333,14 +423,28 @@ regions), then the tables. The caption buttons stack under the count. No horizon
 - The badge says which rule matched; `View as` lists only apps the dataset really qualifies for. Delta tints scale
   with the real delta divided by the largest one, and zero is grey. Hexagon cells are true size; their colour is the
   count. Nothing pulses, counts up or auto-refreshes.
+- Round 6: a Monitoring tile's change, min, max and sparkline are the server's period values; `All` and a missing previous period read
+  `n/a`, never a made-up 0%. The `spike` label exists only on points the server flagged (|z| > 3 against the 30 points before), so a quiet
+  series shows none. The 7-point mean is a named, dashed, grey second line and the data line is never smoothed. Likert segments are
+  drawn at their real share, the neutral one in grey, every scale level listed even at 0. Cross-tab cell colour is the count, and its
+  text gives count and row percent. Nothing animates because a dataset is "monitored": the page reads the file once.
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
+Round 6 (ticket 464, architecture phase, Board gates 181-183): `databoot.css` gains `.tiles` (shares `.cards`), `.periods` (shares
+`.view-as`, plus a four-column row at <= 599px), `.tile-range`, `.card-change.na`, `.monitor-fig`, `.questions` (two columns from 900px),
+`.crosstab` (shares `.filters`), `data-kind` heights for `monitor` (360/280), `likert` (180/240) and `crosstab` (as heatmap), the crosstab
+card's own horizontal scroll, and `.card` `align-content: start`. **Inert until the frontend tickets emit exactly the markup in Components
+and "Monitoring and Survey (round 6)"**; the `monitor`, `likert` and `crosstab` builders, the `bar-click` class on Explorer bars, the
+removal of the Business trend `tozero` and the score caption removal are script and template work, not done here. Checked in a scratch
+page (tiles, periods, questions grid, crosstab form and card) at 1280 and 375 in light and dark: no sideways scroll, every control >=
+44px, the period links fill the width at 375. Contrast: Likert and cross-tab cell text is picked by computed contrast (as the heatmap),
+spike marker `--c5` against `--surface` is 5.4 light / 6.9 dark (>= 3:1 for a graphic), grey mean `--muted` 5.4 / 6.6. **No token change.**
 Design review (ticket 458, round 5), 1280 and 375 px, light and dark, a demo folder (shop.csv Business, places.csv Map,
 60,000-point hexbin map, measures.csv Explorer, long-named TSV, unreadable file, notes.txt, a 404): scrollWidth equals the
 viewport everywhere (no sideways scroll at 375), all drawn plots without `.plot-error`, no console error except the expected 404,
 no tap target under 44px outside the Plotly mode bar. Fixed in `dashboard.js`: (1) Business trend lines start at y = 0 as the
-spec says (they auto-ranged, so 14,000 to 16,000 looked like a swing); (2) phone map colour bar is horizontal under the map;
+spec said then (reversed in round 6, gate 181: automatic range) (they auto-ranged, so 14,000 to 16,000 looked like a swing); (2) phone map colour bar is horizontal under the map;
 (3) top-regions bar has 3 flat ticks in the narrow panel. The `3D view` row is now documented as built. No token change.
 
 Round 4 (ticket 429, architecture phase, Board gate 175): `databoot.css` gains `.kpis`, `.filters`/`.field`,

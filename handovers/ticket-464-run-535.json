@@ -1,0 +1,37 @@
+{
+  "header": {
+    "ticket": 464,
+    "project": "you-think-of-the-project-name",
+    "from_role": "designer",
+    "phase": "architecture",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "1c53b4636107",
+    "tokens_left": 1858640
+  },
+  "goal": "Write or update docs/DESIGN.md and the shared stylesheet for the approved spec and architecture.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/DESIGN.md defines layout, colour, type, motion and components",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py design",
+    "passed": true,
+    "output_tail": "........................................................................ [ 23%]\n........................................................................ [ 46%]\n........................................................................ [ 69%]\n........................................................................ [ 92%]\n.........................                                                [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 2 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n313 passed, 107 warnings in 404.98s (0:06:44)\ncheck passed\n"
+  },
+  "decisions": [],
+  "tried_and_failed": [],
+  "assumptions": [],
+  "open_questions": [],
+  "lessons": [],
+  "problems": [
+    "agent did not end with the handover JSON"
+  ]
+}
