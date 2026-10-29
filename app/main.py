@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import apps, business, catalog, config, export, filters, geo, profile, rules, xlsx
+from app import apps, business, catalog, config, export, filters, geo, monitoring, profile, rules, survey, xlsx
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
@@ -49,11 +49,13 @@ def dashboard(request: Request, id: str):
     v = _view(d, filters.parse(request.query_params, d.columns, _base(d)[1]))
     f, det, shown = v["filters"], _detected(d), _shown(d, request.query_params)
     appq = (("app", shown),) if request.query_params.get("app") == shown else ()  # links keep app only if the URL had it
+    pickq = _pickq(shown, request.query_params)  # likewise period / row / col; View-as links never carry it
+    pick = _pick(d, shown, request.query_params)
 
     def url(*pairs):
         q = urlencode(pairs)
         return f"/datasets/{d.id}" + ("?" + q if q else "")
-    chips = [(label, url(*f[:i], *f[i + 1:], *appq)) for i, label in enumerate(v["labels"])]
+    chips = [(label, url(*f[:i], *f[i + 1:], *appq, *pickq)) for i, label in enumerate(v["labels"])]
     view_as = [(apps.NAMES[a], url(*f, ("app", a)), a == shown) for a in det["qualifies"]] if det["qualifies"] != ["explorer"] else []
     return templates.TemplateResponse(request, "dataset.html", {
         "title": f"{d.path} - DataBoot", "d": d, "types": v["mapping"], "rows": v["rows"][:20], "shown": shown,
@@ -61,8 +63,10 @@ def dashboard(request: Request, id: str):
         "charts": _appview(d, f, "explorer")["charts"] if shown == "explorer" else [],
         "biz": _appview(d, f, "business", shown if appq else None) if shown == "business" else {},
         "geo": _appview(d, f, "map") if shown == "map" else {},
+        "mon": _appview(d, f, "monitoring", None, pick) if shown == "monitoring" else {},
+        "sur": _appview(d, f, "survey", None, pick) if shown == "survey" else {}, "pickq": pickq,
         "kpis": v["kpis"], "options": v["options"], "labels": v["labels"], "filters": f, "chips": chips,
-        "clear": url(*appq), "query": urlencode(f + appq)})
+        "clear": url(*appq, *pickq), "query": urlencode(f + appq + pickq)})
 
 
 @app.get("/api/datasets/{id}/profile")
@@ -115,10 +119,26 @@ def _shown(d, params):
     return params.get("app") if params.get("app") in det["qualifies"] else det["app"]
 
 
+def _pick(d, shown, params):
+    """Validated, hashable request state of the shown app (part of the _appview cache key): Monitoring period, Survey row/col."""
+    if shown == "monitoring":
+        return params.get("period") if params.get("period") in monitoring.PERIODS else "30"
+    if shown == "survey":
+        _, mapping, typed, _ = _base(d)
+        return survey.pick(survey.questions(d.columns, mapping, typed), params.get("row"), params.get("col"))
+    return None
+
+
+def _pickq(shown, params):
+    """The request's own period (Monitoring) or row/col (Survey) pairs, only those the URL had."""
+    keys = {"monitoring": ("period",), "survey": ("row", "col")}.get(shown, ())
+    return tuple((k, params[k]) for k in keys if k in params)
+
+
 @lru_cache(maxsize=8)
-def _appview(d, f, app, app_param=None):
+def _appview(d, f, app, app_param=None, pick=None):
     """Figures of one app under filters f; each chart dict gets `plain`, the axis letters whose label is a plain column."""
-    out = _appview_figures(d, f, app, app_param)
+    out = _appview_figures(d, f, app, app_param, pick)
     names = {d.columns[i] for i in _plain(d)}
     for c in [*out.get("charts", []), out.get("map3d")]:
         if c:
@@ -126,7 +146,7 @@ def _appview(d, f, app, app_param=None):
     return out
 
 
-def _appview_figures(d, f, app, app_param):
+def _appview_figures(d, f, app, app_param, pick):
     if app == "explorer":
         v = _view(d, f)
         return {"charts": rules.charts(d.columns, v["typed"], v["mapping"], config.get())}
@@ -136,6 +156,12 @@ def _appview_figures(d, f, app, app_param):
     if app == "map":
         v = _view(d, f)
         return geo.view(d.columns, v["rows"], v["typed"], v["mapping"], config.get())
+    if app == "monitoring":
+        v = _view(d, f)
+        return monitoring.view(d.columns, v["typed"], v["mapping"], pick, config.get())
+    if app == "survey":
+        v = _view(d, f)
+        return survey.view(d.columns, v["typed"], v["mapping"], _base(d)[2], pick, config.get())
     return {}
 
 
@@ -146,7 +172,8 @@ def dataset_app(request: Request, id: str):
     shown = _shown(d, request.query_params)
     return {"dataset": d.id, **_detected(d), "shown": shown, "filters": _view(d, f)["labels"],
             "charts": [],
-            **_appview(d, f, shown, shown if request.query_params.get("app") == shown else None)}
+            **_appview(d, f, shown, shown if request.query_params.get("app") == shown else None,
+                       _pick(d, shown, request.query_params))}
 
 
 @app.get("/api/datasets/{id}/charts")
@@ -165,18 +192,23 @@ def _download(d, ext, body, media_type):
     return Response(body, headers={"Content-Disposition": disposition}, media_type=media_type)
 
 
-TITLES = {"business": "Business overview", "map": "Map overview"}
+TITLES = {"business": "Business overview", "map": "Map overview", "monitoring": "Monitoring overview",
+          "survey": "Survey overview"}
 
 
 def _export(d, params):
     """(view, charts, title) of the shown app under the request's filters; Explorer has no title."""
     f = filters.parse(params, d.columns, _base(d)[1])
     v, shown = _view(d, f), _shown(d, params)
-    a = _appview(d, f, shown)
+    a = _appview(d, f, shown, None, _pick(d, shown, params))
     if shown == "business":
         return v, business.export(a), TITLES[shown]
     if shown == "map":
         return v, geo.export(a, d.columns, v["typed"], v["mapping"], config.get()), TITLES[shown]
+    if shown == "monitoring":
+        return v, monitoring.export(a), TITLES[shown]
+    if shown == "survey":
+        return v, survey.export(a), TITLES[shown]
     return v, a["charts"], None
 
 

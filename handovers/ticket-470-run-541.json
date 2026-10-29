@@ -1,0 +1,53 @@
+{
+  "header": {
+    "ticket": 470,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1916205
+  },
+  "goal": "Rule order and request wiring for the new apps (D2, P2; Board gate 183 order R1 Map, R5 Survey, R2 Business, R4 Monitoring, R3 Explorer; gate 184 amount guard): roles L/cols, RULES, NAMES, TITLES, _pick in the cache key, /app payload, exports",
+  "acceptance_criteria": [
+    {
+      "text": "apps.roles gains cols and L (numerical columns whose non-empty values are all whole numbers in 1..7), with L emptied when any other numerical column matches apps.MEASURE (amount guard); RULES order is R1, R5 survey (C+L >= 4, >= 60% of columns, N-L <= 2), R2, R4 monitoring (T, N, no C), R3; NAMES gains Monitoring and Survey",
+      "passes": true
+    },
+    {
+      "text": "GET /api/datasets/<id>/app: monitor.csv and quiet.csv give monitoring/R4 with qualifies ['monitoring','explorer']; survey.csv gives survey/R5 with qualifies ['survey','business','explorer']; orders.csv explorer/R3; every data_dir, archetypes_dir, big_csv and big_sales_csv dataset keeps its round 5 app and rule (shop.csv stays business/R2); inline: survey.csv without its date still R5, 4 categoricals among 7 columns is not R5, shop.csv without revenue gives R5 (proves the guard); badges read 'App: Monitoring (rule R4)' and 'App: Survey (rule R5)'",
+      "passes": true
+    },
+    {
+      "text": "main._pick validates period (7|30|90|all, else 30) and the survey row/col pair; it is part of the _appview cache key and is passed by dashboard, /app and _export; pickq carries the request's own period/row/col only when the URL had them (chips, Clear filters, export links, filter-form hidden inputs); View-as links do not carry it",
+      "passes": true
+    },
+    {
+      "text": "main.TITLES gains 'Monitoring overview' and 'Survey overview'; _export maps monitoring and survey to their export lists; XLSX Data first and Summary last, Summary A1 holds the title, PPTX slide 0 title is the same, native charts present (monitor.csv: sheets Data, chart-1 table, chart-2 line, Summary; survey.csv: one bar sheet per question)",
+      "passes": true
+    },
+    {
+      "text": "Empty app_monitoring.html and app_survey.html (comment only) exist so dataset pages for the new apps render until the frontend tickets fill them; make_client clears any new cache; existing tests/test_apps.py tests that list RULES or NAMES are updated here",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-64, AC-66, AC-70, AC-71, AC-73 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 19%]\n........................................................................ [ 39%]\n........................................................................ [ 59%]\n........................................................................ [ 79%]\n........................................................................ [ 99%]\n..                                                                       [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 34 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n362 passed, 109 warnings in 395.56s (0:06:35)\ncheck passed\n"
+  },
+  "decisions": [],
+  "tried_and_failed": [],
+  "assumptions": [],
+  "open_questions": [],
+  "lessons": [],
+  "problems": [
+    "agent did not end with the handover JSON"
+  ]
+}

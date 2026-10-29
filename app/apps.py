@@ -1,10 +1,10 @@
-"""Archetype detection: the ordered rule table R1 Map, R2 Business, R3 Explorer (docs/ARCHITECTURE.md "Round 5: detection")."""
+"""Archetype detection: the ordered rule table R1 Map, R5 Survey, R2 Business, R4 Monitoring, R3 Explorer (docs/ARCHITECTURE.md "Round 6: detection")."""
 import re
 
 from app.rules import LAT, LON, _num
 
 MEASURE = re.compile(r"amount|revenue|sales|total|price|value|cost|qty|quantity", re.I)
-NAMES = {"map": "Map", "business": "Business", "explorer": "Explorer"}
+NAMES = {"map": "Map", "business": "Business", "monitoring": "Monitoring", "survey": "Survey", "explorer": "Explorer"}
 
 
 def roles(columns, mapping, typed):
@@ -20,13 +20,28 @@ def roles(columns, mapping, typed):
             coords += y is not None and x is not None and -90 <= y <= 90 and -180 <= x <= 180
     used = set(by["temporal"] + by["numerical"] + by["categorical"])
     return {"lat": lat, "lon": lon, "G": lat is not None and lon is not None, "T": by["temporal"], "N": by["numerical"],
-            "C": by["categorical"], "I": [i for i in range(len(columns)) if i not in used], "coords": coords,
-            "rows": len(typed)}
+            "C": by["categorical"], "L": answers(columns, mapping, typed), "I": [i for i in range(len(columns)) if i not in used],
+            "coords": coords, "rows": len(typed), "cols": len(columns)}
 
 
-# Round 6 inserts R4-R7 rows before R3.
+def answers(columns, mapping, typed):
+    """L: indexes of numerical columns whose non-empty values are all whole numbers in 1..7; none when another
+    numerical column has an amount-style name (the guard that keeps a sales file with a `units` column out of Survey)."""
+    nums = [i for i, c in enumerate(columns) if mapping.get(c) == "numerical"]
+    ans = []
+    for i in nums:
+        vals = [r[i] for r in typed if r[i] not in (None, "")]
+        if vals and all(v == int(v) and 1 <= v <= 7 for v in vals):
+            ans.append(i)
+    # ponytail: name heuristic; a survey with a `price_paid` column loses its 1..7 answers
+    return [] if any(MEASURE.search(columns[i]) for i in nums if i not in ans) else ans
+
+
+# Gate 183 order: Survey before Business so a survey with a timestamp opens as Survey; Monitoring after Business.
 RULES = [("R1", "map", lambda r: r["G"] and (len(r["N"]) <= 2 or (r["rows"] > 0 and r["coords"] >= 0.5 * r["rows"]))),
+         ("R5", "survey", lambda r: (c := len(r["C"]) + len(r["L"])) >= 4 and c >= 0.6 * r["cols"] and len(r["N"]) - len(r["L"]) <= 2),
          ("R2", "business", lambda r: bool(r["T"] and r["C"] and r["N"])),
+         ("R4", "monitoring", lambda r: bool(r["T"] and r["N"] and not r["C"])),
          ("R3", "explorer", lambda r: True)]
 
 

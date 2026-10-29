@@ -49,16 +49,8 @@ def scale(values):
 
 
 def _answers(columns, mapping, typed):
-    """Indexes of whole-number 1..7 columns that count as answers: none when another numerical column has an
-    amount-style name (the guard that keeps a sales file with a `units` column out of Survey)."""
-    nums = [i for i, c in enumerate(columns) if mapping.get(c) == "numerical"]
-    ans = []
-    for i in nums:
-        vals = [r[i] for r in typed if r[i] not in (None, "")]
-        if vals and all(v == int(v) and 1 <= v <= 7 for v in vals):
-            ans.append(i)
-    # ponytail: name heuristic, same as apps.MEASURE; a survey with a `price_paid` column loses its 1..7 answers
-    return [] if any(apps.MEASURE.search(columns[i]) for i in nums if i not in ans) else ans
+    """Indexes of the 1..5/1..7 answer columns: apps.answers (the amount guard lives there)."""
+    return apps.answers(columns, mapping, typed)
 
 
 def questions(columns, mapping, typed):
