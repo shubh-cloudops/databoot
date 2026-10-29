@@ -1,0 +1,62 @@
+{
+  "header": {
+    "ticket": 460,
+    "project": "you-think-of-the-project-name",
+    "from_role": "coach",
+    "phase": "learn",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "847e9e9f8b68",
+    "tokens_left": 1911469
+  },
+  "goal": "Learn from round 5: update the shared skills and lessons and this project's MEMORY.md from /logs/digest.md.",
+  "acceptance_criteria": [
+    {
+      "text": "Skills and lessons come only from evidence in the digest",
+      "passes": true
+    },
+    {
+      "text": "MEMORY.md is current and short",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py learn",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Added skill add-page-mode-keep-old-tests-green and extended three existing skills instead of adding near-duplicates",
+      "why": "Round 5 tickets 442, 447, 448, 450, 452, 453 and 459 repeated the same page-mode and old-test problems",
+      "evidence": "/logs/digest.md tickets 442-459"
+    },
+    {
+      "what": "Recorded the gate 181 fix-ups as not yet built, and that gate 181 reverses the ticket 458 zero-baseline on Business trends",
+      "why": "QA ticket 459 found them missing; gate 182 moved them to round 6",
+      "evidence": "gates 181, 182; ticket 459 open_questions; ticket 458 decisions"
+    },
+    {
+      "what": "Deleted the frontend lesson about pinned aisle paths in tests/test_office_page.py",
+      "why": "It is unrelated to this project and no round 5 evidence confirmed it; this also kept LESSONS.md under 80 lines",
+      "evidence": "LESSONS.md line count 79"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The digest had no Faded history section, so nothing needed re-confirming or deleting",
+    "The architecture file names in MEMORY.md (apps.py, business.py, geo.py, templates) match the repo listing"
+  ],
+  "open_questions": [
+    "Business trend lines still start at zero in the code, while gate 181 item 5 says line charts keep the auto y-range; the round 6 fix-up ticket must change this and DESIGN.md"
+  ],
+  "lessons": [
+    {
+      "lesson": "Fold new lessons into existing LESSONS.md lines and delete stale unrelated ones to stay under 80 lines",
+      "when": "Coach rounds on a long-lived project",
+      "evidence": "LESSONS.md reached 80 lines before the stale frontend aisle-path line was removed"
+    }
+  ],
+  "problems": []
+}
