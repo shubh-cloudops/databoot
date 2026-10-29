@@ -431,6 +431,13 @@ bar, Respondents histograms one per row. A Likert bar's legend sits under the pl
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
+Design review (ticket 476, round 6), 1280, 800 and 375 px, light and dark, a demo folder (monitor, quiet, survey, shop, places, measures,
+sales, an unreadable file, a 404): scrollWidth equals the viewport everywhere, no `.plot-error`, no console error but the expected 404, no
+external request, no tap target under 44px outside the Plotly mode bar, Tab reaches every control with the `--accent` ring (the date
+inputs ring each segment; the calendar icon uses the browser's own ring). Fixed in `dashboard.js`: (1) Likert segments now have the 1px
+`--line-strong` edge and print their share (one decimal, black or white by computed contrast, only when >= 8% wide) as specified, so the
+light-mode neutral segment is visible; (2) the cross-tab colour bar ticks are whole numbers (`dtick` at least 1, `tickformat ",d"`), a
+count is never shown as 3.5. **No token change.**
 Round 6 (ticket 464, architecture phase, Board gates 181-183): `databoot.css` gains `.tiles` (shares `.cards`), `.periods` (shares
 `.view-as`, plus a four-column row at <= 599px), `.tile-range`, `.card-change.na`, `.monitor-fig`, `.questions` (two columns from 900px),
 `.crosstab` (shares `.filters`), `data-kind` heights for `monitor` (360/280), `likert` (180/240) and `crosstab` (as heatmap), the crosstab

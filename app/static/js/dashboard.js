@@ -107,14 +107,18 @@
       l.yaxis = axis(t, "", { type: "category", showticklabels: false, fixedrange: true });
       return [d.levels.map(function (lv, i) {
         var color = i === d.neutral ? t["--div-mid"] : i < d.neutral ? mix(t["--div-neg"], t["--div-mid"], i / d.neutral) : mix(t["--div-pos"], t["--div-mid"], (last - i) / (last - d.neutral));
-        return { type: "bar", orientation: "h", name: String(lv), x: [d.pct[i]], y: [c.x_label], customdata: [d.counts[i]], marker: { color: color, line: { color: t["--surface"], width: 1 } },
+        var ch = color.charAt(0) === "#" ? rgb(color) : color.match(/\d+/g).map(Number), L = lum(ch);
+        return { type: "bar", orientation: "h", name: String(lv), x: [d.pct[i]], y: [c.x_label], customdata: [d.counts[i]], marker: { color: color, line: { color: t["--line-strong"], width: 1 } },
+          text: [d.pct[i] >= 8 ? d.pct[i].toFixed(1) + "%" : ""], textposition: "inside", insidetextanchor: "middle", cliponaxis: false,
+          textfont: { size: 12, color: 1.05 / (L + 0.05) >= (L + 0.05) / 0.05 ? "#ffffff" : "#000000" },
           hovertemplate: "%{fullData.name}: %{customdata} (%{x:.1f}%)<extra></extra>" };
       }), l];
     },
     // Survey cross-tab: one heatmap of counts, one-hue scale, each cell prints "count (row %)"; the colour bar is the count.
     crosstab: function (c, t, l) {
-      var d = c.data, bar = { outlinewidth: 0, tickfont: { color: t["--fg"] }, title: { text: "count", font: { color: t["--fg"] } } };
-      if (phone.matches) Object.assign(bar, { orientation: "h", x: 0.5, xanchor: "center", y: -0.42, yanchor: "top", len: 0.9, nticks: 4, title: { text: "count", side: "top", font: { color: t["--fg"] } } });
+      var flat = [].concat.apply([], c.data.z), lo = Math.min.apply(null, flat), hi = Math.max.apply(null, flat);
+      var d = c.data, bar = { outlinewidth: 0, tickfont: { color: t["--fg"] }, tickformat: ",d", tickmode: "linear", tick0: lo, dtick: Math.max(1, Math.ceil((hi - lo) / 4)), title: { text: "count", font: { color: t["--fg"] } } };
+      if (phone.matches) Object.assign(bar, { orientation: "h", x: 0.5, xanchor: "center", y: -0.42, yanchor: "top", len: 0.9, title: { text: "count", side: "top", font: { color: t["--fg"] } } });
       if (phone.matches) l.margin.b = 170;
       l.xaxis = axis(t, c.x_label, { type: "category" });
       l.yaxis = axis(t, c.y_label, { type: "category", autorange: "reversed" });
