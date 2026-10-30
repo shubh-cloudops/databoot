@@ -1,0 +1,99 @@
+{
+  "header": {
+    "ticket": 483,
+    "project": "you-think-of-the-project-name",
+    "from_role": "pm",
+    "phase": "spec",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "a2dbf282ff46",
+    "tokens_left": 1924121
+  },
+  "goal": "Write or update docs/PRD.md and docs/acceptance.json for the idea in docs/IDEA.md.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/PRD.md describes the product",
+      "passes": true
+    },
+    {
+      "text": "docs/acceptance.json lists testable acceptance items",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py spec",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Treated round 7 as a restyle plus a new upload path; kept AC-1..AC-72 and appended AC-74..AC-87",
+      "why": "The brief and idea say keep everything earlier rounds built and change only what is listed",
+      "evidence": "docs/BRIEF.md Asked; docs/IDEA.md line 14"
+    },
+    {
+      "what": "Reworded AC-73 in place: Explorer XLSX Summary has no app title line; PPTX title slide first line is 'Data overview'",
+      "why": "Gate 187 told the PM to reword AC-73; the old text ('no overview title') contradicted it",
+      "evidence": "gate 187 PM item; docs/acceptance.json AC-73"
+    },
+    {
+      "what": "Home keeps the dataset, unreadable and other-files tables under the portal when started on a folder; the launcher folder becomes optional",
+      "why": "AC-1, AC-12, AC-15 and AC-22 must stay green; app/launch.py currently requires a folder",
+      "evidence": "app/launch.py:51; docs/acceptance.json AC-1, AC-22"
+    },
+    {
+      "what": "Constraint: /upload must not depend on python-multipart (for example one streamed POST per file with its relative path), with path sanitising",
+      "why": "No new dependencies and python-multipart is not in requirements.txt",
+      "evidence": "requirements.txt; docs/IDEA.md line 3"
+    },
+    {
+      "what": "The upload cap is a setting (DATABOOT_UPLOAD_CAP) so tests can use a small cap; the 2 GB cap applies to one upload's total",
+      "why": "Tests cannot send 2 GB; lessons say to add a switch where a new default would make testing impractical",
+      "evidence": "app/config.py reads env on every call; LESSONS (option to switch off)"
+    },
+    {
+      "what": "team.json: trends off; designer, frontend and design_review on",
+      "why": "IDEA: 'designer + frontend + backend; trends off'; every page is restyled",
+      "evidence": "docs/IDEA.md line 12"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Run python3 /opt/prodagents/check.py spec and json.tool on acceptance.json",
+      "why_it_failed": "Bash commands needed approval and were not run; the JSON was checked by hand only"
+    },
+    {
+      "what": "Find docs/reference/databoot-console.html (the visual contract)",
+      "why_it_failed": "Not in docs/reference/ (only deck.gl and unstructured.io) and not in git history"
+    }
+  ],
+  "assumptions": [
+    "Each upload replaces the previous upload's temp folder and becomes the current data folder; a launcher folder is never written or deleted",
+    "After a filter click inside the expanded overlay, the page reloads with that same tile expanded",
+    "Clickable marks are filtering or drilling bars and donut slices; map points are reached through the map's table view",
+    "Grid spans follow AC-34 (first chart full width, others half at desktop) inside the 12-column grid",
+    "The scan log appears all at once with an 'Open workspace' button, and the workspace also opens by itself"
+  ],
+  "open_questions": [
+    "Branding: no business website capture and no docs/brand/ folder (docs/reference/ holds only deck.gl and unstructured.io, which are third-party library sites). Gate 160 set name DataBoot, system font, no logo and a blank SVG favicon. Please confirm that these stay with the new dark theme (bg #050a12, cyan #4de1ff, amber #ffb454, mono labels), or give a logo as an image link in the gate comment.",
+    "The visual contract docs/reference/databoot-console.html is not in the repository or its git history. Please add it, or confirm that the designer works from the tokens in the IDEA alone.",
+    "Does the 2 GB cap apply to the total of one upload (assumed) or to each file?",
+    "Should a new upload replace the current data folder (assumed), or be added next to the launcher folder?",
+    "Should tile reordering also work from the keyboard (C1), since drag alone is not keyboard-accessible?",
+    "What words should the archetype caption use beyond the role counts (designer to propose in DESIGN.md)?"
+  ],
+  "lessons": [
+    {
+      "lesson": "When the IDEA names a reference file as a contract, Glob docs/reference/ first; if it is missing, write the spec from the IDEA's explicit tokens and ask the Board for it",
+      "when": "Restyle rounds with a named prototype",
+      "evidence": "docs/IDEA.md line 3; Glob docs/reference/**"
+    },
+    {
+      "lesson": "For an upload feature under 'no new dependencies', check requirements.txt for python-multipart and write the constraint into the PRD",
+      "when": "FastAPI upload or form features",
+      "evidence": "requirements.txt"
+    }
+  ],
+  "problems": []
+}

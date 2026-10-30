@@ -1,6 +1,6 @@
 {
-  "trends": {"run": false, "why": "IDEA round 6 says trends off; plain neutral style chosen in gate 160"},
-  "designer": {"run": true, "why": "IDEA names the designer: Monitoring and Survey layouts, DESIGN.md AC-39 cursor and line y-range wording"},
-  "frontend": {"run": true, "why": "IDEA names frontend: tiles, period selector, spike labels, Likert bars, cross-tab picker, Explorer bar cursor"},
-  "design_review": {"run": true, "why": "Two new web page layouts and page-wide fix-ups need the final screenshot review"}
+  "trends": {"run": false, "why": "IDEA round 7 says trends off; the look is set by the Board's prototype and tokens"},
+  "designer": {"run": true, "why": "IDEA names the designer: dark holographic tokens, tile component and portal in DESIGN.md"},
+  "frontend": {"run": true, "why": "IDEA names frontend: portal, scan screen, tile grid, drag, expand, keyboard marks, theme"},
+  "design_review": {"run": true, "why": "A full restyle of every page needs the final screenshot review"}
 }

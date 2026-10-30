@@ -1,153 +1,117 @@
-# PRD: DataBoot, an offline data-to-dashboard bootstrapper (round 6)
+# PRD: DataBoot, an offline data-to-dashboard bootstrapper (round 7)
 
-Round 6 has two parts (docs/IDEA.md, docs/BRIEF.md). **Part 1** finishes the seven gate 181 fix-ups to round 5
-(number format by column role, plurals, Explorer bar cursor, score only in Explorer, line y-range, PPTX title
-slide, an ARCHITECTURE.md fix). **Part 2** adds two apps to the ordered rule table: **Monitoring** (R4) and
-**Survey** (R5). QA adds a fixture per new archetype, week and year grain tests and an Explorer-only export case.
-No AI, offline, no network requests, no new dependencies. Everything under "Product today" stays.
+Round 7 adds a **new look and a one-box intake** (docs/IDEA.md, docs/BRIEF.md). The home page becomes one circular
+drop portal with "Choose files" and "Choose folder"; uploads go to the local server into a temp folder and are
+scanned as today. A scan screen shows a log from the real catalog, then the workspace opens. Every app and the
+Explorer's charts sit in one shared glass-tile component, with tile interactions, a dark holographic theme only and
+accessibility fixes. No AI, offline, no network requests, no new dependencies, no CDN. Everything under "Product
+today" stays: scanning, classification, rules, figures and exports do not change.
 
 ## Problem
 Owners of data (a pen drive, a disk or a folder of spreadsheets) cannot see what is in it without an analyst.
 DataBoot reads the files and at once shows datasets and charts, fully offline, with no AI: fixed rules look at the
 column types and pick the visuals. Charts can be taken away as editable XLSX and PPTX files.
-This round: two common kinds of file still fall through to the generic Explorer. Sensor or metric logs (a
-timestamp and readings) need "where is it now, what range, did anything spike"; survey exports (many answer
-columns) need "how did people answer each question, and how do two questions relate". Round 5 also left small
-inconsistencies the Board asked to fix first (a year shown as "2,024", "1 points", scores on pages that are not
-ordered by score).
+This round: today the only way in is the launcher's folder argument, so a client who has a few files at hand cannot
+just drop them in. The pages also look like a plain admin table; the Board wants a single, consistent "console"
+look where every chart is the same kind of tile the user can move, enlarge and read as a table.
 
 ## Users
-- **Data owner (client)**: non-technical; a Windows 11 laptop and a folder or drive of files. Starts the app with
-  one click and looks; may share a dashboard link with a colleague on the same machine or network.
-- **Operator**: installs it once on the client's machine.
+- **Data owner (client)**: non-technical; a Windows 11 laptop and some files, a folder or a drive. Starts the app
+  with one click, drops files in and looks.
+- **Operator**: installs it once on the client's machine; uses the launcher's -Folder option for large drives.
 
-## Product today (rounds 1 to 5, kept)
+## Product today (rounds 1 to 6, kept)
 1. Started on one folder; lists CSV, TSV, Excel (per sheet), JSON/JSONL, GeoJSON and Parquet datasets, an "Other
    files" inventory and a "Could not be read" list. Columns classified on the first 10,000 rows.
-2. **Explorer** (R3): at most 8 rule-picked charts ordered by score, KPI strip, filters, click-to-filter, chips,
-   URL state, filtered XLSX/PPTX exports with native charts.
-3. **Business** (R2): KPI cards with sparkline, trend per measure, leaderboard with "Other", drill-down with
-   breadcrumb, change table.
-4. **Map** (R1): 2D map with sequential colours or hexagon density cells, side panel, top regions, 3D view.
-5. Badge "App: <name> (rule <id>)", "View as" switch, `app=` in the URL, exports per app, global chart rules in
-   docs/DESIGN.md, table toggle on every chart, launcher, optional Dockerfile.
-
-## Column roles and archetype rules
-Roles as in round 5: **G** = a lat/lon pair (counted once); **T** = temporal; **N** = numerical, not counting the
-lat/lon pair; **C** = categorical; **I** = other. The ordered table, first match wins (new rows in bold; the
-code that walks it does not change):
-
-| Rule | Condition | App |
-|------|-----------|-----|
-| R1 | G present and (N <= 2 or at least 50% of rows have coordinates) | Map |
-| R2 | T >= 1 and C >= 1 and N >= 1 | Business |
-| **R4** | **T >= 1 and N >= 1 and C = 0** | **Monitoring** |
-| **R5** | **C >= 4 and C >= 60% of all columns and N <= 2** | **Survey** |
-| R3 | always | Explorer |
-
-R4 and R5 sit before R3 as the idea says. R2 and R4 cannot both hold (C >= 1 vs C = 0). A file that meets both R2
-and R5 (a date, a number and 4 or more categoricals) opens as Business and can be switched to Survey with "View
-as" (see open questions). For R5 only, a whole-number column whose values all lie in 1..5 counts as a Likert
-question (C), not as N; R1, R2 and R4 still count it as N.
-
-### Number format by column role (fix-up 1)
-- Thousands separators only for values of **numeric** columns and for counts/sums the app computes.
-- Never for **identifier** columns (role I, or a numerical column whose name is `id` or ends in `id`/`_id`, or
-  contains `code`, `zip` or `phone`, any case), **temporal** columns, or **year-like** columns (a whole-number
-  column whose name contains `year`, any case, or whose values are all whole numbers from 1900 to 2100).
-- Applies in tables, the Map side panel, tooltips and table views. The decision is made from the column's role on
-  the server, not by matching the rendered text. "2,024" never appears for a year column.
+2. Ordered rule table, first match wins: R1 Map, R5 Survey, R2 Business, R4 Monitoring, R3 Explorer (gate 183;
+   conditions in AC-43 and AC-64). Badge "App: <name> (rule <id>)", "View as", `app=` in the URL.
+3. Explorer (8 scored charts, KPI strip), Business (KPI cards, trends, leaderboard, drill, change table), Map (2D,
+   hexagons, side panel, top regions, 3D), Monitoring (period, tiles, main line, spikes), Survey (question bars,
+   Likert, cross-tab, Respondents).
+4. Filters, chips, click-to-filter, URL state; filtered XLSX/PPTX exports with native charts; table toggle and
+   tooltip on every chart; number format by column role; launcher and optional Dockerfile.
 
 ## User stories
-### Must (rounds 1 to 5, kept)
-- M1-M28 as in round 5: listing, profiling, Explorer charts and filters, exports, launcher, accessibility, detection,
-  badge, View as, Business, Map, global chart rules, no network (AC-1..AC-58, some reworded below).
+### Must (rounds 1 to 6, kept)
+- M1-M43 as in round 6 (AC-1..AC-73). AC-73 reworded to gate 187 (Explorer PPTX "Data overview", no XLSX title).
 
-### Must (round 6, part 1: fix-ups)
-- M29. Number format by role. As a data owner, a year reads 2024 and an order id reads 10045, while amounts read
-  12,345 (AC-59; AC-55 reworded).
-- M30. Plurals. "1 point", "1 row", "1 of 1 row"; "0 points", "2 points" (AC-60; AC-17 reworded).
-- M31. Explorer bars show the same pointer cursor as clickable Business bars; DESIGN.md Cross-filter (AC-39) text
-  says so (AC-61).
-- M32. "score 0.xx" only in Explorer captions; Business, Map, Monitoring and Survey captions show none (AC-35
-  reworded).
-- M33. Line charts keep the automatic y-range in every app; the zero baseline is for bars only; DESIGN.md says so
-  (AC-62). This reverses the round 5 design review's zero start on Business trends.
-- M34. PPTX title slide: the app title, then the file name (with sheet for Excel) as a smaller second line (AC-63).
-- M35. Architect: docs/ARCHITECTURE.md L147-148 describes hexagon choropleth cells (gate 180). Doc-only, no AC.
-
-### Must (round 6, part 2: new apps)
-- M36. Detection. Monitoring and Survey files open in their app, with the badge "App: Monitoring (rule R4)" or
-  "App: Survey (rule R5)"; earlier fixtures keep their app (AC-64).
-- M37. Monitoring tiles. One sparkline tile per numeric column: latest value, min, max over the selected period, and
-  the change against the previous period as an arrow icon + signed % with 1 decimal + "up"/"down"/"no change",
-  never colour alone (AC-65).
-- M38. Period selector. 7 days, 30 days, 90 days, All; the choice is in the URL and sets the tiles and main line
-  (AC-66).
-- M39. Main line. The primary numeric (AC-46 name rule) over time with its rolling mean as a second line on the same
-  y-axis; spikes flagged with a marker and the text label "spike" (AC-67).
-- M40. Survey questions. One horizontal bar chart per question (categorical column), bars sorted by count, top 10
-  then "Other", in a small-multiples grid (AC-68).
-- M41. Likert questions. A 100% stacked bar per Likert question, segments in scale order on a diverging palette
-  with a grey neutral (AC-69).
-- M42. Cross-tab. Two dropdowns pick a row question and a column question; a heatmap shows the counts with row %
-  (AC-70).
-- M43. Both new apps have the "View as" switch (AC-45), a table toggle on every chart, one y-axis and tooltips
-  (AC-54), and no request to another host (AC-9).
+### Must (round 7)
+- M44. Drop portal. As a data owner, the home page shows one circular drop portal plus "Choose files" and "Choose
+  folder" buttons, so I can drop or pick one file, many files or a folder (AC-74).
+- M45. Upload. Picked or dropped files are sent to the local server (`/upload`), saved in a temp data folder with
+  their relative paths kept (a folder's subfolders stay), and scanned exactly as a launcher folder would be
+  (AC-75). The temp folder is deleted when the app exits (AC-76).
+- M46. Cap. An upload over 2 GB is refused with a clear message that names the limit and the launcher's -Folder
+  option for larger drives; nothing of it is kept (AC-77).
+- M47. Scan screen. After an upload I see a log from the real catalog: per dataset its file, rows, role counts
+  (T/N/C/G) and "-> APP (rule Rn)", unreadable files with their note, and "0 bytes uploaded to the internet"; then
+  the workspace opens (AC-78).
+- M48. Workspace. Dataset tabs, an archetype caption, the app badge, filter chips and a 12-column grid of tiles
+  (AC-79).
+- M49. One tile component for every app (Business, Map, Monitoring, Survey, Explorer) and the Explorer's charts;
+  each tile is a landmark with a heading; tile content and figures unchanged (AC-80).
+- M50. Reorder. Drag a tile by its header; the order is remembered per dataset (AC-81).
+- M51. Expand. A tile opens full screen; Esc or a backdrop click closes it; filters still work inside (AC-82).
+- M52. Dark holographic theme only; chart rules kept; contrast >= 4.5:1 (AC-83).
+- M53. Motion: cursor glow and a staggered entrance under 0.6 s; none with reduced motion; no blur with reduced
+  transparency (AC-84).
+- M54. Keyboard: every clickable chart mark is reachable with Tab, shows a focus ring and acts on Enter/Space
+  (AC-85).
+- M55. Offline: the whole intake-to-workspace walk asks no other host (AC-86).
 
 ### Should
-- S1. Unreadable files listed with a reason; Other files inventory; DataBoot name; speed (AC-12, AC-15, AC-19..AC-21,
-  AC-25, AC-26, AC-31, AC-41).
-- S2. Archetype exports (AC-56). New: Monitoring and Survey exports titled "Monitoring overview" and "Survey
-  overview" (AC-71).
-- S3. QA: Business week and year grain (AC-72); an Explorer-only dataset's exports (AC-73).
+- S1-S3 as in round 6 (speed AC-41/AC-42 still met with the new pages; exports unchanged).
+- S4. docs/DESIGN.md records the tokens and tile rules (AC-87).
 
 ### Could
-- C1. Pick a different folder from the home page without restarting.
-- C2. Rules for Directory and Drive apps (later round).
+- C1. Keyboard reorder of tiles (move buttons or keys) as an alternative to drag.
+- C2. A progressive scan log (lines appear as files are read) instead of all at once.
 
-## Monitoring app definitions (defaults; Board to confirm)
-- Time column = the first T column; rows sorted by time; repeated timestamps are averaged into one point.
-- Period = the last 7, 30 or 90 days ending at the latest timestamp, or All; default 30 days; URL `period=7|30|90|all`.
-- Tile: latest = value at the latest timestamp; min and max over the period; change = mean of the period vs mean
-  of the window of the same length right before it, signed % with 1 decimal. "All", an empty previous window or a
-  previous mean of 0 give "n/a" and no arrow. Sparkline = the period's values.
-- Main line = the primary numeric; rolling mean and spikes use a trailing window of the 30 points before each point;
-  a point is a spike when that window is full and |value - mean| / standard deviation > 3 (no spike when the
-  deviation is 0). Spikes are computed on all rows, then the selected period is shown.
-- The round 4 filter form (date range) stays; there are no categorical filters, since C = 0.
-
-## Survey app definitions (defaults; Board to confirm)
-- Question = every C column (including R5's 1..5 Likert columns), in column order. N and I columns are not charted.
-- Likert = a question whose non-empty values all lie on one known scale with at least 2 distinct values:
-  1..5, or (any case) "strongly disagree, disagree, neither agree nor disagree / neutral, agree, strongly agree".
-  Neutral = 3 or the middle label, drawn grey; disagree side and agree side in the two hues of the diverging scale.
-- Non-Likert question: horizontal bars of row counts per value, sorted descending, top 10 then "Other".
-- Grid: two charts per row at desktop width, one at phone width (DESIGN.md gives the details).
-- Cross-tab: the two dropdowns list every question and default to the first two; cell text = count and row % with
-  1 decimal; row % of each row sums to 100. The pick is in the URL.
-- The round 4 category filters and click-to-filter on non-Likert bars stay.
+## Round 7 definitions (defaults; Board to confirm)
+- **Upload set**: one drop or one pick is one upload. Each upload gets a new temp folder; the app then scans that
+  folder (it becomes the current data folder) and the previous upload's temp folder is deleted. A folder given to
+  the launcher (-Folder) is only read, never written or deleted.
+- **Cap**: 2 GB for the total of one upload (all its files), checked before and while writing; the limit is a
+  setting (`DATABOOT_UPLOAD_CAP`, bytes) so tests can use a small cap.
+- **Launcher**: the folder argument becomes optional; without it the app starts on an empty temp folder and the home
+  page shows only the portal. With a folder, the home page shows the portal and, below it, the dataset, "Could not
+  be read" and "Other files" tables as today (AC-1, AC-12, AC-15, AC-22 stay).
+- **Scan log line**: `<file>[ - <sheet>]  <rows> rows  T<n> N<n> C<n> G<n>  -> <APP> (rule <id>)`, rows with
+  thousands separators, APP in capitals and equal to `/api/datasets/<id>/app`; unreadable: `<file>  <note>`. Last
+  line: "0 bytes uploaded to the internet". Then a button "Open workspace" (focused) opens the first dataset; it also
+  opens by itself after the log is shown.
+- **Archetype caption**: the role counts and the app's purpose in a few words (for example "T1 N2 C1 · business").
+  Exact words are the designer's, in DESIGN.md; no generated sentences (AC-17).
+- **Tile**: header (heading, drag handle, expand, table toggle), body (the existing figure, cards or table). KPI
+  strip, card groups, tables (Columns, First rows, change table) are tiles too. Grid spans follow AC-34 (first chart
+  tile full width, others half at desktop, full at phone).
+- **Expand and filters**: clicking a bar inside the expanded tile applies the filter as on the page (URL, chip,
+  counts); the page then shows that same tile expanded with the filtered figure.
+- **Clickable marks**: bars and donut slices that filter or drill (Explorer, Business leaderboard, Survey bars, Map
+  top regions). Map points are reached through the map's table view.
 
 ## Out of scope
-- Directory and Drive apps; any app beyond Monitoring and Survey.
-- Any AI or learned recommender, any new dependency, any network request, map tiles or online geocoding.
-- Changes to earlier apps beyond the seven fix-ups. Trends research is off (Board, gate 179 and IDEA "trends off").
-- Launcher, Dockerfile, readers, Power BI, shapefile, PDF/Word, SQL, measure picker. New branding, logo or theme
-  toggle.
+- New apps, chart types, scanning or classification rules, export changes, new branding or logo.
+- Uploads over 2 GB through the browser (the launcher's -Folder stays); upload over a network to a remote server.
+- A light theme or OS light/dark switch (removed). Web fonts, CDN assets, new dependencies. Trends research (IDEA:
+  trends off).
 
 ## Constraints
-- Deterministic: same file, same roles, same app, same figures, in the API, page and exports.
-- With no `app` parameter a dataset opens in its detected app; `app=explorer` gives the Explorer page. The new rules
-  must not change the app of any round 1-5 fixture; a test that would change passes `app=` explicitly.
-- Speed: a 200,000-row CSV that opens as Monitoring or Survey answers within AC-42's 5 seconds cold.
-- Text allowed on pages stays as before (titles, axis labels, counts, rule caption, badge, KPI and tile labels,
-  breadcrumb, button labels, the "spike" label). No generated sentences (AC-17).
-- Style follows docs/DESIGN.md: plain neutral, system sans font, OS colour preference only. The designer adds the
-  Monitoring and Survey layouts and the fix-up 3 and 5 wording.
+- No new dependency: `python-multipart` is not in requirements.txt, so `/upload` must not rely on FastAPI form
+  parsing (for example one POST per file with its relative path, body streamed to disk). Upload paths are
+  sanitised: no absolute paths, no `..`, nothing written outside the temp folder.
+- The server binds 127.0.0.1 as today. All earlier tests stay green; a test that relied on the old look (light
+  theme, page order) is changed only where this PRD changes the behaviour, and named in the tickets.
+- Speed: AC-41 and AC-42 still met with the tile pages.
+- Style follows docs/DESIGN.md, updated by the designer from the prototype (docs/reference/databoot-console.html,
+  see open questions): bg #050a12, cyan #4de1ff, amber #ffb454, mono labels, system font stacks only. Global chart
+  rules unchanged (one y-axis, sorted bars from zero, direction never by colour alone).
+- Text allowed on pages stays as before plus the scan log lines, the portal labels, the cap message and tile
+  controls. No generated sentences (AC-17).
 - Team (IDEA): designer, frontend and backend; trends off.
 
 ## Branding
 No business website capture and no docs/brand/ folder: docs/reference/ holds captures of deck.gl and
-unstructured.io, third-party libraries named in the round 1 idea, not the client's site, plus an empty folder
-"0.xx" (the capture step read "score 0.xx" in the idea as a host name; nothing was captured). The Board chose
-(gate 160): name DataBoot, plain neutral style, system sans font, no logo, blank SVG favicon. Unchanged.
+unstructured.io (third-party libraries from the round 1 idea, not the client's site). The Board chose (gate 160):
+name DataBoot, system font, no logo, blank SVG favicon. This round the Board asks for a new theme (dark
+holographic); name, no-logo and favicon stay. The prototype named as the visual contract is not in the repository.
