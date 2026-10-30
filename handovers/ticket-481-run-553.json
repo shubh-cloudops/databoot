@@ -1,0 +1,67 @@
+{
+  "header": {
+    "ticket": 481,
+    "project": "you-think-of-the-project-name",
+    "from_role": "coach",
+    "phase": "learn",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "847e9e9f8b68",
+    "tokens_left": 1929742
+  },
+  "goal": "Learn from round 6: update the shared skills and lessons and this project's MEMORY.md from /logs/digest.md.",
+  "acceptance_criteria": [
+    {
+      "text": "Skills and lessons come only from evidence in the digest",
+      "passes": true
+    },
+    {
+      "text": "MEMORY.md is current and short",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py learn",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Added the skill change-shared-label-after-board-ruling and extended add-page-mode-keep-old-tests-green and acceptance-tests-per-item",
+      "why": "Tickets 467, 478, 479 and 480 and gates 184, 187 and 188 show a Board string ruling needing greps across sibling tests and a route-level branch; tickets 463, 473 and 477 add page-mode and QA pitfalls",
+      "evidence": "/logs/digest.md tickets 463, 467, 473, 477-480; gates 184, 187, 188"
+    },
+    {
+      "what": "Merged nine round 6 lessons into existing role lines of LESSONS.md instead of adding lines",
+      "why": "The file had to stay under 80 lines",
+      "evidence": "LESSONS.md is 79 lines"
+    },
+    {
+      "what": "Rewrote the open-state part of MEMORY.md for round 7 and added the round 6 app facts",
+      "why": "Gate 188 closed round 6 and gates 183, 184, 186 and 187 set the rules",
+      "evidence": "MEMORY.md sections 'Round 6 apps' and 'Open state at start of round 7'"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First scripted insert of lessons placed new text before the old evidence bracket",
+      "why_it_failed": "Evidence brackets were attributed to the wrong lesson; fixed with a second script that swapped them"
+    }
+  ],
+  "assumptions": [
+    "The digest had no 'Faded history' list, so nothing needed re-confirming or deleting",
+    "AC-59..73 map to round 6 topics as written in MEMORY.md; I did not re-read acceptance.json"
+  ],
+  "open_questions": [
+    "Was the DESIGN.md tile Min/Max example corrected to whole numbers after gate 186? The digest does not show it."
+  ],
+  "lessons": [
+    {
+      "lesson": "When a Board ruling changes a shared string, grep the old value across all tests and branch in the route if an immutable test pins another path",
+      "when": "A gate changes a client-facing label",
+      "evidence": "tickets 478, 479, 480; gate 187"
+    }
+  ],
+  "problems": []
+}
