@@ -1053,7 +1053,7 @@ def test_AC_40(make_client, data_dir):
                     return sum(sh.chart.plots[0].series[0].values)
     p_full, p_cut = pptx(""), pptx(query)
     t_full, t_cut = texts(p_full.slides[0]), texts(p_cut.slides[0])
-    assert t_full == ["Explorer", "sales.csv", "Rows: 6, 3 columns", "Filters: none"]
+    assert t_full == ["Data overview", "sales.csv", "Rows: 6, 3 columns", "Filters: none"]
     assert "Rows: 6, 3 columns" in t_full and "Filters: none" in t_full
     assert "Rows: 2 of 6, 3 columns" in t_cut and "Filters: none" not in " ".join(t_cut)
     assert all(label in " ".join(t_cut) for label in labels)
@@ -1626,7 +1626,7 @@ def test_AC_56(make_client, archetypes_dir):
     wb = _xlsx(client, "shop.csv", "?app=explorer")
     assert wb.sheetnames[0] == "Data" and wb.sheetnames[-1] == "Summary" and "chart-1 table" not in wb.sheetnames
     assert wb["Summary"]["A1"].value == "Filters: none"
-    assert first(_pptx(client, "shop.csv", "?app=explorer")[0]) == "Explorer"
+    assert first(_pptx(client, "shop.csv", "?app=explorer")[0]) == "Data overview"  # Board gate 187: one client-facing title for every Explorer export
 
 
 def test_AC_57(archetypes_dir, make_client, tmp_path):
@@ -1753,6 +1753,7 @@ def test_AC_59(make_client, tmp_path):
         f"{10045 + i},{2023 + i % 2},{('North', 'South')[i % 2]},{12345 + 100 * i}\n" for i in range(12)))
     (root / "places.csv").write_text("lat,lon,place_id,year,season,pop\n" + "".join(
         f"{-40 + 4 * i},{-120 + 12 * i},{10045 + i},{2000 + i},{1950 + i},{12345 + i}\n" for i in range(20)))
+    (root / "ids.csv").write_text("lat,lon,place_id\n" + "".join(f"{-40 + 4 * i},{-120 + 12 * i},{10045 + i}\n" for i in range(20)))
     client = make_client(root)
     oid = _app_id(client, "orders.csv")
     for q in ("", "?app=explorer"):
@@ -1781,6 +1782,18 @@ def test_AC_59(make_client, tmp_path):
             assert not any(s in page.inner_text("main") for s in separated)
             assert page.errors == []
             assert not any(s in tip for s in separated), f"tooltip of the {label} colour column: {tip!r}"
+        # Board gate 187: an identifier colour column (place_id) reads "10050" in the tooltip, never "10,050"
+        with _browse(f"{base}/datasets/{_ids6(base)[('ids.csv', None)]}") as page:
+            pts = page.locator("figure[data-kind=map2d] .js-plotly-plot .point")
+            tips = []
+            for k in range(pts.count()):
+                box = pts.nth(k).bounding_box()
+                page.mouse.move(box["x"] + box["width"] / 2 - 2, box["y"] + box["height"] / 2)
+                page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+                page.wait_for_selector(".hoverlayer .hovertext")
+                tips.append(page.locator(".hoverlayer .hovertext").first.text_content())
+            assert any(t.strip().endswith("10050") or "10050" in t for t in tips), tips
+            assert not any(s in t for t in tips for s in separated), tips
 
 
 def test_AC_60(make_client, tmp_path):
