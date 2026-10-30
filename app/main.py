@@ -224,4 +224,4 @@ def export_pptx(request: Request, id: str):
     d = _dataset(id)
     v, charts, title = _export(d, request.query_params)
     shown = len(v["rows"]) if v["filters"] else None
-    return _download(d, "pptx", export.pptx(d, charts, filters.summary(v["labels"]), shown, title), "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+    return _download(d, "pptx", export.pptx(d, charts, filters.summary(v["labels"]), shown, title or (None if request.query_params.get("app") == "explorer" else "Data overview")), "application/vnd.openxmlformats-officedocument.presentationml.presentation")

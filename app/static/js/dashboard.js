@@ -235,7 +235,7 @@
       var line = { color: t["--muted"], width: 0.5 };
       var traces = [];
       if (has.length) traces.push({ type: "scattergeo", mode: "markers", name: c.z_label, lon: pick(has, "lon"), lat: pick(has, "lat"), customdata: has,
-        hovertemplate: "%{marker.color:,}<extra></extra>",
+        hovertemplate: "%{marker.color" + ((c.plain || []).indexOf("z") < 0 ? ":," : "") + "}<extra></extra>",
         marker: { size: 6, opacity: 0.8, line: line, color: pick(has, "color"), colorscale: scale, colorbar: bar(c.z_label) } });
       if (none.length) traces.push({ type: "scattergeo", mode: "markers", name: "no value", lon: pick(none, "lon"), lat: pick(none, "lat"), customdata: none,
         hovertemplate: "%{lat}, %{lon}<extra></extra>", marker: { size: 6, opacity: 0.8, line: line, color: t["--muted"] } });

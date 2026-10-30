@@ -139,4 +139,4 @@ def test_explorer_only_dataset_exports_have_no_overview(make_client, archetypes_
     slides = list(Presentation(io.BytesIO(client.get(f"/datasets/{i}/export.pptx").content)).slides)
     assert len(slides) == 1 + n and n > 0
     assert all(any(s.has_chart or s.has_table for s in sl.shapes) for sl in slides[1:])
-    assert "overview" not in " ".join(_texts(slides[0])).lower()
+    assert _texts(slides[0])[0] == "Data overview"  # Board gate 186: client-facing title, not "Explorer"

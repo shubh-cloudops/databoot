@@ -1,0 +1,71 @@
+{
+  "header": {
+    "ticket": 478,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "qa",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1950150
+  },
+  "goal": "Fix the application so every test in tests/test_acceptance.py passes. Do not edit that file; read the QA handover notes for the failing behaviour.",
+  "acceptance_criteria": [
+    {
+      "text": "All acceptance tests pass",
+      "passes": true
+    },
+    {
+      "text": "tests/test_acceptance.py is unchanged",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa && echo '126a7f0ab9ac0adebcefc563fa7d7d6143ba11685ebcaee9ccae7082a9e4b75d  tests/test_acceptance.py' | sha256sum -c --quiet",
+    "passed": true,
+    "output_tail": "........................................................................ [ 17%]\n........................................................................ [ 35%]\n........................................................................ [ 53%]\n........................................................................ [ 70%]\n........................................................................ [ 88%]\n...............................................                          [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 37 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n407 passed, 112 warnings in 532.35s (0:08:52)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "PPTX title is 'Data overview' unless the request has ?app=explorer, in which case it stays 'Explorer'",
+      "why": "Immutable test_AC_56 and the check at test_acceptance.py:1056 still assert 'Explorer' for explicit ?app=explorer exports, while test_AC_73 asserts 'Data overview' for measures.csv opened with no app param; XLSX Summary must not get a title",
+      "evidence": "app/main.py export_pptx; tests/test_acceptance.py:1028,1056,1629,2222"
+    },
+    {
+      "what": "Map 2D point tooltip omits the ',' format when the colour column is plain (c.plain contains 'z')",
+      "why": "Gate 186 item 2: identifier and year columns never show separators in tooltips; the map already gets c.plain from _appview",
+      "evidence": "app/static/js/dashboard.js scattergeo hovertemplate; main.py:145; test_AC_59 passes"
+    },
+    {
+      "what": "Updated tests/test_export_apps.py::test_explorer_only_dataset_exports_have_no_overview to assert the title slide's first line is 'Data overview'",
+      "why": "The old assertion ('overview' not in title slide text) contradicts Board gate 186",
+      "evidence": "tests/test_export_apps.py:142"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Changing the default title in export.pptx() from 'Explorer' to 'Data overview'",
+      "why_it_failed": "Unit tests in test_export_pptx.py and the immutable test_AC_56 and the line 1056 check expect 'Explorer' as the library default and for explicit ?app=explorer; reverted and set the title in the route instead"
+    }
+  ],
+  "assumptions": [
+    "Explicit ?app=explorer means the user chose the Explorer view-as, so the internal name is kept there; a file that opens as Explorer by default gets the client-facing title"
+  ],
+  "open_questions": [
+    "The 'Explorer' for explicit ?app=explorer exports conflicts with the spirit of gate 186; if the Board wants 'Data overview' everywhere, test_AC_56, the line 1056 check and tests/test_export_pptx.py must change first (test_acceptance.py is immutable in this ticket)."
+  ],
+  "lessons": [
+    {
+      "lesson": "When a Board gate changes a visible string and an immutable acceptance test still asserts the old string on another path, find what differs between the two requests (here the ?app=explorer param) and branch on that in the route, not in the shared library default.",
+      "when": "An immutable test file contradicts a newer gate for only some code paths",
+      "evidence": "app/main.py export_pptx; tests/test_acceptance.py:1056 vs 2222"
+    },
+    {
+      "lesson": "The full QA check takes about 10 minutes; run it once with run_in_background and wait with an until-loop on the output file, because foreground sleeps are blocked.",
+      "when": "Running python3 /opt/prodagents/check.py qa",
+      "evidence": "407 passed in 597s"
+    }
+  ],
+  "problems": []
+}
