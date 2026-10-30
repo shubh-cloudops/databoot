@@ -62,7 +62,7 @@ def test_sales_download(make_client, data_dir):
     slides = list(prs.slides)
     assert len(slides) == 5
     assert all(s.slide_layout.name == "Blank" for s in slides)
-    assert texts(slides[0]) == ["Explorer", "sales.csv", "Rows: 6, 3 columns", "Filters: none"]
+    assert texts(slides[0]) == ["Data overview", "sales.csv", "Rows: 6, 3 columns", "Filters: none"]
     assert texts(slides[1])[0] == "amount by date"
     assert texts(slides[1])[-2:] == ["temporal date + numerical amount: line, sum per date", "6 of 6 points"]
     kinds = [chart_of(s).chart_type for s in slides[1:]]
@@ -97,7 +97,7 @@ def test_heatmap_slide_is_a_native_table_and_counts_have_separators():
     check_package(data)
     assert not [n for n in zipfile.ZipFile(io.BytesIO(data)).namelist() if n.startswith("ppt/charts")]
     prs = Presentation(io.BytesIO(data))
-    assert texts(list(prs.slides)[0]) == ["Explorer", "a.csv", "Rows: 56,789, 2 columns", "Filters: none"]
+    assert texts(list(prs.slides)[0]) == ["Data overview", "a.csv", "Rows: 56,789, 2 columns", "Filters: none"]
     slide = list(prs.slides)[1]
     table = next(s.table for s in slide.shapes if s.has_table)
     assert (len(table.rows), len(table.columns)) == (3, 3)
@@ -135,7 +135,7 @@ def test_no_charts_and_illegal_characters_stay_valid():
     data = export.pptx(d, [])
     check_package(data)
     slides = list(Presentation(io.BytesIO(data)).slides)
-    assert len(slides) == 1 and texts(slides[0]) == ["Explorer", "a<&>.csv - s", "Rows: 0, 0 columns", "Filters: none"]
+    assert len(slides) == 1 and texts(slides[0]) == ["Data overview", "a<&>.csv - s", "Rows: 0, 0 columns", "Filters: none"]
     c = {"id": "chart-1", "kind": "bar", "title": "t\x00", "x_label": "x\x0b", "y_label": "y", "rule": "r\x1f", "shown": 1,
          "total": 1, "data": {"x": ["a\x00b"], "y": [1]}}
     slides = list(Presentation(io.BytesIO(export.pptx(d, [c]))).slides)
@@ -147,7 +147,7 @@ def test_filtered_title_slide_and_chart_total(make_client, data_dir):
     d = next(d for d in client.get("/api/datasets").json() if d["path"] == "sales.csv")
     prs = Presentation(io.BytesIO(client.get(f"/datasets/{d['id']}/export.pptx?app=explorer&f.region=North").content))
     slides = list(prs.slides)
-    assert texts(slides[0]) == ["Explorer", "sales.csv", "Rows: 3 of 6, 3 columns", "Filters: region = North"]
+    assert texts(slides[0]) == ["Data overview", "sales.csv", "Rows: 3 of 6, 3 columns", "Filters: region = North"]
     bar = next(s.chart for sl in slides[1:] for s in sl.shapes
                if s.has_chart and s.chart.chart_type == XL_CHART_TYPE.COLUMN_CLUSTERED and "North" in s.chart.plots[0].categories)
     assert sum(bar.plots[0].series[0].values) == 16

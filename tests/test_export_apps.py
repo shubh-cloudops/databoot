@@ -28,7 +28,7 @@ def test_explorer_output_is_round_4(make_client, data_dir):
     assert xlsx.sheet_names(got) == ["Data", "chart-1 line", "chart-2 histogram", "chart-3 bar", "chart-4 donut", "Summary"]
     assert xlsx.read_sheet(got, "Summary")[0] == ["Filters: none"]
     slides = list(Presentation(_get(make_client, data_dir, "sales.csv", "pptx", "?app=explorer")).slides)
-    assert _texts(slides[0])[:2] == ["Explorer", "sales.csv"]
+    assert _texts(slides[0])[:2] == ["Data overview", "sales.csv"]
 
 
 def test_business_xlsx(make_client, archetypes_dir):
@@ -110,7 +110,7 @@ def _first_runs(slide):
 
 def test_title_slide_second_line_is_file_name_in_smaller_size(make_client, data_dir, archetypes_dir):
     prs = Presentation(_get(make_client, data_dir, "sales.csv", "pptx", "?app=explorer"))
-    assert _texts(prs.slides[0]) == ["Explorer", "sales.csv", "Rows: 6, 3 columns", "Filters: none"]
+    assert _texts(prs.slides[0]) == ["Data overview", "sales.csv", "Rows: 6, 3 columns", "Filters: none"]
     fonts = _first_runs(prs.slides[0])
     assert (fonts[0].size.pt, fonts[0].bold, fonts[1].size.pt) == (40, True, 24)
     shapes = list(prs.slides[0].shapes)

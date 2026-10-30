@@ -1,0 +1,54 @@
+{
+  "header": {
+    "ticket": 480,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "qa",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1968997
+  },
+  "goal": "Fix the application so every test in tests/test_acceptance.py passes. Do not edit that file; read the QA handover notes for the failing behaviour.",
+  "acceptance_criteria": [
+    {
+      "text": "All acceptance tests pass",
+      "passes": true
+    },
+    {
+      "text": "tests/test_acceptance.py is unchanged",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa && echo 'f73f0dab5a39a1939c828a1c23711eb80a0da75bb55e2a3c4ccd0e26b37a9aee  tests/test_acceptance.py' | sha256sum -c --quiet",
+    "passed": true,
+    "output_tail": "........................................................................ [ 17%]\n........................................................................ [ 35%]\n........................................................................ [ 53%]\n........................................................................ [ 70%]\n........................................................................ [ 88%]\n...............................................                          [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 37 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n407 passed, 112 warnings in 551.86s (0:09:11)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "PPTX title slide first line is always 'Data overview', including explicit ?app=explorer",
+      "why": "Board gate 187 item 2; test_AC_40, test_AC_56 and test_AC_73 now assert it",
+      "evidence": "app/main.py:227, app/export.py:114"
+    },
+    {
+      "what": "Updated the expected title in tests/test_export_apps.py (L31, L113) and tests/test_export_pptx.py (L65, L100, L138, L150)",
+      "why": "Gate 187 allows editing these files to say 'Data overview'",
+      "evidence": "python3 -m pytest -q tests/test_export_apps.py tests/test_export_pptx.py: 18 passed"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "AC-59 (place_id=10050 reads '10050') and the side-panel/hex-hover check were already fixed by ticket 478, since test_AC_59 passed in the acceptance run"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "When a Board gate changes a shared label, grep tests/test_export*.py for the old string and update every hit in the same ticket",
+      "when": "A title or label rule changes for exports",
+      "evidence": "6 tests in test_export_apps.py and test_export_pptx.py failed after the code fix until updated"
+    }
+  ],
+  "problems": []
+}
