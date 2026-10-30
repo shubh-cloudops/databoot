@@ -1,0 +1,102 @@
+{
+  "header": {
+    "ticket": 485,
+    "project": "you-think-of-the-project-name",
+    "from_role": "designer",
+    "phase": "architecture",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "1c53b4636107",
+    "tokens_left": 1768911
+  },
+  "goal": "Write or update docs/DESIGN.md and the shared stylesheet for the approved spec and architecture.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/DESIGN.md defines layout, colour, type, motion and components",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py design",
+    "passed": true,
+    "output_tail": "........................................................................ [ 17%]\n........................................................................ [ 35%]\n........................................................................ [ 53%]\n........................................................................ [ 70%]\n........................................................................ [ 88%]\n...............................................                          [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 37 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n407 passed, 112 warnings in 568.99s (0:09:28)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Dark-only :root tokens in databoot.css (prefers-color-scheme block deleted); tile, grid, portal, scan, tabs, overlay rules added as inert-until-markup",
+      "why": "Tokens re-skin every existing page without touching templates; the new rules wait for the W7/H7/S7/I7 markup",
+      "evidence": "app/static/css/databoot.css :root and the round 7 block; docs/DESIGN.md 'Round 7 theme and tiles'"
+    },
+    {
+      "what": "Portal rings rotate only while data-state is over or busy; static at rest",
+      "why": "Honesty rule: no animation suggesting activity that is not happening; the prototype spun them always",
+      "evidence": "docs/DESIGN.md 'Home: the portal'; css .portal[data-state]"
+    },
+    {
+      "what": "No CSS text-transform; mono letter-spaced labels keep their case; archetype caption is upper-cased by the server",
+      "why": "tests/test_pages.py:87 forbids the word 'uppercase' in the stylesheet; th must show names as read",
+      "evidence": "tests/test_pages.py:87; DESIGN.md Type"
+    },
+    {
+      "what": "--div-mid #222b35 (saturation < 0.08), --delta-max 30%",
+      "why": "test_AC_69 requires the Likert neutral colour to be grey; the cyan tint is brighter so the delta tint was lowered to keep fg >= 5.9:1",
+      "evidence": "tests/test_acceptance.py:2116; /tmp/c7.py measurements (not kept)"
+    },
+    {
+      "what": "Entrance 240 ms with 30 ms steps capped at 300 ms; .is-settled stops replay on moved tiles",
+      "why": "AC-84 needs every entrance done within 0.6 s (last ends at 540 ms)",
+      "evidence": "css .grid > .ws-tile:nth-child; DESIGN.md Motion rules"
+    },
+    {
+      "what": "Chart-mark focus ring is 3px --fg (white), not cyan",
+      "why": "Bars are cyan, so a cyan ring would blend into the mark; verified Chromium draws an outline on an SVG path",
+      "evidence": "/tmp/shots/s-focus.png; css .point path:focus-visible"
+    },
+    {
+      "what": "Corrected the Min/Max tile example to whole numbers",
+      "why": "Board gate 186 accepted whole numbers",
+      "evidence": "docs/DESIGN.md Components, ul.tiles row"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "--div-mid #1a2b3e as the diverging midpoint",
+      "why_it_failed": "test_AC_69 hue check saw a saturation of 0.14 and said the neutral Likert segment is not grey; changed to #222b35"
+    }
+  ],
+  "assumptions": [
+    "The prototype databoot-console.html is absent, so visuals come from gate 189's description",
+    "Frontend tickets will emit exactly the markup in DESIGN.md (tile macro, portal, scan, tabs, archetype); the CSS is inert until then",
+    "A figure tile's floating .ws-head relies on :has(); Chromium and Edge support it, without it the head is an in-flow 44px row",
+    "test_AC_52 hexbin hover failure in the full run is load flakiness (passes alone and passed in the earlier full run)"
+  ],
+  "open_questions": [
+    "Board: is a still portal at rest acceptable, or should the rings always turn as in the prototype?",
+    "Board: please add docs/reference/databoot-console.html if exact prototype visuals matter",
+    "Tile titles read as mono labels in original case rather than upper-case (a test bans text-transform); is that acceptable?",
+    "dashboard.js still has the prefers-color-scheme listener (T7 removes it)"
+  ],
+  "lessons": [
+    {
+      "lesson": "When changing diverging or neutral tokens, grep the acceptance tests for a hue or saturation check on them before choosing the value",
+      "when": "Restyling theme colours that charts read from CSS tokens",
+      "evidence": "test_AC_69 failed on a blue-ish --div-mid; fixed with #222b35"
+    },
+    {
+      "lesson": "Grep the existing tests for banned words in the CSS file before using text-transform",
+      "when": "Designing mono uppercase labels",
+      "evidence": "tests/test_pages.py:87"
+    },
+    {
+      "lesson": "Check dashboard.js token readers (hex-only parsing of --div-*, --c*, --seq-*) before choosing token formats",
+      "when": "Defining tokens as rgba or colour-mix",
+      "evidence": "dashboard.js rgb(h) parses #rrggbb"
+    }
+  ],
+  "problems": []
+}

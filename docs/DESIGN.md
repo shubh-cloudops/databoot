@@ -1,11 +1,204 @@
-# Design: DataBoot (round 6)
+# Design: DataBoot (round 7)
 
 Stylesheet: `app/static/css/databoot.css` (all tokens and components below; linked by `app/templates/base.html`).
-Sources: docs/PRD.md, docs/ARCHITECTURE.md ("Pages", "Round 5"), Board gates 160, 165 and 179: **branding unchanged:
-DataBoot, plain neutral style, system sans font, no logo, blank SVG favicon** (`app/static/blank.svg`), text only
-as titles, axis labels, `N of M` counts and one rule caption. No docs/TRENDS.md this round (`team: -trends`), so no
-trend advice is used. No external fonts, images, icons or CDNs; no raster or SVG logo. The brand is the word
-"DataBoot" set in the system font. No docs/brand/ and no site capture exist, so no logo is copied.
+Sources: docs/PRD.md and docs/ARCHITECTURE.md ("Round 7: ..."), Board gates 160 and 189 and the IDEA's numbered list.
+**Branding unchanged (gates 160 and 189): the name DataBoot, system fonts, no logo, the blank SVG favicon**
+(`app/static/blank.svg`). **No docs/TRENDS.md this round (`team: -trends`), so no trend advice is used.** No external
+fonts, images, icons or CDNs; the only graphics are inline SVG icons drawn here (move, expand) and CSS. The prototype
+`docs/reference/databoot-console.html` is **not on disk** (gate 189 allows building from its description); this document
+turns that description into tokens and rules. Where the description and the IDEA's numbered list differ, the list wins, so
+the prototype's "(dev only) sample" button is not designed.
+
+## Round 7 theme and tiles (read this first; it overrides the older sections that disagree)
+
+**What changed.** One dark holographic theme replaces the light/dark pair; every page body is a 12-column grid of one shared
+glass tile; Home becomes a drop portal; a scan log sits between upload and workspace. Everything below this section that
+speaks of light mode, `prefers-color-scheme`, "no gradients, shadows or animation", "no entrance animation" or "no scroll
+reveals" is **replaced** by this section (the older sections are kept for the component details that still hold). Behaviour,
+routes, figures' data, the global chart rules (one y-axis, bars sorted and from zero, direction never by colour alone) and
+exports do not change.
+
+### Tokens (dark only; `:root` in the CSS, `color-scheme: dark`)
+Contrast measured with the WCAG formula (`/tmp/c7.py`, not kept) against the **effective** surfaces: the page `--bg`
+#050a12, the glass tile (top #0f1f34, bottom #070e19, from rgba(22,46,76,.58) and rgba(8,18,32,.50) over `--bg`) and the worst
+case under the cursor glow (#193e54: the lightest tile colour with the glow at its 12% peak; I measured 16% to get margin,
+the CSS uses 12%). Text needs 4.5:1, graphics and control edges 3:1. Pairs below are "bg / tile top / tile bottom / under glow".
+
+| Token | Value | Use | Contrast |
+|---|---|---|---|
+| `--bg` | #050a12 | page | |
+| `--surface` | #0c1a2c | opaque stand-in for glass: hover labels, sticky table head, overlay, reduced-transparency tiles | |
+| `--field` | #07111d | inputs, selects, type badge fill | fg 16.6, muted 7.8, `--line-strong` edge 5.1 |
+| `--fg` | #e6f1fa | text | 17.3 / 14.5 / 16.9 / 9.9 |
+| `--muted` | #93a9bf | captions, mono sublabels, `th` | 8.2 / 6.9 / 8.0 / 4.7 |
+| `--accent` | #4de1ff (cyan) | tile titles, links, focus ring, primary button, current tab, brackets | 12.8 / 10.7 / 12.5 / 7.3 |
+| `--on-accent` | #031018 | text on a cyan button | 12.4 |
+| `--amber` | #ffb454 | filter chips, app badge, drag target, last scan line | 11.3 / 9.4 / 11.0 / 6.4 |
+| `--danger` | #ff8a80 | unreadable notes, chart error, scan line with a note | 8.7 / 7.3 / 8.5 / 4.95 |
+| `--ok`, `--warn` | #7ee787, #ffb454 | reserved; always with a text label | >= 7.3 everywhere |
+| `--line` | rgba(120,220,255,.16) | hairlines, chart grid (decoration only) | n/a |
+| `--tile-edge` | rgba(120,220,255,.22) | tile, table, header border (the prototype's value) | n/a |
+| `--line-strong` | #5f8aa3 | button, input, badge edges (graphic) | 5.3 / 4.5 / 5.2 / 3.0 |
+| `--accent-soft` | rgba(77,225,255,.14) | hover fill, current tab and View-as fill | fg on it 10.4 |
+| `--amber-soft` | rgba(255,180,84,.14) | chip and badge fill | fg on it 11.0, amber on it 7.1 |
+| `--glass` | linear-gradient(160deg, rgba(22,46,76,.58), rgba(8,18,32,.50)) | tile, table box, scan panel, portal message | |
+| `--glass-shadow` | inset 0 1px 0 rgba(255,255,255,.08), 0 8px 32px rgba(0,0,0,.35) | the inner top highlight and the lift | |
+| `--glow` | rgba(77,225,255,.12) | cursor glow peak | |
+| `--blur`, `--tile-radius` | blur(14px), 14px | tile glass, tile corner | |
+| `--delta-max` | 30% | most a change-table delta cell takes of the hue (was 35%) | `--fg` on the full tint: 5.9 cyan, 6.4 amber |
+
+Chart palette (`--c1..--c8`, each >= 4.9:1 even under the glow; the series order is fixed, a one-series chart is `--c1`):
+`#4de1ff #ffb454 #7ee787 #b79bf0 #ff8a7a #9aa9ff #d1a086 #f08ab8` (cyan, amber, green, violet, coral, periwinkle, tan, pink).
+The donut (2 to 5 slices) uses `--c1..--c5`. Sequential scale `--seq-lo` #17405c to `--seq-hi` #4de1ff; map points and hexagons
+start at `--seq-pt-lo` #3a8fb8 (5.5 on the page, 4.6 on the tile). Diverging scale: `--div-neg` #ffb454 (amber), `--div-mid`
+#222b35, `--div-pos` #4de1ff (cyan): two hues with a neutral grey midpoint (saturation under 0.08, which AC-69 tests), still safe for red-green colour blindness, and the sign is
+always in the text. `--div-mid` is 1.16:1 against the tile, so **every Likert segment keeps its 1px `--line-strong` edge** (unchanged)
+and delta cells keep their signed text. `dashboard.js` reads every one of these as `#rrggbb` (except `--line`, which Plotly accepts as
+rgba); keep them in that form. Heatmap, cross-tab and Likert cell text stays black or white by computed contrast.
+
+Type: still the system stack `--font` for text, titles and buttons. New `--mono` use (system monospace: `ui-monospace, "Cascadia Mono",
+Consolas, Menlo, monospace`; Cascadia Mono on the Windows 11 target): **labels** (`--t-label` 0.75rem = 12px, letter-spacing 0.06 to
+0.08em): tile and table titles in `--accent`, sublabels, `View as`, field labels, KPI and card labels, chart rule and count, app badge,
+archetype caption, tabs, the brand; and **figures**: KPI and card values at `--t-xl` (28px; 24px at <= 599px, the prototype's 24 to 32px
+range), tile min/max values, scan log lines. **No CSS `text-transform` anywhere** (`tests/test_pages.py:87` forbids the word in the
+stylesheet and `th` shows names as read): the archetype caption is upper-cased by the server (`|upper`), titles keep their case and
+read as labels through the mono face and the letter-spacing. `th` stays in the sans font and in the file's case. Deltas are always
+arrow + signed percent + word (`▲ +19.4% up`), never colour alone.
+
+### Page shell
+- **Header** (`.site-header`, sticky, 56px, `rgba(5,10,18,.78)` with `--blur`, `--tile-edge` bottom line): the brand `DataBoot` (mono,
+  700, `--t-lg`, `--accent`) then `nav.tabs` (below). Opaque `--bg` with reduced transparency.
+- **Tabs** `nav.tabs[aria-label="Datasets"] > ul > li > a`, inside `.site-header .inner`, outside `<main>`: one link per dataset
+  (`path` or `path - sheet`), mono 12px, 44px high, `--muted`; hover `--fg` on `--accent-soft`; the current one has
+  `aria-current="page"`, `--accent` text, a 2px `--accent` bottom edge and the soft fill. Names longer than 30 characters end in an
+  ellipsis (`max-width: 30ch`). Many tabs scroll sideways inside the nav (`overflow-x: auto`), never the page. At >= 900px the tabs sit
+  on the brand's row; at <= 599px the tabs take their own full-width row under the brand (`order: 3`). Tab order: skip, brand, tabs.
+- **Page head** order: crumb, `.page-title` (h1, `.archetype`, `.app-badge`), actions, `View as`, controls (period links, filters,
+  chips, Business crumbs), then the grid.
+- **Archetype caption**: `<div class="archetype">APP: BUSINESS · RULE R2 · T1 N2 C2 · 288 ROWS</div>` (exactly the architecture's
+  string: G only when non-zero, rows with the plural word). Mono 12px, 0.08em, `--accent`. Not a `<p>`. The badge under it,
+  `<span class="app-badge">App: Business (rule R2)</span>`, is an amber pill (mono 12px 600, `--amber` text and edge, `--amber-soft`
+  fill). Chips (`.chips a`) are amber pills too: `--amber` edge and `×`, `--amber-soft` fill, `--fg` text (11.0:1), 44px high.
+- **Controls** keep their components; they are re-skinned by the tokens only: `.btn` is `rgba(77,225,255,.06)` with a `--line-strong`
+  edge, hover `--accent-soft` and an `--accent` edge; `.btn-primary` is solid `--accent` with `--on-accent` text; inputs are
+  `--field`; View-as and period links use the same joined row with the cyan current state.
+
+### The tile (`section.ws-tile`, one component for every app)
+Markup is the architecture's macro (`_tile.html`): `section.ws-tile[data-tile][data-span][aria-label]` > `div.ws-head` (the `h2` when
+the tile has its own heading, then the move and expand buttons) > the body. Parts:
+1. **Surface**: `--glass` fill, 1px `--tile-edge` border, radius `--tile-radius`, `--glass-shadow`, `backdrop-filter: --blur`.
+   Corner brackets: 16px L-shapes in `--accent`, top-left and bottom-right (`::before`, `::after`, 2px, decorative, `pointer-events:
+   none`). Padding 16px (12px at <= 599px). Direct children of the grid only: `.grid > .ws-tile`.
+2. **Header** (`.ws-head`): title left, **move handle** and **expand** right, each a 44 x 44px button with a 16px inline SVG
+   (`aria-hidden`), `--muted`, hover `--accent` on `--accent-soft` with a `--line-strong` edge. Title = mono 12px 600 `--accent`
+   (`h2` in the head, or `<h2 class="chart-h">` inside a figure's figcaption, or `caption h2` in a table). When the head has no
+   `h2` (figure and table tiles) it floats in the tile's top-right corner (8px in) and the title row of the body keeps 96px
+   clear of it (`padding-right: 96px` on `figcaption` and `caption`). A title row is 44px tall so it lines up with the buttons;
+   a figure's `View as table` button (44px) sits left of the two icon buttons in that same band, and under the count at <= 599px.
+   Icons (use exactly these; no other graphic):
+   - move (six-dot grip): `<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><g fill="currentColor"><circle cx="5.5" cy="3.5" r="1.25"/><circle cx="10.5" cy="3.5" r="1.25"/><circle cx="5.5" cy="8" r="1.25"/><circle cx="10.5" cy="8" r="1.25"/><circle cx="5.5" cy="12.5" r="1.25"/><circle cx="10.5" cy="12.5" r="1.25"/></g></svg>`
+   - expand (four corners): `<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg>`
+   - In the overlay the expand button gets `data-open`: the CSS hides its SVG and draws a 28px `×` (`aria-label` becomes `Close <label>`).
+   - The table toggle stays the text button `View as table` (`.btn.table-toggle`, `aria-pressed`), because tests and the tab order
+     rely on it; every chart tile has it, tables and cards do not.
+3. **Body**: the existing content, unchanged. Inside a tile the old cards flatten (the tile is the card): `figure.chart` loses its
+   own fill, border and padding; `.table-wrap` loses its box and bleeds to the tile edges (negative margin = the tile padding) with
+   its caption padded 16px; `ul.cards`, `ul.tiles`, `dl.kpis` keep their nested cards (`rgba(5,10,18,.35)`, 10px radius, `--line`
+   border); the map panel's `.panel-box` loses its box. Old wrapper classes riding on a tile (`questions`, `trends`, `map-layout`,
+   `monitor-fig`, `block`, `charts`) have their margin, grid and column rules neutralised by `.grid > .ws-tile` (2 classes beat 1),
+   so a tile is always a single column flexbox.
+4. **Grid** (`div.grid`, 16px gap, 12px at <= 599px): one column under 900px (also 600 to 899px, as before); from 900px twelve
+   columns, `data-span` 12 (default), 6, 8 or 4 sets `grid-column: span N`. Default spans per app are the architecture table; the first
+   Explorer chart is 12 and the rest 6 (AC-34), the map is 8 with its panel 4. A user's drag order only changes position; spans stay.
+5. **States**: hover = the **cursor glow**, a radial `--glow` (peak alpha .12, radius 240px) at `--mx`/`--my`, which `tiles.js`
+   sets on `pointermove` and clears on `pointerleave` (CSS puts the centre off-tile at -999px when unset, so a touch device shows
+   none); dragging = `.is-dragging` (opacity .55, 2px dashed `--amber` outline); drop target = `.is-over` (2px solid `--amber`);
+   `body.is-dragging` shows the grabbing cursor and disables text selection; focus = the usual 3px `--accent` ring on the buttons.
+   The header and figcaption show a grab cursor (the drag zones), buttons and links keep the pointer.
+6. **Overlay** (`dialog.overlay#tile-dialog`, native modal): full viewport, 16px padding (8px at <= 599px), `rgba(5,10,18,.88)` fill,
+   backdrop `rgba(2,5,10,.72)` with a 6px blur. The tile moves in as `dialog.overlay > .ws-tile`: max 1200px wide, at least the viewport
+   high minus padding, no entrance animation, no move handle, plots `max(360px, 100dvh - 190px)` high (leaderboards `max(420px, ...)`).
+   The page behind does not scroll (`body:has(dialog.overlay[open])`). Esc, a click on the padding area (the dialog itself) or the
+   `×` closes it; focus returns to the tile's expand button. Filters work inside it; a bar click reloads the page and the same tile
+   opens again (architecture I7).
+7. **Chart marks** that act on click (bars, donut slices) are keyboard stops made by `dashboard.js`: `:focus-visible` draws a 3px
+   `--fg` (white) outline at 2px offset on the SVG path (white, not cyan, because the bars are cyan; 14.5:1 against the tile).
+   Checked in a scratch page: Chromium paints the outline around an SVG `path` with that rule.
+
+### Grid layout per app (desktop 1280, then 375)
+Tiles in default order; "6/6" means two tiles per row at >= 900px. Everything is one column at <= 899px.
+| App | Desktop (12 columns) |
+|---|---|
+| Explorer | `Key figures` 12 (the KPI strip, titled by the tile), chart 1 12, charts 2 to 8 in pairs of 6, `Columns` 12, `First 20 rows` 12 |
+| Business | `Key figures` 12 (cards), trend tiles 6 each (a lone trend 12), leaderboard 6 and `Change` 6 (leaderboard 12 when there is no change table), `Columns` 12, `First 20 rows` 12 |
+| Map | map 8 (the 2D/3D figure, the `3D view` button in its head), panel 4 (details and top regions; keeps its `h2`, `Selected point`), `Columns` 12, `First 20 rows` 12 |
+| Monitoring | `Measures` 12 (the min/max tiles and their note), main line 12, `Columns` 12, `First 20 rows` 12 |
+| Survey | question tiles 6 each, `Cross-tab` 12, `Respondents` 12 (absent without histograms), `Columns` 12, `First 20 rows` 12 |
+At 375px every tile is full width, 12px padding, tile padding-right of the title row 96px so titles wrap early, nested cards one per row, the
+`View as table` button under the count, tables scroll inside their own box, plots keep the heights of the older sections. Tab order is
+visual order because tiles move in the DOM: skip, brand, tabs, export links, View as, period links, filters, chips, crumbs, then per tile
+its move handle, expand, `View as table`, mode-bar buttons and marks, table links.
+
+### Home: the portal (`/`)
+`<h1>DataBoot</h1>`, then `div.portal-wrap` (centred, 24px above, 32px below), then, **only when the data folder holds files**, the three
+round 1 tables (Datasets, Could not be read, Other files) unchanged and below it, each in a `.table-wrap` (now the glass box). The
+`.muted.mono` folder path line stays under the h1 when a launcher folder was given.
+```
+<div class="portal-wrap">
+  <div class="portal" id="portal" data-state="idle">
+    <div class="portal-rings" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="portal-core">
+      <h2 class="portal-title">Give me your data</h2>
+      <div class="portal-actions"><button type="button" class="btn btn-primary">Choose files</button><button type="button" class="btn">Choose folder</button></div>
+      <div class="portal-status" role="status"></div>
+    </div>
+  </div>
+  <div class="note note-error portal-msg" role="alert" hidden>...cap message...</div>
+</div>
+```
+The two file inputs are `hidden` and opened by the buttons (`webkitdirectory` on the folder one); the buttons are the keyboard route.
+- **Portal**: a circle, `width: min(400px, 100% / 1.24)` (so 400px on a desktop, 277px at 375px) and `aspect-ratio: 1`, border 1.5px
+  `rgba(77,225,255,.5)`, a radial cyan glow inside (`.16` centre to transparent at 72%). Three dashed rings sit behind it at 4%, 8% and
+  12% outside the edge (cyan .35, cyan .24, amber .22). Title = the system sans at `--t-lg` 650 (an `h2`, because the page's h1 is
+  the product name). Buttons are stacked, 220px wide at most (44px high). Contents are 70% of the width and centred.
+- **States** by `data-state`: `idle` = static; `over` (a drag is over the portal) = the border goes solid `--accent`, the glow doubles,
+  a 3px `--accent-soft` halo; `busy` (an upload is running) = same rings. **The rings turn (24 s, 36 s reversed, 52 s per turn) only in
+  `over` and `busy`**, which are real events. The prototype turned them all the time; an idle portal that spins suggests work that is
+  not happening (the honesty rule), so at rest they stand still. With reduced motion they never turn, and `over` still shows the
+  border and halo change. `.portal-status` (mono, `--muted`) shows real counts only: `3 of 12 files`, `Uploading 41 MB of 120 MB`; empty at
+  rest.
+- **Cap and errors**: the message is a `.note.note-error.portal-msg` (`role="alert"`, max 560px, centred under the portal) with the
+  server's text; the page keeps working. Nothing is listed or kept from a refused upload.
+- Focus order: skip, brand, `Choose files`, `Choose folder`, then the tables' links. Only the portal is a drop target: a drop elsewhere is
+  ignored (`intake.js` stops the browser from opening the file) and nothing else on the page highlights.
+
+### Scan screen (`/scan`)
+`<h1>DataBoot</h1>` then `div.scan` (glass panel, 900px max, 16px padding) holding `<ol class="scan-log" aria-live="polite">` and the
+link `<a class="btn btn-primary" id="open-workspace">Open workspace</a>` (always visible, first stop). Lines are mono `--t-sm`,
+`white-space: pre-wrap` so the double spaces of the architecture's format stay; each has a cyan `›` prompt (CSS, empty alt). Classes:
+`li` plain = a dataset line in `--fg`; `li.bad` = an unreadable file with its note, `--danger` (the words carry it, not the colour);
+`li.last` = `0 bytes uploaded to the internet` in `--amber`. `scan.js` sets `hidden` on every line, then removes it one by one
+(every 350 ms at most, all within 2.5 s); a line that appears plays a 200 ms slide and fade (`log-in`), so the reveal is the only
+motion. Honest: the lines are the already finished catalog result, so the pacing is a display delay, with **no spinner, no progress bar
+and no "scanning..." text**. With reduced motion the lines still appear in turn but without the slide. With no JS all lines show.
+At 375px the lines wrap (`overflow-wrap: anywhere`); the panel is full width.
+
+### Motion rules
+(Round 7: replaced; the full list is "Motion rules" in "Round 7 theme and tiles" above.) Short form: tiles enter one after another in
+under 0.6 s, the portal rings turn only during a real drag or upload, scan lines slide in as they appear, buttons fade 160 ms, the skeleton
+shimmers only while a fetch is pending; reduced motion removes all of it; reduced transparency removes every blur. Plotly never animates
+and nothing auto-rotates.
+
+## Accessibility (adds to the older section)
+- Contrast pairs are in the token table; body and label text >= 4.5:1 on every effective surface including under the glow.
+- Focus: 3px `--accent` outline, 2px offset, on every control (cyan is 7.3 to 12.8:1 on every surface); chart marks use `--fg`.
+- Each tile is a region named by its h2 (`aria-label` = the h2's text); move and expand buttons carry `aria-label` with the tile's name;
+  `#ws-live` announces keyboard moves; the dialog is a native modal (focus trapped, Esc closes).
+- Targets >= 44px for our controls (move and expand are 44 x 44); the Plotly mode bar stays 28px as before.
+- Decoration (brackets, rings, glow, washes) is `aria-hidden` or pseudo-element only and never carries meaning.
+
+
+## Earlier rounds (kept where round 7 does not override them)
 
 **Round 6 delta** (Board gates 181-183: **branding unchanged** (gate 160), "Trends off" is a team setting, so no docs/TRENDS.md
 and no trend advice is used; **no token change**: no new colour, size, space or motion value; no logo, font or image):
@@ -56,42 +249,16 @@ Everything below not mentioned here is as in round 2.
 5. Numbers with thousands separators and the new inventory/Parquet/XLSX datasets need no new component.
 
 ## Visual direction
-A quiet instrument panel: flat surfaces, hairline borders, one blue accent, and the charts carry the colour.
-Light and dark follow `prefers-color-scheme` (no toggle this round; `color-scheme: light dark` is set so native
-controls match). Nothing decorative: no gradients, shadows, icons or animation except the one real loading state.
+(Round 7: replaced.) A dark holographic instrument panel: near-black blue page, translucent glass tiles with a cyan hairline and
+corner brackets, cyan as the one accent, amber for chips, the badge and drag targets, mono labels, and the charts carry the colour.
+One theme only; the OS light or dark preference is ignored (`color-scheme: dark`). Decoration (two static washes, brackets, ring
+dashes) is allowed but carries no meaning and never moves unless a real event drives it (Motion rules, Honesty rules).
 
 ## Colour tokens
-Contrast measured with the WCAG formula (`/tmp/contrast.py`, not kept). Text pairs need 4.5:1; graphics and
-control borders need 3:1.
-
-| Token | Light | Dark | Use | Contrast (light / dark) |
-|---|---|---|---|---|
-| `--bg` | #f7f7f5 | #17191c | page, table header | |
-| `--surface` | #ffffff | #202328 | header, cards, tables | |
-| `--fg` | #1d2329 | #e8e8e4 | text | 15.9 / 12.8 on surface |
-| `--muted` | #5d6670 | #a0a8b0 | captions, th, notes | 5.4 / 6.6 on bg or surface (min) |
-| `--line` | #dcdcd6 | #33373c | hairlines (decorative only) | n/a |
-| `--line-strong` | #868b92 | #80868e | button, badge, empty-state borders | 3.2 / 4.3 on bg (min) |
-| `--accent` | #1f5fbf | #8ab4ff | links, focus ring, primary button | 5.7 / 7.5 |
-| `--on-accent` | #ffffff | #0b0d10 | text on a primary button | 6.1 / 9.3 |
-| `--accent-soft` | #e6eefa | #26334a | row hover, button hover | fg on it > 12 |
-| `--danger` | #b3261e | #ff8a80 | unreadable-file note, chart error | 6.1 / 6.9 |
-| `--delta-max` | 35% | 35% | most tint a change-table delta cell takes (the share of `--div-pos` or `--div-neg` mixed into `--div-mid`) | `--fg` on the full tint: 7.2 to 9.1 light, 5.8 to 5.9 dark (measured, `/tmp/contrast.py`) |
-| `--seq-pt-lo` | #5f8ad3 | #5a7fc4 | low end of map point and hexagon colours | see below |
-| `--ok` / `--warn` | #1b6e3c / #8a5300 | #6fcf97 / #e0a84a | reserved; always with a text label | >= 5.8 |
-
-Chart palette (categorical, in this order, each >= 4.5:1 on `--surface`; colour is never the only carrier, the
-legend or axis names the category):
-`--c1..--c8` light `#1f5fbf #b85c00 #00796b #7b4fb3 #c0392b #6b7a00 #8a5a44 #b0306f`, dark `#6ea4ff #f0963c
-#3fc1ad #b79bf0 #ff8a7a #b5c93a #d1a086 #f08ab8`. A chart with one series uses `--c1`. Donut uses `--c1..--c5`
-in value order (the rule allows 2 to 5 slices, gate 179). Bars of one series are all `--c1`: bar height already encodes the
-value, so no rainbow bars.
-Sequential scale (country map, 3D map z): `--seq-lo` to `--seq-hi`. Map points and hexagon cells start at
-`--seq-pt-lo` (light #5f8ad3, dark #5a7fc4: 3.2 / 4.4 on the land colour `--bg`, 3.5 / 4.0 on the sea `--surface`) because
-the palest `--seq-lo` would vanish on the land; the colour bar uses the same two ends, so what is drawn is what is read. Diverging scale (correlation heatmap, -1 to
-+1, fixed range, 0 at the middle): `--div-neg` (orange) via `--div-mid` to `--div-pos` (blue). Orange/blue is safe
-for red-green colour blindness; each heatmap cell also prints its value to two decimals, so the number is read,
-not guessed from the hue.
+(Round 7: replaced.) The light/dark token table of rounds 1 to 6 is gone; the one dark table is in "Round 7 theme and tiles" at the top.
+Rules that still hold: colour is never the only carrier (type is a word, category is in the axis or legend, heatmap cells print their
+values, Likert segments have an edge and a printed share, deltas have arrow, sign and word); a sequential scale is one hue, a diverging
+scale has two hues around a neutral midpoint that is the zero of the data; bars of one series are all `--c1`.
 
 ## Type scale
 System stack `--font`: `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`
@@ -103,6 +270,7 @@ System stack `--font`: `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica
 | `--t-md` | 1rem, line-height 1.5 | body, chart title (650), table titles (`caption h2`, 650), side-panel heading |
 | `--t-sm` | 0.875rem | tables, `th` (650, `--muted`, original case), captions, notes |
 | `--t-xs` | 0.8125rem | badges |
+| `--t-label` | 0.75rem, `--mono`, letter-spacing 0.06 to 0.08em | round 7 labels: tile and table titles, field labels, sublabels, counts (no `text-transform`) |
 Numbers in tables and counts use `font-variant-numeric: tabular-nums` and right-align (`.num`). Thousands
 separators are used on counts and amounts (Board gate 161) through the `num` filter, but **by column role, not by the look of the
 text** (gate 181, AC-59): a numerical amount shows `12,345`; a year-like column (name contains `year` or `yr`, or whole numbers all
@@ -137,7 +305,7 @@ Breakpoints: `<= 599px` phone (gate 175: "phone width" is this one), `600-899px`
 | `button.btn.table-toggle` | `View as table`, last child of every Plotly `figcaption`, right-aligned at >= 600px, under the count at <= 599px (44px high). Pressed: `.plot` gets `hidden` and a `div.plot-table-wrap[tabindex="0"][role="region"][aria-label="<title> data"] > table.plot-table` takes its place, scrolling inside its own box (max 320px high, 420px for maps and heatmap), sticky header, numbers right-aligned with separators. Pressed again: the table is removed and the plot shown. No animation | hover, focus ring, pressed |
 | `.map-layout > figure.chart + aside.map-panel` | Map page body: map left, panel right (340px) from 900px, stacked below. Panel = `.panel-box` with `h2` `Selected point` and its `dl` (or `.panel-empty` text `Click a point to see its row.` / `Click a cell to see its count.`), then a `.panel-box` holding the top-regions figure. `aria-live="polite"` on the details box | none |
 | `nav.periods > .view-as-label + ul > li > a` | Monitoring period links `7 days`, `30 days`, `90 days`, `All`: the View as joined row (same CSS, 44px high, current is `aria-current="page"`). Plain GET links, so the URL holds the period and Back works. At <= 599px the four links share the width as a four-column grid (centred, `--t-sm`), so they never wrap into a ragged pair of rows | hover, focus ring, current |
-| `ul.tiles > li.card.tile` | Monitoring tile = the Business card (`.card-label` column name, `.card-value` latest value in `--t-xl`, `.card-change`) plus `dl.tile-range` (`Min 20.0  Max 60.0`: `dt` `--muted`, `dd` `--fg`, tabular) and `.card-period` (`latest 2024-04-29`), then `svg.spark` (same component as Business, the period's values). Change is `▲ +5.1% up`, `▼ -0.4% down`, `▶ 0.0% no change`, neutral `--fg`, never green or red. With no previous period (`All`, or too little history) `.card-change.na` reads `n/a` in `--muted`, no arrow; with no data in the period `.card-value` reads `n/a` and there is no sparkline. One tile per numerical column; grid `repeat(auto-fill, minmax(240px, 1fr))`, one per row at <= 599px. Cards align to the top, so a short tile is not stretched | none |
+| `ul.tiles > li.card.tile` | Monitoring tile = the Business card (`.card-label` column name, `.card-value` latest value in `--t-xl`, `.card-change`) plus `dl.tile-range` (`Min 20  Max 60`: `dt` `--muted`, `dd` `--fg` in mono, tabular; whole values print whole, 20.5 keeps its decimal; corrected in round 7 from the old `20.0 / 60.0`, gate 186) and `.card-period` (`latest 2024-04-29`), then `svg.spark` (same component as Business, the period's values). Change is `▲ +5.1% up`, `▼ -0.4% down`, `▶ 0.0% no change`, neutral `--fg`, never green or red. With no previous period (`All`, or too little history) `.card-change.na` reads `n/a` in `--muted`, no arrow; with no data in the period `.card-value` reads `n/a` and there is no sparkline. One tile per numerical column; grid `repeat(auto-fill, minmax(240px, 1fr))`, one per row at <= 599px. Cards align to the top, so a short tile is not stretched | none |
 | `div.questions > figure.chart` | Survey grid: two figures per row from 900px, one per row below, top aligned (a short Likert card is not stretched to the height of its neighbour). Used for question figures and for the Respondents histograms | as figure |
 | `form.crosstab` | Survey cross-tab form: two `.field` selects labelled `Row question` and `Column question` (native, 44px) and `Apply` (`.btn`), laid out exactly like `form.filters`. Changing a select submits (JS), `Apply` works without JS | hover, focus ring |
 | `.badge` | column type label (`numerical`, `categorical`, `temporal`, `geospatial`, `other`) in a pill, text always shown | |
@@ -326,7 +494,7 @@ Apply to every Plotly figure in every app (Explorer, Business, Map, Monitoring, 
 ## Page layouts
 Both pages share the header (56px) and `main` (max 1200px).
 
-### Home `/`
+### Home `/` (round 7: the portal comes first, see "Home: the portal" above; the tables below it are as here)
 Desktop (>= 900px): h1 `DataBoot`; below it a `.muted` line with the scanned folder path (`.mono`). Then up to
 three `.table-wrap` tables, 32px apart, each titled by `<caption><h2>` (Datasets, Could not be read, Other files):
 1. Datasets: File path | Sheet | Rows (`.num`) | Columns (`.num`) | the file path is the link to `/datasets/{id}`.
@@ -336,7 +504,7 @@ Empty tables are not rendered. If everything is empty, one `.empty` box shows th
 375px: same order, one column. Tables keep all columns and scroll sideways inside their `.table-wrap`; File
 column has `min-width: 12ch` and wraps long paths (`overflow-wrap: anywhere`). The link row is >= 44px tall.
 
-### Dashboard `/datasets/{id}`
+### Dashboard `/datasets/{id}` (round 7: the page body is the tile grid of "Grid layout per app" above; this older order is the content of the tiles)
 Desktop: `.crumb` link `DataBoot` / file; `.page-head` with h1 (file name, sheet in `.muted`) and `.actions`
 with `Export PPTX` (`.btn-primary`) and `Export XLSX` (`.btn`). Then, in order:
 1. `dl.kpis`: a row of tiles, `repeat(auto-fit, minmax(150px, 1fr))`, 12px gap; 4 to 6 tiles fill the width.
@@ -431,6 +599,23 @@ bar, Respondents histograms one per row. A Likert bar's legend sits under the pl
 - Colour never carries meaning alone: type is a word, category is in the axis or legend, heatmap prints values.
 
 ## Changes this round
+Round 7 (ticket 485, architecture/design phase, Board gate 189, no TRENDS): **new tokens** (dark only: #050a12, #4de1ff, #ffb454, mono labels,
+glass, glow, blur; `--delta-max` 35% to 30% because the cyan tint is brighter; chart palette re-cut around cyan and amber), **new
+components** (tabs, archetype caption, portal, scan log, `.grid`, `.ws-tile`, `.ws-head`, `.ws-move`, `.ws-expand`, `dialog.overlay`, mark focus
+ring) and **motion rules** (entrance under 0.6 s, state-driven rings, reduced motion, reduced transparency). `databoot.css`: the
+`prefers-color-scheme` block is deleted and `:root` is the dark table, so **every existing page is already dark and re-skinned by tokens**
+(buttons, inputs, chips amber, badges, cards, tables and chart boxes use the glass). The rules for the tile, grid, portal, scan log, tabs and
+overlay are **inert until the frontend tickets emit exactly the markup in this file** (H7 portal, S7 scan, W7 tabs, archetype and tile macro,
+I7 interactions, K7 marks); `.charts` keeps its old two-column rule only as `.charts:not(.grid)`, so Explorer is unchanged until W7 adds
+`.grid`. Checked in a scratch page at 1280 and 375 (portal, scan log, tabs with a long name, a heading tile, a figure tile with a focusable
+bar, a table tile, the overlay): no sideways scroll, tiles sit at spans 12/6/6 from 900px, the SVG bar shows the 3px white ring, reduced
+motion sets `animation: none`. **Differences from the prototype description, for the Board**: (1) the portal rings turn only while a drag
+is over or an upload runs (idle rings are still); (2) no "(dev only) sample" button (list wins); (3) tile titles keep their case in mono
+instead of CSS upper-case (a test forbids `text-transform`); (4) the table toggle stays a text button, not an icon, so it keeps its label
+and tab order. **Frontend notes**: `dashboard.js` still has `matchMedia("(prefers-color-scheme: dark)")` (T7 removes it); Plotly grid colour
+is `--line` (rgba, .16) and the hover label fill is `--surface`; the mode bar icons are `--muted` (6.9:1 on the tile); heights of plots are
+unchanged. The Min/Max example in Components now shows whole numbers (gate 186).
+
 Design review (ticket 476, round 6), 1280, 800 and 375 px, light and dark, a demo folder (monitor, quiet, survey, shop, places, measures,
 sales, an unreadable file, a 404): scrollWidth equals the viewport everywhere, no `.plot-error`, no console error but the expected 404, no
 external request, no tap target under 44px outside the Plotly mode bar, Tab reaches every control with the `--accent` ring (the date
