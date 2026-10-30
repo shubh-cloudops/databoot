@@ -1,44 +1,34 @@
-# Brief: round 6
+# Brief: round 7
 
 ## Asked
-Seven fix-ups to do first, then two new app types. The fix-ups cover number formatting by column role, pluralising, Explorer bar-click styling, where "score" captions appear, line chart y-range, the PPTX title slide, and one ARCHITECTURE.md edit. The new apps are Monitoring (rule R4) and Survey (rule R5), added to the ordered rule table before Explorer. Everything earlier rounds built and the business's branding stay as they are; only what these suggestions ask changes.
+A new look and a one-box intake for the existing app. The home page becomes one circular drop portal plus "Choose files" and "Choose folder"; uploads go to the local server (/upload) into a temp folder and are scanned as today. A scan screen shows a log fed by the real catalog, then opens the workspace. The workspace uses a shared glass-tile component for all apps and the Explorer's charts, with tile interactions, a dark holographic theme only, and accessibility fixes. DESIGN.md is updated. Everything earlier rounds built and the business's branding stay; only what the idea lists changes.
 
 ## Deliverable
-A change to the existing product: seven fix-ups, two new app types (Monitoring and Survey), QA fixtures and tests, and edits to DESIGN.md and ARCHITECTURE.md. The idea does not say what kind of product it is.
+A change to an existing web app (UI restyle plus a new upload path on the local server), with updated DESIGN.md and new tests. The visual contract is docs/reference/databoot-console.html. It must work offline, with no CDN and no new dependencies.
 
 ## Done when
-- Separators appear only for numeric columns. Identifier, temporal and year-like columns never get them ("2,024" never appears) in tables, the side panel and tooltips.
-- Counts are pluralised correctly ("1 point", "1 row"). "score 0.xx" shows only in Explorer captions, not in Business or Map.
-- Explorer bars get the bar-click class and pointer like Business. Line charts keep the auto y-range, with a zero baseline for bars only. DESIGN.md is updated for both (AC-39 for the bars).
-- The PPTX title slide shows the file name as a smaller second line. ARCHITECTURE.md L147-148 says hexagon choropleth cells.
-- R4 Monitoring (T>=1, N>=1, C=0) has:
-  - one sparkline tile per numeric column, showing latest, min, max and change vs previous period (arrow plus text);
-  - a period selector (7/30/90 days, all);
-  - a main line with a rolling mean;
-  - spikes flagged where |z|>3 on a 30-point rolling window (marker plus "spike" label, never colour alone).
-- R5 Survey (C>=4, categoricals >=60% of columns, N<=2) has:
-  - one horizontal bar per question, sorted by count, in a small-multiples grid;
-  - Likert questions (agree/disagree scales or 1-5) as a 100% stacked bar in scale order, on a diverging palette with a grey neutral;
-  - a cross-tab picker (two dropdowns) giving a count heatmap with row %.
-- Both new apps have a View-as switch and a table toggle. Exports are titled "Monitoring overview" and "Survey overview".
-- QA has one fixture per new archetype, week and year grain tests, and an Explorer-only XLSX/PPTX case.
+- Home page is a circular drop portal plus "Choose files" and "Choose folder" (relative paths kept); 1 file, many files and a folder all upload and scan.
+- Uploads land in a temp data folder that is deleted on exit; over 2 GB gives a clear message; larger drives still use the launcher's -Folder picker.
+- Scan screen log shows, from the real catalog: file, rows, column roles (T/N/C/G), app and rule ("-> BUSINESS (rule R2)"), unreadable files with their note, and "0 bytes uploaded"; then the workspace opens.
+- Workspace has dataset tabs with archetype caption, "App: ... rule ..." badge, filter chips and a 12-column tile grid. Business, Map, Monitoring, Survey, Explorer and the Explorer charts use one shared tile component; tile content and logic are unchanged.
+- Tiles have cursor glow, header drag-reorder (order remembered per dataset in localStorage), full-screen expand (Esc or backdrop closes, filters still work inside), table toggle on every chart tile, tooltips, and a staggered entrance under 0.6 s.
+- Dark holographic theme only (bg #050a12, cyan #4de1ff, amber #ffb454, mono labels, system fonts); no motion under reduced motion; no backdrop-filter blur under `prefers-reduced-transparency`; chart rules kept (one y-axis, sorted bars, direction never by colour alone).
+- Accessibility: chart marks keyboard-focusable (Enter/Space), visible focus ring, contrast >= 4.5:1, tiles are landmarks with headings.
+- Tests: the upload cases, temp-folder removal, over-cap message, the Playwright cases (drag reorder, expand/close, table toggle, cross-filter in the overlay), no external network requests, AC-41/AC-42 speed targets met, all earlier tests green. Exports unchanged.
 
 ## Unclear
-- What do T, N and C stand for in the rules (presumably temporal, numeric and categorical column counts)? The idea does not define them.
-- What is the existing rule table, and where do R4 and R5 sit relative to R1-R3? "Before Explorer" is the only placement given.
-- What does the "View-as switch" switch between? The idea does not say.
-- What does the "bar-click class/pointer" do in Business, and what should clicking an Explorer bar do?
-- How should "year-like" columns be detected, given that the idea rejects regex and wants column roles?
-- What are "week and year grain tests"? The idea does not say which feature has a grain.
-- Does "change vs previous period" compare the whole selected period or the last two points, and what happens for "all"?
-- What counts as a Likert scale beyond "agree/disagree scales or 1-5"? What happens to a question that is only partly Likert?
-- What does "trends off" mean in the Team line?
-- Should the new apps be exportable to XLSX and PPTX, or only titled? "Exports" is not defined.
+- Which parts of the prototype are binding where it and the numbered list differ? The idea calls the prototype the "visual contract" but gives only a few tokens.
+- Does the 2 GB cap apply per file or to the whole upload (many files, a folder)? The idea says "per upload".
+- What exactly does "-> BUSINESS (rule R2)" mean beyond that example, and where are the rules defined? The idea names none.
+- Should the scan log fill progressively or appear all at once? The idea only says it is fed by the real catalog.
+- Is a small number of tiles shown per app or are all existing ones kept? ("existing tile content/logic is unchanged".)
+- What is the contrast target for large text or decorative glow? Only body and labels are named.
+- "Trends off" is stated for the team; what does it mean here? The idea doesn't say.
 
 ## Not asked
-- No changes to earlier rounds' features or to the business's branding.
-- No new app types beyond Monitoring and Survey.
-- No zero baseline on line charts.
-- No "score 0.xx" captions in Business or Map.
-- No trend features ("trends off").
-- No roles beyond designer, frontend and backend.
+- New dependencies, CDN assets, web fonts or any network access.
+- A light theme or an OS light/dark switch (these are to be replaced).
+- Changes to exports, to scanning/classification rules, or to the business's branding.
+- Uploads above 2 GB through the browser; the launcher's -Folder picker stays for that.
+- New apps or new chart types beyond those listed.
+- Anything else in earlier rounds' behaviour; it must stay and its tests stay green.
