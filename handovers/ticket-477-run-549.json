@@ -1,0 +1,97 @@
+{
+  "header": {
+    "ticket": 477,
+    "project": "you-think-of-the-project-name",
+    "from_role": "qa",
+    "phase": "qa",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "e14d1b175e03",
+    "tokens_left": 1789656
+  },
+  "goal": "Write or extend tests/test_acceptance.py with one test per acceptance item and run them.",
+  "acceptance_criteria": [
+    {
+      "text": "One test per acceptance item, named after its id",
+      "passes": false
+    },
+    {
+      "text": "Failures are reported, not hidden",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa",
+    "passed": false,
+    "output_tail": "ernal word \"Explorer\"\n>       assert [s.text_frame.text for s in slides[0].shapes if s.has_text_frame][0] == \"Data overview\"\nE       AssertionError: assert 'Explorer' == 'Data overview'\nE         \nE         - Data overview\nE         + Explorer\n\ntests/test_acceptance.py:2222: AssertionError\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 37 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED tests/test_acceptance.py::test_AC_59 - AssertionError: tooltip of the ...\nFAILED tests/test_acceptance.py::test_AC_73 - AssertionError: assert 'Explore...\n2 failed, 405 passed, 112 warnings in 548.82s (0:09:08)\ntests failed\n"
+  },
+  "decisions": [
+    {
+      "what": "Wrote test_AC_59..test_AC_73 as self-contained tests; Monitoring/Survey expectations are computed in Python from the fixture CSVs",
+      "why": "Skill and lessons say to derive expected values independently of app code",
+      "evidence": "tests/test_acceptance.py (Round 6 section)"
+    },
+    {
+      "what": "Kept test_AC_73 asserting the title slide first line is 'Data overview' and left it failing",
+      "why": "Gate 186 says to report 'Explorer' as a failing test and add a fix ticket; AC-73 text is garbled",
+      "evidence": "app/export.py:114 falls back to 'Explorer'; pytest: assert 'Explorer' == 'Data overview'"
+    },
+    {
+      "what": "Left test_AC_59 failing on the map tooltip",
+      "why": "Do not change app code to pass a test; a real bug against gate 186 item 2",
+      "evidence": "app/static/js/dashboard.js:238 hovertemplate '%{marker.color:,}'; failure message: tooltip of the place_id colour column: '10,050'"
+    },
+    {
+      "what": "AC-60 asserts '1 of 1 row/point' and '0 of 0 rows/points' with filters, not the literal '1 of 5 rows'",
+      "why": "The page caption total is the filtered row count; 'N of M' with N<M only arises from sampling caps, covered by tests/test_pages.py::count",
+      "evidence": "probe output: f.grp filter gives '2 of 2 rows'"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "A first AC-60 fixture used a 5-row file with categorical 'cat' filtered via f.cat=c",
+      "why_it_failed": "cat (3 values in 5 rows) is not a filter column, so the filter was ignored; rebuilt with a 12-row file and tier/grp columns"
+    },
+    {
+      "what": "First AC-72 version asserted the previous-period value appears in the page text",
+      "why_it_failed": "The card shows the latest value and the change, not the previous value; it now checks the payload card's previous and the page's latest"
+    },
+    {
+      "what": "A probe file that did 'from tests.test_acceptance import *'",
+      "why_it_failed": "pytest collected every imported test_ function and ran the whole file; use a standalone probe"
+    }
+  ],
+  "assumptions": [
+    "The AC texts for AC-59, 62, 64-71 and 73 are garbled (missing words); I tested their evident meaning plus gate 183, 184 and 186",
+    "AC-73's 'no overview title' is taken to mean no app title ('Business overview' etc.) in the XLSX Summary; the PPTX title follows gate 186 ('Data overview'), which contradicts a literal reading of the AC",
+    "Monitoring windows are half-open (latest - N days, latest] and tile change compares equal-length windows (gate 184)",
+    "Survey cross-tab row percent is checked unrounded to sum 100 and shown to 1 decimal"
+  ],
+  "open_questions": [
+    "BUG AC-59: map point tooltip shows an identifier column with a thousands separator: dashboard.js:238 uses '%{marker.color:,}' for every colour column; fixture places.csv place_id=10050 shows '10,050'. Needs a fix ticket (frontend).",
+    "BUG AC-73/gate 186: Explorer PPTX title slide first line is 'Explorer'; expected 'Data overview' (app/export.py:114). Needs a fix ticket; when it lands, tests/test_acceptance.py::test_AC_56 (last assertion '== \"Explorer\"') and tests/test_export_apps.py::test_explorer_output_is_round_4, tests/test_export_pptx.py (title slide texts) must change to 'Data overview'.",
+    "AC-73 text is garbled and its 'no overview title' wording conflicts with gate 186's 'Data overview'; the PM should reword it.",
+    "AC-59, 62, 64-71, 73 texts are missing words; the PM should reword them.",
+    "A background server from my sweep may still be running on 127.0.0.1:8795 (pkill is not available); it serves /tmp/sweep_data only.",
+    "Full suite took 556 s in this run (405 passed, 2 failed)."
+  ],
+  "lessons": [
+    {
+      "lesson": "Never use 'from tests.test_acceptance import *' in a probe test: pytest collects the imported test_ functions and runs the whole file. Write a standalone probe and delete it with os.remove.",
+      "when": "Making a throwaway probe test that needs helpers",
+      "evidence": "The probe hit the 120 s timeout and was moved to the background"
+    },
+    {
+      "lesson": "Before asserting a caption such as '1 of 5 rows', probe what the page prints under a filter: the total is the filtered count, so N<M appears only with sampling caps. Also check that the filter column really gets a filter (few distinct values in few rows may not).",
+      "when": "Writing pluralisation or filter-caption tests",
+      "evidence": "tests/test_acceptance.py::test_AC_60 and the probe output in this ticket"
+    },
+    {
+      "lesson": "To append a large block of tests, write it with the Write tool to /tmp and append it with `cat /tmp/x.py >> tests/test_acceptance.py`; a long heredoc append with an inline pytest run was blocked by the deny list.",
+      "when": "Adding many tests to test_acceptance.py",
+      "evidence": "Two bash calls blocked, the Write plus cat approach worked"
+    }
+  ],
+  "problems": []
+}

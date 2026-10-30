@@ -1697,3 +1697,526 @@ def test_AC_58(arch):
         page.wait_for_function("document.querySelector('figure[data-kind=map2d] .plot').getBoundingClientRect().width > 100")
         table(page, "map2d")
         assert len(page.local) > 5 and page.external == [] and page.failed == [] and page.errors == []
+
+
+# ---- Round 6: number format, Monitoring, Survey, grains, exports (AC-59 .. AC-73) ----------------------------------
+# Expected values are computed here in plain Python from the fixture files (conftest.monitor_rows / survey_rows), not by app code.
+
+@contextmanager
+def _server():
+    from app.main import app
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="error"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    while not server.started:
+        time.sleep(0.05)
+    try:
+        yield f"http://127.0.0.1:{server.servers[0].sockets[0].getsockname()[1]}"
+    finally:
+        server.should_exit = True
+        thread.join(10)
+
+
+def _ids6(base):
+    return {(d["path"], d["sheet"]): d["id"] for d in json.load(urllib.request.urlopen(f"{base}/api/datasets"))}
+
+
+def _csv_rows(folder, name):
+    import csv
+    with open(Path(folder) / name, newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def _tiles6(page):
+    return {t.locator(".card-label").inner_text(): t for t in page.locator("ul.tiles > li.card.tile").all()}
+
+
+def _mixed_dir(tmp_path, archetypes_dir, round6_dir):
+    """One folder with shop/places/measures (round 5), monitor/quiet/survey (round 6) and book.xlsx (sheet Revenue)."""
+    import shutil
+    from tests.conftest import write_xlsx
+    root = tmp_path / "mixed"
+    root.mkdir()
+    for n in ("shop.csv", "places.csv", "measures.csv"):
+        shutil.copy(Path(archetypes_dir) / n, root / n)
+    for n in ("monitor.csv", "survey.csv", "quiet.csv"):
+        shutil.copy(Path(round6_dir) / n, root / n)
+    write_xlsx(root / "book.xlsx", {"Revenue": [("month", "team", "revenue"),
+                                                *[(("date", 45292 + 31 * i), "AB"[i % 2], 100 + i) for i in range(6)]]})
+    return root
+
+
+def test_AC_59(make_client, tmp_path):
+    root = tmp_path / "fmt"
+    root.mkdir()
+    (root / "orders.csv").write_text("order_id,year,region,amount\n" + "".join(
+        f"{10045 + i},{2023 + i % 2},{('North', 'South')[i % 2]},{12345 + 100 * i}\n" for i in range(12)))
+    (root / "places.csv").write_text("lat,lon,place_id,year,season,pop\n" + "".join(
+        f"{-40 + 4 * i},{-120 + 12 * i},{10045 + i},{2000 + i},{1950 + i},{12345 + i}\n" for i in range(20)))
+    client = make_client(root)
+    oid = _app_id(client, "orders.csv")
+    for q in ("", "?app=explorer"):
+        html = client.get(f"/datasets/{oid}{q}").text
+        text = _text(html)
+        assert "12,345" in text and "10045" in text and "2023" in text and "2024" in text, q
+        for banned in ("2,023", "2,024", "10,045", "10,046"):
+            assert banned not in html, (q, banned)
+    separated = [f"{v:,}" for i in range(20) for v in (2000 + i, 1950 + i, 10045 + i)]  # year, year-like and id values with a comma
+    with _server() as base:
+        pid = _ids6(base)[("places.csv", None)]
+        with _browse(f"{base}/datasets/{pid}") as page:
+            _click_point(page, 3)
+            d = _details(page)
+            assert d["pop"] == "12,348" and d["year"] == "2003" and d["place_id"] == "10048" and d["season"] == "1953", d
+            point = page.locator("figure[data-kind=map2d] .js-plotly-plot .point").nth(5)
+            box = point.bounding_box()
+            page.mouse.move(box["x"] + box["width"] / 2 - 2, box["y"] + box["height"] / 2)
+            page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            page.wait_for_selector(".hoverlayer .hovertext")
+            tip = page.locator(".hoverlayer .hovertext").first.text_content()
+            label = page.evaluate("document.querySelector('figure[data-kind=map2d] .js-plotly-plot').data[0].name")
+            page.get_by_role("button", name="View as table").first.click()
+            table = page.locator("table.plot-table").first.inner_text()
+            assert not any(s in table for s in separated), table[:300]
+            assert not any(s in page.inner_text("main") for s in separated)
+            assert page.errors == []
+            assert not any(s in tip for s in separated), f"tooltip of the {label} colour column: {tip!r}"
+
+
+def test_AC_60(make_client, tmp_path):
+    root = tmp_path / "count"
+    root.mkdir()
+    # 12 rows; tier a/b (6 each), grp x/y (5 each) and one row z: the filters below leave 1 and 0 rows
+    (root / "five.csv").write_text("tier,grp,n,m\n" + "".join(
+        f"{'ab'[i % 2]},{'z' if i == 1 else 'xy'[i % 3 % 2]},{i},{12 - i}\n" for i in range(12)))
+    (root / "one.csv").write_text("cat,n,m\na,1,5\n")
+    client = make_client(root)
+    banned = re.compile(r"\b1 (rows|points)\b")
+    one = client.get(f"/datasets/{_app_id(client, 'one.csv')}?app=explorer").text
+    assert not banned.search(one)
+    assert all(s in one for s in ("1 of 1 row", "1 of 1 point", "First 1 row"))
+    fid = _app_id(client, "five.csv")
+    page12 = client.get(f"/datasets/{fid}?app=explorer").text
+    assert "12 of 12 rows" in page12 and "12 of 12 points" in page12
+    for query, row, point in (("f.grp=z", "1 of 1 row", "1 of 1 point"), ("f.grp=z&f.tier=a", "0 of 0 rows", "0 of 0 points")):
+        html = client.get(f"/datasets/{fid}?app=explorer&{query}").text
+        assert row in html and point in html, (query, re.findall(r"\d+ of [\d,]+ (?:rows?|points?)", html))
+        assert not banned.search(html), query
+    # tooltips: hover the single histogram bar and the single scatter point of the one-row file
+    with _server() as base:
+        with _browse(f"{base}/datasets/{_ids6(base)[('one.csv', None)]}?app=explorer") as page:
+            hovers = []
+            for kind in ("histogram", "scatter"):
+                fig = page.locator(f"figure[data-kind={kind}]").first
+                fig.scroll_into_view_if_needed()
+                pt = fig.locator(".barlayer .point, .scatterlayer .point").first.bounding_box()
+                page.mouse.move(pt["x"] + pt["width"] / 2 - 3, pt["y"] + pt["height"] / 2)
+                page.mouse.move(pt["x"] + pt["width"] / 2, pt["y"] + pt["height"] / 2)
+                page.wait_for_selector(".hoverlayer .hovertext")
+                hovers.append(page.locator(".hoverlayer .hovertext").first.text_content().replace("\xa0", " "))
+            assert not any(banned.search(h) for h in hovers), hovers
+            strings = page.evaluate("[...document.querySelectorAll('.js-plotly-plot')].map(g => JSON.stringify(g.data.map(t => [t.hovertemplate, t.text])))")
+            assert not any(banned.search(s) for s in strings), strings
+            assert page.errors == []
+
+
+def test_AC_61(arch):
+    base, ids = arch
+    with _browse(f"{base}/datasets/{ids['shop.csv']}?app=explorer") as page:
+        names = page.eval_on_selector_all("form.filters select", "e => e.map(s => s.name)")
+        hit = None
+        for fid in page.evaluate("[...document.querySelectorAll('[data-kind=\"bar\"]')].map(f => f.id)"):
+            label = page.evaluate("id => document.querySelector('#' + id + ' .js-plotly-plot')._fullLayout.xaxis.title.text", fid)
+            if "f." + label in names:
+                hit = fid
+        assert hit, names
+        page.locator(f"#{hit} .plot").scroll_into_view_if_needed()
+        c = page.evaluate("""id => { const r = document.querySelector('#' + id + ' .barlayer .point').getBoundingClientRect();
+            return {x: r.x + r.width / 2, y: r.y + r.height / 2}; }""", hit)
+        page.mouse.move(c["x"] - 2, c["y"] - 2)
+        page.mouse.move(c["x"], c["y"])
+        page.wait_for_timeout(300)
+        assert page.evaluate("id => getComputedStyle(document.querySelector('#' + id + ' .nsewdrag')).cursor", hit) == "pointer"
+        assert page.errors == []
+    # the Business leaderboard shows the same cursor
+    with _browse(f"{base}/datasets/{ids['shop.csv']}") as page:
+        assert _bar_cursor(page, "web") == "pointer"
+    design = (ROOT / "docs" / "DESIGN.md").read_text(encoding="utf-8")
+    para = re.search(r"- Cross-filter \(AC-39[^\n]*\n(?:  [^\n]*\n)+", design).group(0)
+    assert "AC-61" in para and "Explorer bars" in para and "pointer" in para and "Business leaderboard" in para
+
+
+def test_AC_62(make_client, tmp_path):
+    import csv
+    root = tmp_path / "range"
+    root.mkdir()
+    # Business: 8 months, month sums 14,000 .. 16,000; Explorer: one line over 40 days with values 14,000 .. 16,000
+    with open(root / "flat.csv", "w", newline="") as f:
+        csv.writer(f).writerows([("date", "store", "amount"), *[
+            (f"2024-{m:02d}-{d:02d}", s, 7000 + 1000 * (m - 1) // 7) for m in range(1, 9) for d, s in ((3, "N"), (17, "S"))]])
+    with open(root / "ts.csv", "w", newline="") as f:
+        csv.writer(f).writerows([("day", "level", "other"), *[(f"2024-02-{i + 1:02d}" if i < 28 else f"2024-03-{i - 27:02d}",
+                                                              14000 + 50 * i, 3 + i % 4) for i in range(40)]])
+    make_client(root)
+    with _server() as base:
+        ids = _ids6(base)
+        probe = """() => ({lines: [...document.querySelectorAll('.js-plotly-plot')].filter(g => g.data.some(t => t.type === 'scatter' && /lines/.test(t.mode || '')))
+              .map(g => [g._fullLayout.yaxis.range[0], g._fullLayout.yaxis.rangemode]),
+            bars: [...document.querySelectorAll('[data-kind="bar"] .js-plotly-plot')].map(g => g._fullLayout.xaxis.range[0] + ':' + g._fullLayout.yaxis.range[0])})"""
+        for name, query in (("flat.csv", "?app=business&period=all"), ("ts.csv", "?app=explorer")):
+            with _browse(f"{base}/datasets/{ids[(name, None)]}{query}") as page:
+                got = page.evaluate(probe)
+                assert got["lines"] and all(lo > 0 and mode != "tozero" for lo, mode in got["lines"]), (name, got)
+                assert all(b.startswith("0:") or b.endswith(":0") for b in got["bars"]), (name, got)
+                assert page.errors == []
+    design = (ROOT / "docs" / "DESIGN.md").read_text(encoding="utf-8")
+    rules = design.split("## Global chart rules", 1)[1].split("\n## ", 1)[0]
+    assert "bars only" in rules and "zero baseline" in rules and "automatic y-range" in rules
+
+
+def test_AC_63(make_client, tmp_path, archetypes_dir, round6_dir):
+    from pptx import Presentation
+    client = make_client(_mixed_dir(tmp_path, archetypes_dir, round6_dir))
+    sheets = {(d["path"], d["sheet"]): d["id"] for d in client.get("/api/datasets").json()}
+    cases = [(("shop.csv", None), "?app=business", "Business overview", "shop.csv"),
+             (("shop.csv", None), "?app=explorer", None, "shop.csv"),
+             (("places.csv", None), "?app=map", "Map overview", "places.csv"),
+             (("monitor.csv", None), "?app=monitoring", "Monitoring overview", "monitor.csv"),
+             (("survey.csv", None), "?app=survey", "Survey overview", "survey.csv"),
+             (("measures.csv", None), "", None, "measures.csv"),
+             (("book.xlsx", "Revenue"), "", None, "book.xlsx")]
+    for key, query, title, name in cases:
+        r = client.get(f"/datasets/{sheets[key]}/export.pptx{query}")
+        assert r.status_code == 200, key
+        boxes = [s for s in list(Presentation(io.BytesIO(r.content)).slides)[0].shapes if s.has_text_frame]
+        size = lambda b: b.text_frame.paragraphs[0].runs[0].font.size.pt
+        first, second = boxes[0].text_frame.text, boxes[1].text_frame.text
+        assert first and (title is None or first == title), (key, first)
+        assert second.startswith(name) and (key[1] is None or key[1] in second), (key, second)
+        assert size(boxes[1]) < size(boxes[0]), (key, size(boxes[0]), size(boxes[1]))
+
+
+def test_AC_64(make_client, round6_dir, archetypes_dir, tmp_path):
+    client = make_client(round6_dir)
+    app = lambda c, n: c.get(f"/api/datasets/{_app_id(c, n)}/app").json()
+    want = {"monitor.csv": ("monitoring", "R4", ["monitoring", "explorer"]), "quiet.csv": ("monitoring", "R4", ["monitoring", "explorer"]),
+            "survey.csv": ("survey", "R5", ["survey", "business", "explorer"]), "orders.csv": ("explorer", "R3", ["explorer"])}
+    for name, (a, rule, qualifies) in want.items():
+        got = app(client, name)
+        assert (got["app"], got["rule"], got["qualifies"]) == (a, rule, qualifies), name
+    # survey.csv has a date column and an age column, yet opens as Survey (R5 before R2); Business stays in View-as
+    html = _html(client, "survey.csv")
+    assert "App: Survey (rule R5)" in html and "App: Monitoring (rule R4)" in _html(client, "monitor.csv")
+    assert re.findall(r'<nav class="view-as" aria-label="View as">(.*?)</nav>', html, re.S) and ">Business<" in html
+    # the round 5 fixtures keep their app: shop.csv opens as Business with View-as
+    arch = make_client(archetypes_dir)
+    got = {n: (app(arch, n)["app"], app(arch, n)["rule"]) for n in ("shop.csv", "places.csv", "measures.csv", "sparse.csv")}
+    assert got == {"shop.csv": ("business", "R2"), "places.csv": ("map", "R1"), "measures.csv": ("explorer", "R3"),
+                   "sparse.csv": ("explorer", "R3")}
+    assert ">Business<" in _html(arch, "shop.csv") and ">Explorer<" in _html(arch, "shop.csv")
+    # amount guard: shop.csv without revenue (units 1..7) is a survey
+    root = tmp_path / "guard"
+    root.mkdir()
+    rows = [("date", "store", "channel", "product", "units")]
+    rows += [(f"2024-0{1 + i % 6}-01", ("N", "S")[i % 2], ("web", "shop")[i % 3 % 2], ("p", "q", "r")[i % 3], 1 + i % 7) for i in range(24)]
+    (root / "shop.csv").write_text("\n".join(",".join(map(str, r)) for r in rows) + "\n")
+    g = make_client(root)
+    assert (app(g, "shop.csv")["app"], app(g, "shop.csv")["rule"]) == ("survey", "R5")
+    # four categoricals among seven columns (57% < 60%) is not a survey; a date + numbers and no categorical is monitoring
+    (root / "shop.csv").unlink()
+    (root / "s.csv").write_text("a,b,c,d,x,y,z\n" + "".join(
+        f"{('p', 'q')[i % 2]},{('r', 's')[i % 3 % 2]},{('t', 'u')[i % 2]},{('v', 'w', 'k')[i % 3]},{i * 31},{i * 17},{i * 5}\n" for i in range(30)))
+    (root / "mon.csv").write_text("t,v\n" + "".join(f"2024-01-{i + 1:02d},{i * 3.5}\n" for i in range(20)))
+    g = make_client(root)
+    assert app(g, "s.csv")["rule"] == "R3" and (app(g, "mon.csv")["app"], app(g, "mon.csv")["rule"]) == ("monitoring", "R4")
+
+
+def test_AC_65(make_client, round6_dir, tmp_path):
+    import csv
+    import shutil
+    from datetime import date, timedelta
+    from statistics import fmean
+    root = tmp_path / "mon"
+    root.mkdir()
+    shutil.copy(Path(round6_dir) / "monitor.csv", root / "monitor.csv")
+    with open(root / "short.csv", "w", newline="") as f:  # 20 days only: no previous 30-day period
+        csv.writer(f).writerows([("time", "level"), *[(f"2024-05-{i + 1:02d}", 10 + i) for i in range(20)]])
+    with open(root / "wide.csv", "w", newline="") as f:
+        csv.writer(f).writerows([("time", *[f"m{k}" for k in range(10)]), *[(f"2024-01-{i + 1:02d}", *[i + k for k in range(10)]) for i in range(30)]])
+    make_client(root)
+    rows = [(date.fromisoformat(r["time"]), float(r["temperature"]), float(r["humidity"])) for r in _csv_rows(root, "monitor.csv")]
+    latest = rows[-1][0]
+
+    def window(days, back):  # the days*back .. days*(back+1) days before the latest timestamp, half-open
+        return [r for r in rows if latest - timedelta(days=days * (back + 1)) < r[0] <= latest - timedelta(days=days * back)]
+    num = lambda v: f"{v:,.0f}" if float(v).is_integer() else f"{v:,.1f}"
+    with _server() as base:
+        ids = _ids6(base)
+        for period in (7, 30, 90):
+            cur, prev = window(period, 0), window(period, 1)
+            with _browse(f"{base}/datasets/{ids[('monitor.csv', None)]}?period={period}") as page:
+                tiles = _tiles6(page)
+                assert list(tiles) == ["temperature", "humidity"]
+                for k, name in ((1, "temperature"), (2, "humidity")):
+                    t = tiles[name]
+                    vals = [r[k] for r in cur]
+                    assert t.locator(".card-value").inner_text() == num(vals[-1]), (period, name)
+                    assert t.locator(".tile-range").inner_text().split() == ["Min", num(min(vals)), "Max", num(max(vals))], (period, name)
+                    pct = round((fmean(vals) / fmean(r[k] for r in prev) - 1) * 100, 1)
+                    arrow, word = ("▲", "up") if pct > 0 else ("▼", "down") if pct < 0 else ("▶", "no change")
+                    got = " ".join(t.locator(".card-change").inner_text().split())
+                    assert got == f"{arrow} {pct:+.1f}% {word}" if pct else got == f"{arrow} 0.0% {word}", (period, name, got)
+                    assert t.locator("svg.spark polyline").count() == 1
+                assert page.errors == []
+        with _browse(f"{base}/datasets/{ids[('monitor.csv', None)]}?period=all") as page:
+            for t in _tiles6(page).values():
+                assert t.locator(".card-change").inner_text() == "n/a" and not set(t.inner_text()) & set("▲▼▶")
+        with _browse(f"{base}/datasets/{ids[('short.csv', None)]}") as page:  # default 30 days, nothing before it
+            t = _tiles6(page)["level"]
+            assert t.locator(".card-change").inner_text() == "n/a" and not set(t.inner_text()) & set("▲▼▶")
+            assert t.locator(".card-value").inner_text() == "29" and t.locator(".tile-range").inner_text().split() == ["Min", "10", "Max", "29"]
+        with _browse(f"{base}/datasets/{ids[('wide.csv', None)]}") as page:  # gates 184/186: tiles cap at 8
+            assert page.locator("ul.tiles > li.tile").count() == 8 and page.locator(".note").inner_text() == "8 of 10 measures"
+            assert page.errors == []
+
+
+def test_AC_66(make_client, round6_dir):
+    from datetime import date, timedelta
+    client = make_client(round6_dir)
+    rows = [date.fromisoformat(r["time"]) for r in _csv_rows(round6_dir, "monitor.csv")]
+    latest = rows[-1]
+    mid = _app_id(client, "monitor.csv")
+    for p in ("7", "30", "90", "all"):
+        got = client.get(f"/api/datasets/{mid}/app?period={p}").json()
+        want = [d.isoformat() for d in rows if p == "all" or d > latest - timedelta(days=int(p))]
+        assert got["period"] == p and got["charts"][0]["data"]["x"] == want, p
+    html = client.get(f"/datasets/{mid}").text
+    nav = re.search(r'<nav class="periods" aria-label="Period">.*?</nav>', html, re.S).group(0)
+    links = re.findall(r'<a href="([^"]*)"( aria-current="page")?>([^<]*)</a>', nav)
+    assert [x[2] for x in links] == ["7 days", "30 days", "90 days", "All"] and [bool(x[1]) for x in links] == [False, True, False, False]
+    assert [x[0].split("period=")[1] for x in links] == ["7", "30", "90", "all"]
+    with _server() as base:
+        url = f"{base}/datasets/{_ids6(base)[('monitor.csv', None)]}"
+        with _browse(url) as page:
+            page.get_by_role("link", name="90 days").click()
+            page.wait_for_url(re.compile("period=90"))
+            _settle(page)
+            assert _query(page)["period"] == ["90"] and page.locator(".periods a[aria-current=page]").inner_text() == "90 days"
+            assert page.evaluate("document.querySelector('.js-plotly-plot').data[0].x.length") == 90
+        with _browse(url + "?period=90") as page:  # opening the URL shows the same period
+            assert page.locator(".periods a[aria-current=page]").inner_text() == "90 days"
+            assert page.evaluate("document.querySelector('.js-plotly-plot').data[0].x.length") == 90
+
+
+def test_AC_67(make_client, round6_dir):
+    from statistics import fmean, pstdev
+    make_client(round6_dir)
+
+    def spikes(name):  # |z| > 3 against the 30 points before each point (population stdev)
+        y = [float(r["temperature"]) for r in _csv_rows(round6_dir, name)]
+        out = [i for i in range(30, len(y)) if pstdev(y[i - 30:i]) and abs(y[i] - fmean(y[i - 30:i])) / pstdev(y[i - 30:i]) > 3]
+        return y, out
+    y, planted = spikes("monitor.csv")
+    assert planted == [100] and spikes("quiet.csv")[1] == []  # hand-checked: only day 100 reads 60.0 among values 20..26
+    day = _csv_rows(round6_dir, "monitor.csv")[100]["time"]
+    mean7 = [fmean(y[max(0, i - 6):i + 1]) for i in range(len(y))]
+    with _server() as base:
+        ids = _ids6(base)
+        with _browse(f"{base}/datasets/{ids[('monitor.csv', None)]}?period=all") as page:
+            d = page.evaluate("""() => { const g = document.querySelector('.js-plotly-plot');
+                return {traces: g.data.map(t => ({name: t.name, mode: t.mode, y: t.y, x: t.x, yaxis: t.yaxis || 'y'})),
+                  labels: [...g.querySelectorAll('.textpoint text')].map(e => e.textContent), y2: !!g.layout.yaxis2}; }""")
+            main, mean, spike = d["traces"]
+            assert (main["name"], mean["name"], spike["name"]) == ("temperature", "7-point mean", "spike")
+            assert main["y"] == y and all(abs(a - b) < 1e-6 for a, b in zip(mean["y"][6:], mean7[6:]))
+            assert {t["yaxis"] for t in d["traces"]} == {"y"} and not d["y2"]
+            assert spike["x"] == [day] and "markers" in spike["mode"] and "text" in spike["mode"]
+            assert d["labels"] == ["spike"] and page.errors == []
+        with _browse(f"{base}/datasets/{ids[('quiet.csv', None)]}?period=all") as page:
+            assert page.evaluate("document.querySelector('.js-plotly-plot').data.map(t => t.name)") == ["temperature", "7-point mean"]
+            assert page.locator(".textpoint").count() == 0 and "spike" not in page.locator(".js-plotly-plot").first.inner_text()
+
+
+def test_AC_68(make_client, round6_dir):
+    from collections import Counter
+    make_client(round6_dir)
+    rows = _csv_rows(round6_dir, "survey.csv")
+    with _server() as base:
+        url = f"{base}/datasets/{_ids6(base)[('survey.csv', None)]}"
+        with _browse(url) as page:
+            got = page.evaluate("""() => [...document.querySelectorAll('.questions figure[data-kind=bar]')].map(f => {
+                const gd = f.querySelector('.js-plotly-plot'), m = {}, order = [];
+                for (const t of gd.data) t.y.forEach((l, i) => { m[l] = t.x[i]; order.push(l); });
+                return {m, order}; })""")
+            assert len(got) == 3  # the three non-Likert questions: gender, region, city
+            gender, region, city = sorted(got, key=lambda v: len(v["order"]))
+            assert gender["m"] == dict(Counter(r["gender"] for r in rows)) and region["m"] == dict(Counter(r["region"] for r in rows))
+            counts = sorted(Counter(r["city"] for r in rows).values(), reverse=True)  # 12 cities: 4,4,4,4,3 x 8
+            assert city["order"][-1] == "Other" and len(city["order"]) == 11
+            assert [city["m"][l] for l in city["order"][:-1]] == counts[:10]
+            assert city["m"]["Other"] == sum(counts[10:]) == 6 and sum(city["m"].values()) == 40
+            # layout: two per row at desktop width; Respondents holds the age histogram only
+            tops = page.evaluate("[...document.querySelectorAll('.questions figure[data-kind=bar]')].map(f => Math.round(f.getBoundingClientRect().top + scrollY))")
+            assert tops[0] == tops[1] and tops[2] > tops[0]
+            sec = page.locator("section.block:has(h2:text-is('Respondents'))")
+            assert sec.locator("figure[data-kind=histogram]").count() == 1 and "age" in sec.inner_text()
+            assert "respondent_id" not in sec.inner_text()
+            assert page.evaluate("document.querySelector('section.block figure[data-kind=histogram] .js-plotly-plot').data[0].y.reduce((a, b) => a + b, 0)") == 40
+            assert page.errors == []
+        with _browse(url, width=375) as page:  # one chart per row at phone width
+            tops = page.evaluate("[...document.querySelectorAll('.questions figure.chart')].map(f => Math.round(f.getBoundingClientRect().top + scrollY))")
+            assert tops == sorted(set(tops)) and page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            assert page.errors == []
+
+
+def test_AC_69(make_client, round6_dir):
+    from collections import Counter
+    rows = _csv_rows(round6_dir, "survey.csv")
+    scales = {"q_service": ["Very dissatisfied", "Dissatisfied", "Neutral", "Satisfied", "Very satisfied"],
+              "q_easy": ["Strongly disagree", "Disagree", "Neither agree nor disagree", "Agree", "Strongly agree"],
+              "q_visits": ["Never", "Rarely", "Sometimes", "Often", "Always"], "q_score": ["1", "2", "3", "4", "5"]}
+
+    def hue(c):
+        c = c.strip()
+        v = [int(x) for x in re.findall(r"\d+", c)[:3]] if c.startswith("rgb") else [int(c[i:i + 2], 16) for i in (1, 3, 5)]
+        r, g, b = (x / 255 for x in v)
+        mx, mn = max(r, g, b), min(r, g, b)
+        d = mx - mn
+        if d < 0.08:
+            return None  # grey
+        return ((g - b) / d % 6 if mx == r else (b - r) / d + 2 if mx == g else (r - g) / d + 4) * 60
+    make_client(round6_dir)
+    with _server() as base:
+        with _browse(f"{base}/datasets/{_ids6(base)[('survey.csv', None)]}") as page:
+            figs = page.evaluate("""() => [...document.querySelectorAll('figure[data-kind=likert]')].map(f => { const gd = f.querySelector('.js-plotly-plot');
+                return {barmode: gd.layout.barmode, range: gd._fullLayout.xaxis.range, orient: gd.data[0].orientation,
+                  traces: gd.data.map(t => ({name: String(t.name), pct: t.x[0], count: t.customdata[0], colour: t.marker.color}))}; })""")
+            assert len(figs) == 4
+            for fig, (q, scale) in zip(figs, scales.items()):
+                c = Counter(r[q] for r in rows)
+                assert fig["barmode"] == "stack" and fig["range"] == [0, 100] and fig["orient"] == "h", q
+                assert [t["name"] for t in fig["traces"]] == scale, q  # scale order, all levels
+                assert [t["count"] for t in fig["traces"]] == [c.get(l, 0) for l in scale], q
+                assert [round(t["pct"], 6) for t in fig["traces"]] == [round(c.get(l, 0) / 40 * 100, 6) for l in scale], q
+                assert abs(sum(t["pct"] for t in fig["traces"]) - 100) < 1e-9, q
+                cols = [t["colour"] for t in fig["traces"]]
+                assert hue(cols[2]) is None, (q, "neutral middle is grey", cols[2])
+                h1, h2 = hue(cols[0]), hue(cols[4])
+                assert h1 is not None and h2 is not None and min(abs(h1 - h2), 360 - abs(h1 - h2)) > 60, (q, cols)
+            assert page.errors == []
+
+
+def test_AC_70(make_client, round6_dir):
+    from collections import Counter
+    rows = _csv_rows(round6_dir, "survey.csv")
+    questions = ["gender", "region", "city", "q_service", "q_easy", "q_visits", "q_score"]
+    make_client(round6_dir)
+    with _server() as base:
+        url = f"{base}/datasets/{_ids6(base)[('survey.csv', None)]}"
+        form = re.search(r'<form class="crosstab".*?</form>', urllib.request.urlopen(url).read().decode(), re.S).group(0)
+        selects = re.findall(r'<select[^>]*name="(row|col)"[^>]*>(.*?)</select>', form, re.S)
+        assert [n for n, _ in selects] == ["row", "col"]
+        for _, body in selects:
+            assert re.findall(r'<option value="([^"]*)"', body) == questions
+        read = """() => { const gd = document.querySelector('figure[data-kind=crosstab] .js-plotly-plot'), t = gd.data[0];
+            return {x: t.x, y: t.y, text: t.text, z: t.z}; }"""
+
+        def check(page, rq, cq):
+            d = page.evaluate(read)
+            c = Counter((r[rq], r[cq]) for r in rows)
+            tot = Counter(r[rq] for r in rows)
+            for i, rl in enumerate(d["y"]):
+                shares = []
+                for j, cl in enumerate(d["x"]):
+                    n = c.get((str(rl), str(cl)), 0)
+                    assert d["z"][i][j] == n, (rq, cq, rl, cl)
+                    assert d["text"][i][j] == f"{n} ({n / tot[str(rl)] * 100:.1f}%)", (rq, cq, rl, cl, d["text"][i][j])
+                    shares.append(n / tot[str(rl)] * 100)
+                assert abs(sum(shares) - 100) < 1e-9, (rq, cq, rl)
+            assert sum(sum(r) for r in d["z"]) == 40
+        with _browse(url) as page:  # default: the first two questions
+            check(page, "gender", "region")
+            page.get_by_label("Column question").select_option("q_easy")
+            page.wait_for_url(re.compile("col=q_easy"))
+            _settle(page)
+            assert _query(page)["row"] == ["gender"] and _query(page)["col"] == ["q_easy"]
+            check(page, "gender", "q_easy")
+            assert page.errors == []
+        with _browse(url + "?row=q_easy&col=gender") as page:
+            assert page.get_by_label("Row question").input_value() == "q_easy" and page.get_by_label("Column question").input_value() == "gender"
+            check(page, "q_easy", "gender")
+
+
+def test_AC_71(make_client, tmp_path, archetypes_dir, round6_dir):
+    import openpyxl
+    from pptx import Presentation
+    client = make_client(_mixed_dir(tmp_path, archetypes_dir, round6_dir))
+    xl = lambda n, q: openpyxl.load_workbook(io.BytesIO(client.get(f"/datasets/{_app_id(client, n)}/export.xlsx{q}").content))
+    pp = lambda n, q: list(Presentation(io.BytesIO(client.get(f"/datasets/{_app_id(client, n)}/export.pptx{q}").content)).slides)
+    first = lambda slide: [s.text_frame.text for s in slide.shapes if s.has_text_frame][0]
+    wb = xl("monitor.csv", "?app=monitoring")
+    assert wb.sheetnames[0] == "Data" and wb.sheetnames[-1] == "Summary" and wb["Summary"]["A1"].value == "Monitoring overview"
+    assert sum(len(ws._charts) for ws in wb) == 1 and type(next(c for ws in wb for c in ws._charts)).__name__ == "LineChart"
+    slides = pp("monitor.csv", "?app=monitoring")
+    assert first(slides[0]) == "Monitoring overview" and sum(s.has_chart for sl in slides for s in sl.shapes) == 1
+    wb = xl("survey.csv", "?app=survey")
+    assert wb.sheetnames[0] == "Data" and wb.sheetnames[-1] == "Summary" and wb["Summary"]["A1"].value == "Survey overview"
+    assert len([c for ws in wb for c in ws._charts if type(c).__name__ == "BarChart"]) >= 7
+    slides = pp("survey.csv", "?app=survey")
+    assert first(slides[0]) == "Survey overview"
+    titled = {first(sl): any(s.has_chart for s in sl.shapes) for sl in slides[1:]}
+    for q in ("gender", "region", "city", "q_service", "q_easy", "q_visits", "q_score"):
+        assert titled.get(q) is True, (q, list(titled))
+
+
+def test_AC_72(make_client, tmp_path):
+    import csv
+    from datetime import date, timedelta
+    root = tmp_path / "grain"
+    root.mkdir()
+
+    def write(name, rows):
+        with open(root / name, "w", newline="") as f:
+            csv.writer(f).writerows([("date", "store", "amount"), *rows])
+    start = date(2024, 1, 1)  # a Monday
+    write("week.csv", [((start + timedelta(days=i)).isoformat(), "ab"[i % 2], 1000 + i) for i in range(100)])
+    months = [(y, m) for y in range(2021, 2025) for m in range(1, 13) if (y, m) <= (2024, 3)]  # 1,155 days
+    write("year.csv", [(f"{y}-{m:02d}-01", "ab"[m % 2], 10000 * (y - 2020) + 100 * m) for y, m in months])
+    spans = (60, 61, 182, 183, 1096, 1097)  # day <= 60 < week <= 182 < month <= 1096 < year
+    for span in spans:
+        write(f"span{span}.csv", [((start + timedelta(days=i)).isoformat(), "ab"[i % 2], 5000 + i) for i in range(span + 1)])
+    client = make_client(root)
+    app = lambda n: client.get(f"/api/datasets/{_app_id(client, n)}/app").json()
+    # weeks: full ISO weeks only (the partial last week is left out); 100 days = 14 full weeks + 2 days
+    data = app("week.csv")
+    full = [sum(1000 + i for i in range(7 * k, 7 * k + 7)) for k in range(14)]
+    trend = next(c for c in data["charts"] if c["kind"] == "line")["data"]
+    assert data["grain"] == "week" and trend["y"] == full
+    assert trend["x"][0] == "2024-01-01" and all(date.fromisoformat(x).weekday() == 0 for x in trend["x"])
+    card = data["cards"][0]
+    assert (card["latest"], card["previous"]) == (full[-1], full[-2]) and f"{full[-1]:,}" in _text(_html(client, "week.csv"))
+    # years: full calendar years only (2024 has three months)
+    data = app("year.csv")
+    sums = [sum(10000 * (y - 2020) + 100 * m for m in range(1, 13)) for y in (2021, 2022, 2023)]
+    trend = next(c for c in data["charts"] if c["kind"] == "line")["data"]
+    assert data["grain"] == "year" and trend["y"] == sums and trend["x"] == ["2021-01-01", "2022-01-01", "2023-01-01"]
+    card = data["cards"][0]
+    assert (card["latest"], card["previous"]) == (sums[-1], sums[-2]) and f"{sums[-1]:,}" in _text(_html(client, "year.csv"))
+    assert {s: app(f"span{s}.csv")["grain"] for s in spans} == {60: "day", 61: "week", 182: "week", 183: "month", 1096: "month", 1097: "year"}
+
+
+def test_AC_73(make_client, tmp_path, archetypes_dir, round6_dir):
+    import openpyxl
+    from pptx import Presentation
+    client = make_client(_mixed_dir(tmp_path, archetypes_dir, round6_dir))
+    mid = _app_id(client, "measures.csv")
+    assert client.get(f"/api/datasets/{mid}/app").json()["qualifies"] == ["explorer"]
+    charts = client.get(f"/api/datasets/{mid}/charts").json()["charts"]
+    wb = openpyxl.load_workbook(io.BytesIO(client.get(f"/datasets/{mid}/export.xlsx").content))
+    assert wb.sheetnames[0] == "Data" and wb.sheetnames[-1] == "Summary" and sum(len(ws._charts) for ws in wb) > 0
+    assert "overview" not in str(wb["Summary"]["A1"].value).lower()
+    slides = list(Presentation(io.BytesIO(client.get(f"/datasets/{mid}/export.pptx").content)).slides)
+    assert len(slides) == 1 + len(charts)
+    assert sum(s.has_chart for sl in slides for s in sl.shapes) == len([c for c in charts if c["kind"] not in ("heatmap", "table")]) > 0
+    # Board gate 186: the client-facing title slide says "Data overview", not the internal word "Explorer"
+    assert [s.text_frame.text for s in slides[0].shapes if s.has_text_frame][0] == "Data overview"
