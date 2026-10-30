@@ -1,0 +1,96 @@
+{
+  "header": {
+    "ticket": 484,
+    "project": "you-think-of-the-project-name",
+    "from_role": "architect",
+    "phase": "architecture",
+    "attempt": 1,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "4acf784af3ed",
+    "tokens_left": 1758454
+  },
+  "goal": "Write or update docs/ARCHITECTURE.md and adapt the scaffold for the approved spec.",
+  "acceptance_criteria": [
+    {
+      "text": "docs/ARCHITECTURE.md explains how every acceptance item will be met",
+      "passes": true
+    },
+    {
+      "text": "All tests pass",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py architecture",
+    "passed": true,
+    "output_tail": "........................................................................ [ 17%]\n........................................................................ [ 35%]\n........................................................................ [ 53%]\n........................................................................ [ 70%]\n........................................................................ [ 88%]\n...............................................                          [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 37 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n407 passed, 112 warnings in 553.57s (0:09:13)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Upload = POST /upload (file list) -> one streamed PUT per file -> POST /upload/{batch}/done; data folder switched via DATABOOT_DATA; all route caches cleared on done",
+      "why": "python-multipart is not installed; streaming keeps 2 GB out of memory; begin/done give the cap over the whole upload and a clean switch; Dataset objects compare equal across folders and catalog.load reads from config at call time, so stale cached rows would be served",
+      "evidence": "requirements.txt; app/catalog.py:107 (load reads config.get().data); docs/ARCHITECTURE.md 'Round 7: upload'"
+    },
+    {
+      "what": "Reworded AC-78, AC-79, AC-81 to match gate 189 (progressive scan log, exact badge-line caption, keyboard reorder)",
+      "why": "Lesson: when a later gate changes what an AC means, reword the same id so check.py plan forces a ticket",
+      "evidence": "docs/acceptance.json L79-L82; graphify-out/memory.md gate 189"
+    },
+    {
+      "what": "Tile = section.ws-tile with aria-label equal to an h2 inside it; tables keep <caption><h2>X</h2></caption>; old wrapper classes ride on tiles via 'extra'; tabs outside <main>",
+      "why": "Keeps dozens of literal and selector checks green (ul.tiles > li.card.tile, .questions > .chart, .map-layout, caption literals, main aria-current count)",
+      "evidence": "tests/test_monitoring_page.py:25, tests/test_survey_page.py:58, tests/test_business_page.py:156, tests/test_pages.py:27,66"
+    },
+    {
+      "what": "Golden snapshot tests/fixtures/round6_api.json of /app and /charts for 16 datasets",
+      "why": "AC-80 requires figures' data unchanged; an exact comparison beats eyeballing",
+      "evidence": "two generation runs byte-identical (cmp)"
+    },
+    {
+      "what": "Pointer-event drag with real DOM moves, localStorage key databoot.order.<id>.<app>; native <dialog> expand; sessionStorage reopen after filter",
+      "why": "Touch and Playwright drag_to work; Tab order matches visual order; dialog gives Esc/backdrop/focus for free; server and URLs unchanged",
+      "evidence": "Playwright probe: Esc on showModal restores focus in Chromium 156"
+    },
+    {
+      "what": "Prototype '(dev only) sample' button not built; launcher folder optional, PS1 dialog Cancel starts without a folder",
+      "why": "Gate 189: numbered list wins over prototype; PRD definitions make the folder optional",
+      "evidence": "docs/PRD.md 'Round 7 definitions'; Start-DataBoot.ps1:16-21"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Writing the draft with a Bash heredoc (cat > /tmp/r7.md <<EOF)",
+      "why_it_failed": "Blocked by the ProdAgents pretool deny list; used the Write tool and a python3 splice instead"
+    }
+  ],
+  "assumptions": [
+    "The archetype caption prints G<n> only when non-zero, so the Board's example 'T1 N2 C2' reads exactly; the scan log always prints all four counts as the PRD format says",
+    "Role counts come from the profile mapping (temporal/numerical/categorical/geospatial), not apps.roles (which adds L answer columns)",
+    "Tile titles for non-chart tiles ('Key figures', 'Measures') are placeholders the Designer may rename",
+    "Cap sizes use GiB (2 * 1024**3) and print as '2 GB'"
+  ],
+  "open_questions": [
+    "The prototype docs/reference/databoot-console.html is not on disk; the Designer works from gate 189's description. Please add the file if the exact visuals matter.",
+    "Should the archetype caption always show G0 (consistent with the scan log) or omit it when zero (matches the Board's example)? I chose omit.",
+    "Launcher: is starting without a folder when the folder dialog is cancelled acceptable (Docker mode still requires a folder)?"
+  ],
+  "lessons": [
+    {
+      "lesson": "Before designing a shared wrapper component around existing page markup, grep the tests for container selectors, child combinators, caption literals and main-only counts; carrying the old wrapper classes on the new wrapper and putting new nav outside <main> kept the planned test edits to one line",
+      "when": "A restyle round wraps existing sections in a new component",
+      "evidence": "docs/ARCHITECTURE.md 'Round 7: tests that must change'"
+    },
+    {
+      "lesson": "When an AC says data must be 'the same as before', snapshot the JSON responses into a fixture during the architecture ticket, while the old code is still there",
+      "when": "Any round that changes looks but promises unchanged data",
+      "evidence": "tests/fixtures/round6_api.json"
+    },
+    {
+      "lesson": "Playwright has no option for prefers-reduced-transparency; use a CDP session with Emulation.setEmulatedMedia features (works in Chromium 156)",
+      "when": "Testing reduced-transparency CSS",
+      "evidence": "probe in ticket 484"
+    }
+  ],
+  "problems": []
+}

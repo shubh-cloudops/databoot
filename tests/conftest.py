@@ -244,4 +244,27 @@ def make_client(monkeypatch, tmp_path):
                 getattr(main, cache).cache_clear()
         app = main.app
         return TestClient(app)
-    return make
+    yield make
+    from app import upload
+    if hasattr(upload, "cleanup"):  # round 7: delete the temp folders a test's uploads made
+        upload.cleanup()
+
+
+def files_of(root):
+    """{relative path: bytes} of every file under root, the browser's view of a picked folder (AC-75)."""
+    return {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(root.rglob("*")) if p.is_file()}
+
+
+def upload(client, files):
+    """Send {relative path: bytes} the way app/static/js/intake.js does (ARCHITECTURE.md "Round 7: upload"):
+    POST /upload with the list, PUT each body, POST done. Returns the first non-200 response, else the done response."""
+    r = client.post("/upload", json={"files": [{"path": p, "size": len(b)} for p, b in files.items()]})
+    if r.status_code != 200:
+        return r
+    batch = r.json()["batch"]
+    for p, b in files.items():
+        r = client.put(f"/upload/{batch}", params={"path": p}, content=b,
+                       headers={"Content-Type": "application/octet-stream"})
+        if r.status_code != 200:
+            return r
+    return client.post(f"/upload/{batch}/done")

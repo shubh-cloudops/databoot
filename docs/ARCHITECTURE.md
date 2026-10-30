@@ -1,4 +1,261 @@
-# Architecture: DataBoot (round 6)
+# Architecture: DataBoot (round 7)
+
+**Round 7** (docs/PRD.md round 7, AC-74..AC-87, Board gate 189) keeps every behaviour below and adds a **one-box
+intake** (drop portal, `/upload` into a temp folder, a scan screen) and a **new look** (one shared glass tile for
+every app, tile interactions, dark holographic theme only, keyboard chart marks). No new dependency, no CDN, no web
+font. Scanning, classification, rules, figures, the JSON contracts of `/app` and `/charts`, and exports do not
+change. Sections "Round 7: ..." come first; the round 1-6 sections after them still hold unless a round 7 section
+says otherwise.
+
+No docs/TRENDS.md this round (docs/team.json: trends off; IDEA: "trends off"), so I used no trend advice.
+**The prototype `docs/reference/databoot-console.html` is not on disk** (`find / -name 'databoot-console*'` finds
+nothing; docs/reference/ holds only deck.gl and unstructured.io). Gate 189 says to build from its description in
+that case; the Designer turns the description into DESIGN.md tokens. Where it and the IDEA's numbered list differ,
+the list wins (gate 189), so the prototype's "(dev only) sample" button is **not built** (no list item asks for it).
+
+**Gate 189 overrides the PRD on four points; I reworded AC-78, AC-79 and AC-81 (same ids) in acceptance.json.**
+(a) Scan log (AC-78): lines appear **progressively, about 0.35 s apart and all within 2.5 s**; the "Open workspace"
+link is visible from the start; the workspace opens by itself after the last line (PRD: all at once). (b) Archetype
+caption (AC-79): **exactly the badge line** `APP: BUSINESS · RULE R2 · T1 N2 C2 · 288 ROWS` (PRD: role counts plus
+words chosen by the designer). (c) Keyboard reorder C1 is **built** (AC-81): Alt+Left/Right or Alt+Up/Down on a
+tile's move handle moves it one place, announced in an aria-live region. (d) Expanded overlay after a filter click
+stays open on the same tile (PRD default, confirmed). Branding unchanged (gates 160, 189): DataBoot, system fonts,
+no logo, blank SVG favicon.
+
+## Round 7 changes at a glance
+| # | Change | Files | AC | Role |
+|---|---|---|---|---|
+| U1 | Upload batch: begin / write (streamed) / finish, cap, path sanitising, temp folder lifecycle, cache reset; lifespan cleanup | `app/upload.py` (new, empty), `app/main.py` (3 routes, lifespan), `app/config.py` (`upload_cap`, done) | AC-75, AC-76, AC-77 | backend |
+| L7 | Launcher folder optional: no folder -> an empty owned temp folder; PS1 dialog Cancel starts with no folder | `app/launch.py`, `Start-DataBoot.ps1` | AC-74, AC-76 | backend |
+| S7 | Scan screen `GET /scan`: one line per dataset and unreadable file; `_summary(d)` | `app/main.py`, `scan.html` (new), `app/static/js/scan.js` (new) | AC-78 | backend (route, `_summary`) + frontend (page, JS) |
+| D7 | DESIGN.md round 7: tokens, portal, tile, scan log, motion, overlay, focus ring, contrast pairs | `docs/DESIGN.md` | AC-87, AC-83 | designer (after this ticket, before the frontend tickets) |
+| H7 | Home: portal + Choose files / Choose folder, drop, upload client, cap message | `home.html`, `app/static/js/intake.js` (new) | AC-74, AC-75, AC-77 | frontend |
+| W7 | Workspace shell: dataset tabs, archetype caption; `tile` macro; every app template re-cut into tiles in one `.grid` | `base.html`, `dataset.html`, `_tile.html` (new), `_figure.html`, `app_*.html`, `_tables.html`, `app/main.py` (`tabs`, `summary` in the page context) | AC-79, AC-80 | frontend |
+| I7 | Tile interactions: drag and keyboard reorder, localStorage order, expand dialog and reopen, glow, entrance | `app/static/js/tiles.js` (new), CSS | AC-81, AC-82, AC-84 | frontend |
+| K7 | Keyboard chart marks (Tab, focus ring, Enter/Space = click) | `dashboard.js` (`keyboardMarks`, `apply`) | AC-85 | frontend |
+| T7 | Dark theme only: delete the `prefers-color-scheme` block and the `dark` media listener; reduced motion and transparency | `databoot.css`, `dashboard.js` | AC-83, AC-84 | frontend (Designer's tokens) |
+| Q7 | Acceptance tests AC-74..AC-87, offline walk, AC-41/42 re-timed, golden `/app` + `/charts` (AC-80) | `tests/test_acceptance.py`, new test files | all | QA |
+
+Order: U1 + L7 and the D7 design ticket first (independent), then S7 and H7 (need U1), then W7, then I7, K7, T7
+(need W7's markup), then QA. W7 moves markup that old browser tests select, so W7 runs the whole suite once at its
+end (see "Round 7: tests that must change").
+
+## Round 7: routes (sitemap: home, scan, dataset page; NAV = the "DataBoot" home link plus the dataset tabs)
+| Method, path | Returns |
+|---|---|
+| GET `/` | Home: h1 DataBoot, the portal, then (when the data folder has files) the round 1 tables, unchanged |
+| POST `/upload` | begin a batch (JSON contract below) |
+| PUT `/upload/{batch}?path=<relative path>` | one file's bytes, streamed to disk |
+| POST `/upload/{batch}/done` | the batch becomes the data folder; `{"next": "/scan"}` |
+| GET `/scan` | Scan screen: server-rendered log of the current data folder (no JSON, no polling) |
+| GET `/datasets/{id}` | as before, now in tiles; tabs for every dataset in the header |
+
+All round 1-6 routes are unchanged. The scan page is reached after an upload (and by URL); it is not in the NAV.
+No page polls: intake.js makes the upload calls once per upload; dashboard.js still fetches `/app` once.
+
+## Round 7: upload (`app/upload.py`, routes in `app/main.py`)
+No `python-multipart` (not installed, no new dependency): the browser sends **one raw request per file**, read with
+`request.stream()` and written in chunks, so a 2 GB upload never sits in memory. JSON bodies use `await request.json()`.
+
+**JSON contracts** (errors are FastAPI's `{"detail": "<text>"}`):
+1. `POST /upload` body `{"files": [{"path": "sub/sales.csv", "size": 123}, ...]}` ->
+   `200 {"batch": "<token>"}` (token = the temp folder's name, `[A-Za-z0-9_-]+`);
+   `413 {"detail": <cap message>}` when `sum(size) > config.get().upload_cap` (nothing created);
+   `400` for an empty list, a duplicate or a bad path (rules below).
+2. `PUT /upload/{batch}?path=<path>` body = the file bytes (`application/octet-stream`) ->
+   `200 {"path": "sub/sales.csv", "bytes": 123}`; `404` unknown batch; `400` a path not in the batch's list;
+   `413 {"detail": <cap message>}` as soon as the batch's running byte total passes the cap: the batch folder is
+   deleted at once (AC-77: none of that upload's files are kept or listed).
+3. `POST /upload/{batch}/done` -> `200 {"next": "/scan"}`; `404` unknown batch. Effects: `DATABOOT_DATA` = the batch
+   folder (the same switch `launch.run` uses; `config.get()` reads env on every call); the previous **upload**
+   folder is deleted (only folders in `upload.OWNED` are ever deleted, never a launcher folder); the caches
+   `catalog.scan`, `catalog.load`, `main._base`, `_view`, `_plain`, `_detected`, `_appview` are cleared, because a
+   `Dataset` compares equal across folders (same path, sheet, kind, rows) and would serve the old file's rows.
+
+**Cap message** (`upload.cap_message(total, cap)`, returned as `detail` and shown by the page in a `role="alert"`
+box): `This upload is <total> and the limit is <cap>. For larger drives, start DataBoot with the launcher's -Folder
+option.` Sizes >= 1 GiB print as GB with at most one decimal (`2 GB`, `2.4 GB`), smaller ones as `1,000 bytes`.
+Default cap `2 * 1024**3` (`DATABOOT_UPLOAD_CAP`; added to `app/config.py` in this ticket), so the default message
+names "2 GB" (AC-77); tests set a small cap. intake.js sums `File.size` first and shows the same text (built by
+the same rule in JS) without sending anything; the server checks again (declared sizes, then real bytes).
+
+**Paths** (`upload.safe(path) -> str | None`): `\` becomes `/`; reject empty, absolute (`/x`, `C:...`), any part that
+is `..`, `.` or empty, any NUL; the resolved target must stay inside the batch folder (`resolve()` +
+`is_relative_to`). The client sends paths **relative to the picked or dropped folder**: for a folder pick
+(`webkitRelativePath` "picked/sub/sales.csv") or a dropped folder (`webkitGetAsEntry`, fullPath
+"/picked/sub/sales.csv") it strips the first segment when every file shares it, so ids, paths and the scan equal a
+launcher run on that folder (AC-75: `sub/sales.csv`). Single files send `File.name`. Hidden files are written;
+`catalog.scan` skips them as today.
+
+**Lifecycle**: `upload.begin` makes `tempfile.mkdtemp(prefix="databoot-upload-")` (system temp: outside the project
+and any launcher folder, AC-76) and adds it to `OWNED`; `upload.cleanup()` deletes every `OWNED` folder. `main.app`
+gets `FastAPI(lifespan=...)` whose shutdown calls `upload.cleanup()` (uvicorn runs it on Ctrl+C and on
+`server.should_exit`; a TestClient runs it when used as a context manager, which is how QA tests AC-76). One upload
+at a time: `begin` deletes any batch that was begun and not finished.
+`# ponytail: a hard kill leaves the temp folder; the OS temp cleanup removes it.`
+
+## Round 7: launcher (L7)
+- `app/launch.py`: `folder` becomes `nargs="?"`. Without it, `run(upload.empty())`, where `upload.empty()` makes an
+  owned empty temp folder (deleted on exit like an upload); the home page then shows only the portal. With a folder,
+  behaviour is unchanged (`test_missing_folder_exits_2_with_one_line` keeps passing). A launcher folder is only read.
+- `Start-DataBoot.ps1`: if the folder dialog is cancelled, start **without** a folder instead of `exit 1`
+  (`-Docker` still needs a folder and keeps `exit 1`). Call `app.launch` with `$Folder` only when it is set
+  (Windows PowerShell 5.1 drops empty string arguments, so use an `if`). Keep every needle of
+  `tests/test_launcher_files.py` (FolderBrowserDialog, `-m app.launch`, `exit 1`, ...).
+
+## Round 7: scan screen (S7)
+`GET /scan` renders `scan.html` from `catalog.scan(config.get().data)` and, per dataset, `main._summary(d)` =
+`{"app": det["app"], "rule": det["rule"], "T": n, "N": n, "C": n, "G": n}`: the counts of `temporal`,
+`numerical`, `categorical`, `geospatial` in `_base(d)[1]` (the profile mapping, AC-2) and `det = _detected(d)`.
+Markup (no `<p>` in main): `<h1>DataBoot</h1>`, `<ol class="scan-log" aria-live="polite">` with one `<li>` per line,
+then `<a class="btn btn-primary" id="open-workspace" href="/datasets/<first id>">Open workspace</a>` (`/` when there
+is no dataset). Lines (exact, AC-78):
+- dataset: `<path>[ - <sheet>]  <rows|plural("row")>  T<n> N<n> C<n> G<n>  -> <APP> (rule <id>)`, APP =
+  `det["app"].upper()`; e.g. data_dir sales.csv: `sales.csv  6 rows  T1 N1 C1 G0  -> BUSINESS (rule R2)` (counts checked with `profile.classify`);
+- unreadable: `<path>[ - <sheet>]  <reason>`;
+- last: `0 bytes uploaded to the internet`.
+All lines are in the HTML (tests and no-JS read them). `scan.js` hides them on load and reveals one every
+`min(350, 2500 / n)` ms; after the last it calls `location.assign` with `#open-workspace`'s href. Under reduced
+motion the lines still appear in turn but without a fade.
+`# ponytail: /scan profiles every dataset (one _base load each); a folder of many big files shows late; add a
+background scan if the Board reports it.`
+
+## Round 7: workspace shell (W7)
+- `base.html` gets `{% block tabs %}` inside `.site-header` after the brand; `dataset.html` fills it with
+  `<nav class="tabs" aria-label="Datasets"><ul>` one `<li><a href="/datasets/<id>">path[ - sheet]</a>` per dataset
+  (`tabs` = `catalog.scan(...).datasets`, passed by the route), the current one `aria-current="page"`. The tabs sit
+  **outside `<main>`** so main-only checks (`test_business_page.py:156` counts two `aria-current` in main) hold.
+  Many datasets scroll sideways (Designer).
+- Under the h1, `dataset.html` prints `<div class="archetype">` with `APP: {{ s.app|upper }} · RULE {{ s.rule }} ·
+  T{{ s.T }} N{{ s.N }} C{{ s.C }}{% if s.G %} G{{ s.G }}{% endif %} · {{ d.rows|plural("row")|upper }}` (`s =
+  _summary(d)`): `APP: BUSINESS · RULE R2 · T1 N1 C1 · 6 ROWS` for data_dir sales.csv. G is printed only when non-zero so
+  the Board's example reads exactly. The badge `App: Business (rule R2)`, View as, filters and chips stay.
+- The page body is one `<div class="grid" data-dataset="{{ d.id }}" data-app="{{ shown }}">` (12 columns at
+  desktop, 1 column under 600 px) holding all tiles in the default order below. Filters form, chips, View as,
+  Monitoring period links and the Business drill crumbs stay **above** the grid (page controls, not tiles). One
+  `<dialog class="overlay" id="tile-dialog">` and one `<div class="sr-only" id="ws-live" aria-live="polite">` at the
+  end of main.
+
+## Round 7: tile component (W7; one macro for every app)
+`app/templates/_tile.html`, `{% macro tile(key, label, span=12, extra="", heading=true) %}`, used with `{% call %}`:
+```
+<section class="ws-tile {{ extra }}" id="tile-{{ key }}" data-tile="{{ key }}" data-span="{{ span }}" aria-label="{{ label }}">
+  <div class="ws-head">{% if heading %}<h2>{{ label }}</h2>{% endif %}
+    <button type="button" class="ws-move" aria-label="Move {{ label }}">(icon)</button>
+    <button type="button" class="ws-expand" aria-label="Expand {{ label }}" aria-haspopup="dialog">(icon)</button></div>
+  {{ caller() }}
+</section>
+```
+- Class `ws-tile`, not `tile`: `ul.tiles > li.card.tile` is the round 6 Monitoring card and tests select it.
+- A `<section>` with an accessible name is a **region landmark**; its name (`aria-label`) is the text of an h2 inside
+  the tile (AC-80). Where the body already has that heading, `heading=false`: **figures** wrap the caption title as
+  `<figcaption><h2 class="chart-h"><span class="chart-title">…</span></h2> …` (the exact `<span
+  class="chart-title">` string that `test_pages.py:66` reads and the `<figcaption>` count stay); **tables** keep
+  `<caption><h2>Columns</h2></caption>` byte for byte (dozens of test literals); the **map panel** keeps its
+  `<h2>Selected point</h2>`; Survey **Cross-tab** and **Respondents** keep their h2. Other tiles get the tile h2:
+  Explorer `kpis` and Business `cards` "Key figures", Monitoring `tiles` "Measures" (Designer may rename; plain
+  labels, AC-17).
+- In a figure tile the `<figure>` is a **direct child** of the section, after `.ws-head`, so `.questions > .chart`
+  matches when the tile carries `questions`. The table toggle stays inside figcaption (`.table-toggle`); the
+  `#map3d-toggle` button moves into the map tile's `.ws-head`.
+- **Keys, default spans** (desktop; 12 under 600 px) and `extra` (the old wrapper class, kept where tests use it as
+  an ancestor):
+
+| App | Tiles in default order: key span (extra) |
+|---|---|
+| Explorer | `kpis` 12 (`dl.kpis` inside), `chart-1` 12, `chart-2`..`chart-8` 6, `columns` 12, `rows` 12; the grid also has class `charts` (`test_filter_ui.py:80`, AC-34 widths); no charts -> `empty` 12 |
+| Business | `cards` 12 (`ul.cards`), each trend `chart-N` 6 (`trends`), leaderboard `chart-N` 6 or 12 without a change table, `changes` 6, `columns` 12, `rows` 12 |
+| Map | `map` 8 (`map-layout`: the 2D and the hidden 3D figure, 3D button), `panel` 4 (`aside.map-panel` with the region bar figure), `columns` 12, `rows` 12 |
+| Monitoring | `tiles` 12 (`ul.tiles` and the `.note`), each `chart-N` 12 (`monitor-fig`), `columns` 12, `rows` 12 |
+| Survey | each question `chart-N` 6 (`questions`), `crosstab` 12 (`block`: h2, form, figure), `respondents` 12 (`block`: h2, `<div class="questions">` with the histograms), `columns` 12, `rows` 12 |
+
+## Round 7: tile interactions (`app/static/js/tiles.js`, I7; loaded by dataset.html after dashboard.js, `defer`)
+- **Drag** (pointer events, not HTML5 drag and drop, so mouse, pen and touch share one path and Playwright
+  `drag_to` works): `pointerdown` on `.ws-head` or a figure's `figcaption` (not on a button, link, select or input)
+  of tile A, `pointerup` over tile B moves A into B's place (`B.before(A)` when A came after B, else `B.after(A)`).
+  The move handle has `touch-action: none`; the rest of the header keeps page scrolling on touch.
+- **Keyboard** (gate 189): on `.ws-move`, Alt+ArrowLeft/ArrowUp moves the tile one place earlier,
+  Alt+ArrowRight/ArrowDown one later; focus stays on the handle; `#ws-live` says `<label> moved to position <i> of
+  <n>`.
+- **Order store**: after each move `localStorage["databoot.order.<dataset id>.<app>"] = JSON.stringify(keys)`. On
+  load, stored keys come first in stored order, the rest follow in default order. Another dataset has another key,
+  so it keeps its default order (AC-81). Tiles really move in the DOM, so Tab order = visual order.
+- **Expand** (AC-82): `.ws-expand` leaves a placeholder comment where the tile is, moves the tile into
+  `#tile-dialog`, calls `showModal()`, then `Plotly.Plots.resize` on each `.js-plotly-plot` inside (when
+  `window.Plotly`). On `close` (Esc through the native `cancel`, a click whose target is the dialog itself = the
+  backdrop, or the expand button again) the tile goes back to the placeholder, plots resize, and its `.ws-expand`
+  gets focus (a probe showed Chromium 156 restores focus on Esc, but the tile moved, so focus it explicitly).
+- **Reopen after a filter**: on `pagehide` with the dialog open, `sessionStorage["databoot.expand"] = "<dataset
+  id>:<key>"`; on load, if it names this dataset and a present tile, open that tile and delete the entry. A bar click
+  inside the overlay navigates as today (dashboard.js `crossFilter`: URL, chip and counts change) and the page comes
+  back with the same tile expanded, filtered.
+- **Glow**: `pointermove` on a tile sets `--mx`/`--my` (px) on it; CSS draws the radial glow from them. Not wired
+  when `matchMedia("(prefers-reduced-motion: reduce)")` matches.
+- **Entrance**: CSS only: `.ws-tile` gets an animation whose delay grows with `:nth-child` and is capped; the
+  Designer picks values with **max delay + duration <= 0.6 s** (for example 30 ms steps capped at 300 ms, 240 ms).
+  `@media (prefers-reduced-motion: reduce)`: `animation: none; transition: none` everywhere.
+  `@media (prefers-reduced-transparency: reduce)`: `backdrop-filter: none` on every element and an opaque tile fill.
+
+## Round 7: keyboard chart marks (K7, `dashboard.js`)
+- `crossFilter` is split: `apply(c, value)` (today's URL toggle) is called by `plotly_click` and by the keyboard.
+- `keyboardMarks(plot, c)` (same MutationObserver pattern as `keyboardBar`), only when `clickable(c)`: each bar
+  `.point path` of trace 0 (never the grey Other trace) and each donut `.slice path` gets `tabindex="0"`,
+  `role="button"`, `aria-label="<x_label>: <category>"`; Enter or Space calls `apply(c, category)` with the category
+  taken from the trace by index (`gd.data[0].y[i]` for horizontal bars, `.x[i]` vertical, `labels[i]` donut). This
+  covers Explorer bars and donuts, the Business leaderboard, Survey question bars and Map top regions (AC-85; the
+  last-level leaderboard `data-drill=false` stays non-clickable). Focus ring: `:focus-visible` outline on the SVG
+  path, colour and width from DESIGN.md.
+
+## Round 7: theme (T7)
+Dark only: `databoot.css` `:root` holds the Designer's dark tokens (`--bg: #050a12`, cyan `#4de1ff`, amber `#ffb454`,
+`--mono` system monospace stack, `color-scheme: dark`); delete the `@media (prefers-color-scheme: dark)` block;
+`dashboard.js` drops `var dark = matchMedia(...)` and listens to `phone` only. Charts read the tokens through
+`tokens()`, so they follow. Global chart rules unchanged (one y-axis, bars sorted from zero, arrows + signed % +
+text). No `@font-face`, no image, no external URL. Body and label text >= 4.5:1 against the **effective** tile
+background (the glass gradient over `#050a12`); the Designer lists each pair in DESIGN.md.
+
+## Round 7: tests that must change (name them in W7; grep before trusting line numbers)
+- `tests/test_survey_page.py:28` order list: `'<div class="questions">'` -> `'class="ws-tile questions"'` (that
+  wrapper string now appears only inside Respondents, after Cross-tab).
+- Nothing else is planned to change: table captions, figcaption text, `.trends`, `.questions`, `.map-layout`,
+  `.map-panel`, `ul.cards > li.card`, `ul.tiles > li.card.tile`, `.kpis`, `section.block`, `.charts` keep matching
+  through the `extra` classes and the unchanged inner markup; server order checks (`test_business_page.py:152`,
+  `test_survey_page.py:28`) follow the default tile order; `main` checks (`<p>` count, `aria-current` count) hold
+  because the tabs are in the header and tiles add no `<p>`. A failure there is a W7 bug, not a test edit.
+- Token-reading tests (AC-50 `--div-mid`, AC-69, `test_table_toggle.py`) read CSS at run time: re-run after T7.
+- `test_AC_41`, `test_AC_42`, `tests/test_speed.py`: re-time with the tile pages; report the numbers, do not loosen.
+
+## Round 7: fixtures (done in this ticket)
+- `tests/conftest.py`: `files_of(root)` -> `{relative path: bytes}` of a folder (what a folder pick sends);
+  `upload(client, files)` sends a batch the way intake.js does (begin, one PUT per file, done) and returns the first
+  non-200 response or the done response. `make_client` now yields and, after each test, calls `upload.cleanup()`
+  once it exists.
+- `tests/fixtures/round6_api.json`: the round 6 `/api/datasets/{id}/app` and `/charts` responses of every dataset in
+  `data_dir`, `archetypes_dir` and `round6_dir`, keyed `"<fixture>/<path>|<sheet>"` (16 datasets, written from
+  commit bd6c14f; two runs were byte-identical). AC-80: QA compares the live responses to it.
+- Upload cases: `data_dir` (one file `sales.csv`; many: `sales.csv` + `points.tsv`; folder: `files_of(data_dir)`,
+  which has `sub/` and the unreadable files), `archetypes_dir` (`shop.csv` -> `BUSINESS (rule R2)`), and
+  `monkeypatch.setenv("DATABOOT_UPLOAD_CAP", "1000")` for the cap.
+
+## Round 7: decisions
+1. **One raw request per file plus begin/done**, not multipart: no new dependency (PRD constraint), streaming keeps
+   memory flat for 2 GB, and begin/done give the cap over the whole upload and the atomic switch of data folder.
+2. **Switch the data folder through `DATABOOT_DATA`**: `config.get()` already reads env on every call and
+   `launch.run` already sets it; every route keeps calling `config.get().data`, so nothing else changes.
+3. **Tabs in the header, controls above the grid, tables keep their caption h2**: the many existing tests that read
+   `main`, captions and container classes stay green (lesson: list each test line; here only one line changes).
+4. **`aria-label` on the tile, equal to an h2 inside it** (not `aria-labelledby`): it needs no ids in table
+   captions, whose literals dozens of tests check, and still gives a region named by its heading.
+5. **Old wrapper classes ride on the tiles (`extra`)**: one flat grid is needed for reorder across all tiles, and the
+   classes keep the round 5/6 browser selectors working without edits to test_acceptance.py.
+6. **Pointer-event drag, DOM moves, localStorage key per dataset and app**: works with touch and Playwright, keeps
+   Tab order equal to visual order, and different apps of one dataset have different tile sets.
+7. **Native `<dialog>` for expand**: Esc, focus trap, backdrop and top layer come free; the reopen after a filter
+   uses sessionStorage so the server and the URLs stay as they are.
+8. **Golden JSON fixture for AC-80**: "figures' data the same as before round 7" is checked exactly, not by eye.
+
+
+## Round 6 and earlier: overview
 
 DataBoot scans one mounted folder or drive letter, profiles every dataset with fixed rules and draws the
 charts those rules pick, fully offline. Sources: docs/PRD.md (round 6), docs/acceptance.json (AC-1..AC-73),
@@ -709,6 +966,14 @@ takes `plain`; `export.pptx` title slide; templates `app_monitoring.html`, `app_
 `clickable`, plain axes, hex text, and loses the trends `tozero` and its `sep` regex. Readers, catalog, profile,
 filters, score, xlsx, launcher and config are unchanged.
 
+Round 7: new `app/upload.py` (`begin`, `write`, `finish`, `cleanup`, `empty`, `safe`, `cap_message`, `OWNED`;
+created empty by the architect); `app/config.py` gains `upload_cap` (`DATABOOT_UPLOAD_CAP`, 2 GiB; done);
+`app/main.py` gains the lifespan, the three upload routes, `/scan`, `_summary`, and `tabs`/`summary` in the page
+context; `app/launch.py` folder optional; templates `scan.html`, `_tile.html` (new), every `app_*.html`,
+`_figure.html`, `dataset.html`, `base.html`, `home.html`; JS `intake.js`, `scan.js`, `tiles.js` (new) and
+`dashboard.js` (`keyboardMarks`, `apply`, no `dark` listener). Readers, catalog, profile, rules, apps, business,
+geo, monitoring, survey, filters, score, xlsx and export are unchanged.
+
 ## Routes (sitemap: two pages, no nav beyond a "DataBoot" home link; unchanged)
 | Method, path | Returns |
 |---|---|
@@ -1023,7 +1288,21 @@ Dockerfile `python:3.11-slim` installs requirements.txt too. Offline client mach
 | AC-70 | SU1 cross-tab, `pick`; SU2 form | survey.csv `/app` crosstab gender x region counts and row % as hand values, each row of `pct` sums to 100 (1e-9); `?row=q_easy&col=gender` gives that pair; bad names fall back to the first two; Playwright: change the col select -> URL has `col=`, heatmap text shows `count (pct%)` with 1 decimal |
 | AC-71 | MO1/SU1 `export`; `TITLES` | monitor.csv `export.xlsx?app=monitoring`: sheets `Data`, `chart-1 table`, `chart-2 line`, `Summary`; Summary A1 `Monitoring overview`; PPTX slide 1 `Monitoring overview`, a LINE chart slide; survey.csv `?app=survey`: 7 bar sheets (`has_chart`), a table, a histogram, `Summary` A1 `Survey overview` |
 | AC-72 | round 5 grain (unchanged code) | QA inline files: daily sales over 100 days -> `grain == "week"`, trend x are Mondays, sums equal hand per-ISO-week sums, latest/previous cards match; monthly rows over 2020-01..2024-06 (> 1,096 days) -> `grain == "year"`, x `2020-01-01`..`2023-01-01` (2024 partial left out), sums per year |
-| AC-73 | Explorer path of `_export` | measures.csv (Explorer only): XLSX sheets start `Data`, end `Summary`, Summary A1 `Filters: none` (no `overview`), a chart sheet with `ws._charts`; PPTX `len(slides) == 1 + len(/charts)`, each chart slide `has_chart` (or a table for a heatmap), slide 1 has no `overview` text |
+| AC-73 | Explorer path of `_export` | measures.csv (Explorer only): XLSX sheets start `Data`, end `Summary`, Summary A1 `Filters: none` (no `overview`), a chart sheet with `ws._charts`; PPTX `len(slides) == 1 + len(/charts)`, each chart slide `has_chart` (or a table for a heatmap), slide 1's first line is `Data overview` (gate 187, ticket 480) |
+| AC-74 | H7 `home.html` portal, `intake.js`; L7 | Server HTML of `/`: `<h1>DataBoot</h1>`, one portal element, `<input type="file" multiple>` (Choose files) and `<input type="file" webkitdirectory>` (Choose folder), each with a visible label; on `data_dir` the three captions follow the portal (index order) and `/` still has exactly one `<p` in main (test_pages:32); Playwright 1280 and 375: the portal box width == height and computed `border-radius` >= half its width; `set_input_files` on Choose files with 2 files ends on `/scan`; a synthetic `drop` event (DataTransfer with a File) uploads too |
+| AC-75 | U1 routes, `upload.safe`; client path rule | `upload(client, …)` (conftest) for one file (`sales.csv`), two files, and `files_of(data_dir)`: `/api/datasets` rows (path, sheet, rows, columns) and each `/app` `app` equal a `make_client(data_dir)` run on the same files (ids equal too); unit: `safe("../x")`, `safe("/etc/x")`, `safe("C:/x")`, `safe("a//b")` are None, `safe("sub\\a.csv") == "sub/a.csv"`; a PUT with a path not declared -> 400; Playwright: `set_input_files` on Choose folder with a directory (Chromium sends `webkitRelativePath`) lists `sub/records.json` |
+| AC-76 | U1 lifecycle, lifespan | `with TestClient(main.app) as c:` upload -> the folder `config.get().data` exists, is under `tempfile.gettempdir()`, not under the repo or the launcher folder; after the `with` it does not exist; a second upload deletes the first folder; `make_client(data_dir)` + upload + done: `data_dir` file list and bytes unchanged (`files_of` before == after); `launch.main([])` path: `upload.empty()` folder is in `OWNED` |
+| AC-77 | U1 cap, `cap_message`; intake.js pre-check | `DATABOOT_UPLOAD_CAP=1000`: begin with sizes 600 + 600 -> 413, `detail` contains `1,000 bytes` and `-Folder`; begin that declares 10 bytes but PUTs 2,000 -> 413 and the batch folder is gone; the current data folder and `/api/datasets` are unchanged; unit `cap_message(3 * 2**30, 2 * 2**30)` contains `2 GB` and `-Folder`; Playwright with the small cap: the page shows the message in `[role=alert]` and sends no PUT (route log) |
+| AC-78 | S7 `/scan`, `_summary`, `scan.js` | Upload `archetypes_dir` + `broken.xlsx`: `/scan` HTML has one `li` per dataset matching `^<path>(?: - <sheet>)?  [\d,]+ rows?  T\d+ N\d+ C\d+ G\d+  -> [A-Z]+ \(rule R\d\)$`, its APP == `/app` `app`.upper() and rule equal (shop.csv `-> BUSINESS (rule R2)`), a line `broken.xlsx  not a valid xlsx`, last line `0 bytes uploaded to the internet`; Playwright: `#open-workspace` visible at once, the second line is hidden at 0 ms and visible later, all lines visible by 2.5 s, then the URL is `/datasets/<first id>` |
+| AC-79 | W7 tabs, archetype, grid | shop page: `nav.tabs` has one link per `/api/datasets` item and exactly one `aria-current="page"` (the shop link); `.archetype` text `APP: BUSINESS · RULE R2 · T1 N2 C3 · <rows> ROWS` built from `/app` and `/profile`; the badge `App: Business (rule R2)` and chips stay; Playwright 1280: `getComputedStyle(.grid).gridTemplateColumns` has 12 tracks; 375: no horizontal scroll |
+| AC-80 | W7 `tile` macro on every app; golden JSON | For one dataset per app (sales `app=explorer`, shop, places, monitor, survey): every `figure.chart`, `ul.cards`, `ul.tiles`, `dl.kpis` and `table` has a `section.ws-tile` ancestor whose `aria-label` equals the text of an `h2` inside it (Playwright `get_by_role("region", name=…)` finds it); every tile has `.ws-move` and `.ws-expand`; `/app` and `/charts` of all 16 snapshot datasets equal `tests/fixtures/round6_api.json` |
+| AC-81 | I7 drag, keyboard, order store | Playwright on survey: `drag_to` from tile 3's header to tile 1 -> `data-tile` order changes as specified; reload -> same order; another dataset (monitor) keeps its default order; focus `.ws-move` of tile 2, Alt+ArrowLeft -> it is first, `#ws-live` text contains `position 1 of`, focus still on that handle |
+| AC-82 | I7 expand dialog, reopen | Playwright on sales `app=explorer`: click `.ws-expand` of `chart-3` (the bar) -> `dialog[open]` contains `#chart-3`, plot width > 0.8 × viewport; Esc -> no `dialog[open]`, tile back in the grid, `document.activeElement` is that `.ws-expand`; open again, click at the dialog's corner (backdrop) -> closed; open, click a bar -> URL has `f.region=`, a chip and the `N of M` count change, and after load `dialog[open]` holds `#chart-3` again |
+| AC-83 | T7 tokens; D7 | CSS text: no `prefers-color-scheme`, no `@font-face`, `#050a12`, `#4de1ff`, `#ffb454` present; Playwright with `color_scheme="light"` and `"dark"`: `body` background `rgb(5, 10, 18)` both times; a tile label's computed `font-family` starts with the mono stack; contrast (WCAG formula in the test) of body text, tile titles, `.chart-rule`, `.chart-count`, table cells, chips and the archetype line against the backdrop computed from DESIGN.md's effective tile colour >= 4.5; AC-54/AC-62 checks still pass (one y-axis, bars from zero) |
+| AC-84 | I7 glow; CSS entrance and media rules | Playwright: after load, `document.getAnimations()` on tiles: each `startTime + delay + duration <= 600`, then all `finished`; `mouse.move` over a tile changes its `--mx`; `emulate_media(reduced_motion="reduce")`: `getAnimations().length == 0` and `--mx` stays unset; CDP `Emulation.setEmulatedMedia` features `prefers-reduced-transparency: reduce` (Playwright has no option; probe in this ticket: Chromium 156 honours it) -> every element's computed `backdropFilter` is `none` |
+| AC-85 | K7 `keyboardMarks`, `apply` | Playwright on sales `app=explorer` (bar and donut), shop (leaderboard), survey (question bar), places (top regions): Tab reaches a bar `path[tabindex="0"][role=button]`; its `:focus-visible` outline width > 0; Enter -> URL gains `f.<column>=<that category>`; Space on the same mark of the filtered page removes it; the Other bar and a `data-drill=false` leaderboard have no `tabindex` |
+| AC-86 | all of the above, same origin | Playwright with `page.route("**/*")` logging hosts: open `/`, upload 2 files via Choose files, wait for the scan to open the workspace, drag a tile, expand and close it, toggle a table, expand a bar tile and click a bar: every request host is `127.0.0.1:<port>` (AC-9, AC-58 walk) |
+| AC-87 | D7 (Designer) | Text check of DESIGN.md: a heading containing `round 7` (any case) whose section lists `#050a12`, `#4de1ff`, `#ffb454`, `mono`, `header`, `drag handle`, `expand`, `table toggle`, `12-column`, `0.6 s`, `reduced motion`, `reduced transparency` |
 
 ## Work items without AC ids: explicit checks
 - **W-1 Unreadable.sheet (gate 162)**: a workbook where one sheet fails lists `book.xlsx - <sheet>` in "Could not
@@ -1139,6 +1418,7 @@ Round 2 (done):
   must accept `<caption><h2>…</h2></caption>`; test_G_1 expects 9 parquet datasets; then the rename (R9).
 
 ## Test fixtures (tests/conftest.py; round 3: `write_xlsx` takes raw sheet XML as `bytes`)
+Round 7: `files_of`, `upload`, `make_client` cleanup and `tests/fixtures/round6_api.json`: see "Round 7: fixtures".
 `data_dir` builds: `sales.csv`, `points.tsv`, `notes.csv`, `empty.csv`, `broken.xlsx`, `manual.pdf`,
 `.hidden.csv`, `sub/records.json`, `sub/events.jsonl`, `sub/cities.geojson`, `sub/book.xlsx` (sheets `Revenue`
 with Excel date cells, `Lookup`). `write_xlsx` stays hand-written: openpyxl reads it (with the harmless "no
