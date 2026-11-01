@@ -1,0 +1,37 @@
+{
+  "header": {
+    "ticket": 486,
+    "project": "you-think-of-the-project-name",
+    "from_role": "techlead",
+    "phase": "build",
+    "attempt": 2,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "38d349eb1f24",
+    "tokens_left": 2000000
+  },
+  "goal": "Write plan/tickets.json: the build tickets for the approved architecture and design.",
+  "acceptance_criteria": [
+    {
+      "text": "Every acceptance item is covered by a ticket",
+      "passes": false
+    },
+    {
+      "text": "Each ticket is small, testable and has a layer",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py plan",
+    "passed": false,
+    "output_tail": "failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.\n"
+  },
+  "decisions": [],
+  "tried_and_failed": [],
+  "assumptions": [],
+  "open_questions": [],
+  "lessons": [],
+  "problems": [
+    "agent did not end with the handover JSON"
+  ]
+}
