@@ -32,14 +32,17 @@ def serve(make_client):
         make_client(folder)
         from app.main import app
         s = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="error"))
-        threading.Thread(target=s.run, daemon=True).start()
+        t = threading.Thread(target=s.run, daemon=True)
+        t.start()
         while not s.started:
             time.sleep(0.05)
-        servers.append(s)
+        servers.append((s, t))
         return f"http://127.0.0.1:{s.servers[0].sockets[0].getsockname()[1]}"
     yield start
-    for s in servers:
+    for s, t in servers:
         s.should_exit = True
+    for s, t in servers:  # the lifespan shutdown runs upload.cleanup(): let it finish before the next test
+        t.join(10)
 
 
 def open_tiles(browser, base, name, query="", width=1280):
