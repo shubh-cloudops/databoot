@@ -346,6 +346,7 @@ section.block { margin-top: var(--s6); }
 .ws-tile .table-wrap caption { padding-left: var(--s4); }
 .ws-tile .cards, .ws-tile .tiles, .ws-tile .kpis { margin: 0; }
 .ws-tile .map-panel .panel-box { background: none; border: 0; padding: 0; }
+.ws-tile .map-panel .chart, .ws-tile .questions > .chart { background: none; border: 0; border-radius: 0; padding: 0; box-shadow: none; }  /* the panel tile is the card, so the region chart gets the full width and its modebar stays on one row */
 .ws-tile .map-layout { margin: 0; }
 .ws-tile .biz-grid, .ws-tile .trends, .ws-tile .questions, .ws-tile .monitor-fig { margin: 0; }
 .ws-tile .crosstab { margin: 0; }

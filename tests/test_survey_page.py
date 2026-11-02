@@ -25,10 +25,10 @@ def html(base, qs=""):
 
 def test_server_html_order_form_and_no_prose(base):
     h = html(base)
-    order = [h.index(x) for x in ('<form class="filters"', '<div class="questions">', "<h2>Cross-tab</h2>", '<form class="crosstab"',
+    order = [h.index(x) for x in ('<form class="filters"', 'class="ws-tile questions"', "<h2>Cross-tab</h2>", '<form class="crosstab"',
                                   "<h2>Respondents</h2>", "<h2>Columns</h2>", "<h2>First")]
     assert order == sorted(order)
-    grid = re.search(r'<div class="questions">(.*?)\n</div>', h, re.S).group(1)
+    grid = h.split('class="ws-tile questions"', 1)[1].split("<h2>Cross-tab</h2>")[0]
     kinds = re.findall(r'data-kind="(\w+)"', grid)
     assert kinds == ["bar", "bar", "bar", "likert", "likert", "likert", "likert"]  # gender, region, city, q_service..q_score
     form = re.search(r'<form class="crosstab".*?</form>', h, re.S).group(0)

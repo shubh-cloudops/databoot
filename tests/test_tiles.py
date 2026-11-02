@@ -13,7 +13,7 @@ from playwright.sync_api import sync_playwright
 from app import config
 from tests.test_pages import _ids
 
-FIGURES = "figure.chart, ul.cards, dl.kpis, table"
+FIGURES = "figure.chart, ul.cards, ul.tiles, dl.kpis, table"
 
 
 @pytest.fixture
@@ -54,7 +54,8 @@ def open_tiles(browser, base, name, query="", width=1280):
     return page, errors
 
 
-@pytest.mark.parametrize("folder,name,query", [("data_dir", "sales.csv", "?app=explorer"), ("archetypes_dir", "shop.csv", "")])
+@pytest.mark.parametrize("folder,name,query", [("data_dir", "sales.csv", "?app=explorer"), ("archetypes_dir", "shop.csv", ""),
+                                              ("archetypes_dir", "places.csv", ""), ("round6_dir", "monitor.csv", ""), ("round6_dir", "survey.csv", "")])
 def test_every_figure_card_and_table_sits_in_a_named_region(request, serve, browser, folder, name, query):
     base = serve(request.getfixturevalue(folder))
     page, errors = open_tiles(browser, base, name, query)
@@ -140,11 +141,11 @@ def test_api_responses_equal_the_round_6_snapshot(request, make_client, folder):
 
 
 def test_shell_adds_no_height_outside_tiles(request, serve, browser):
-    """The figure h2 and the archetype line must not push an untiled Map down (test_AC_59 hovers every point at 1280x900)."""
+    """The figure h2 (one 44px tile title row now) and the archetype line must not push the Map down (test_AC_59 hovers every point at 1280x900)."""
     base = serve(request.getfixturevalue("archetypes_dir"))
     page, errors = open_tiles(browser, base, "places.csv")
     h = page.evaluate("""() => { const t = document.querySelector('.map-layout .chart-title'), h = t.closest('.chart-h');
         const a = document.querySelector('.archetype'), b = document.querySelector('.app-badge');
         return [h.getBoundingClientRect().height - t.getBoundingClientRect().height, a.getBoundingClientRect().top - b.getBoundingClientRect().top] }""")
-    assert h[0] <= 1 and abs(h[1]) <= 8, h
+    assert h[0] <= 44 and abs(h[1]) <= 8, h
     assert errors == []

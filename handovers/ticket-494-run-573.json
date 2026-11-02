@@ -1,0 +1,51 @@
+{
+  "header": {
+    "ticket": 494,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1880645
+  },
+  "goal": "Workspace tiles, part 2 (W7b): Map, Monitoring and Survey re-cut into tiles with the architecture's keys and spans.",
+  "acceptance_criteria": [
+    {
+      "text": "app_map.html: tile 'map' span 8 (extra 'map-layout', the 2D and hidden 3D figure, #map3d-toggle moved into the tile's .ws-head), tile 'panel' span 4 (aside.map-panel with the region bar figure; its <h2>Selected point</h2> kept), then columns and rows tiles",
+      "passes": false
+    },
+    {
+      "text": "app_monitoring.html: tile 'tiles' (ul.tiles > li.card.tile and the .note inside, tile h2 'Measures'), each chart a 12-span tile with extra 'monitor-fig', then columns and rows; app_survey.html: each question a 6-span tile with extra 'questions' (figure a direct child of the section so '.questions > .chart' matches), 'crosstab' 12 (h2, form, figure) and 'respondents' 12 (h2 and the histograms), then columns and rows",
+      "passes": false
+    },
+    {
+      "text": "Each template opens its own <div class='grid'>; every chart, card group and table of these apps sits in a tile whose aria-label equals an h2 in it (AC-80); the /app and /charts golden comparison in tests/test_tiles.py now covers the monitor, survey and places datasets too",
+      "passes": false
+    },
+    {
+      "text": "tests/test_survey_page.py:28 order list is edited from '<div class=\"questions\">' to 'class=\"ws-tile questions\"' and nothing else in existing tests changes; no <p> in main, no bare 4+ digit numbers added to the page text",
+      "passes": false
+    },
+    {
+      "text": "python3 -m pytest -q tests/test_map_page.py tests/test_monitoring_page.py tests/test_survey_page.py tests/test_tiles.py tests/test_app_pages.py tests/test_offline_apps.py passes; the full suite is run once at the end of this ticket because markup moved under old browser tests, and tests/test_speed.py numbers are reported, not loosened",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-80, AC-79 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [],
+  "tried_and_failed": [],
+  "assumptions": [],
+  "open_questions": [],
+  "lessons": [],
+  "problems": []
+}
