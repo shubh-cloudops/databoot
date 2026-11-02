@@ -5,13 +5,22 @@ from pathlib import Path
 
 from urllib.parse import quote, urlencode
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app import apps, business, catalog, config, export, filters, geo, monitoring, profile, rules, survey, xlsx
+from app import apps, business, catalog, config, export, filters, geo, monitoring, profile, rules, survey, upload, xlsx
 
-app = FastAPI()
+
+@asynccontextmanager
+async def _lifespan(_):
+    yield
+    upload.cleanup()  # the temp folders of browser uploads go with the process (AC-76)
+
+
+app = FastAPI(lifespan=_lifespan)
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 templates.env.filters["num"] = "{:,}".format  # the one thousands-separator filter for every count (gate 161)
@@ -23,6 +32,31 @@ templates.env.filters.update(fmt=business.fmt, signed=business.signed, spark=bus
 def home(request: Request):
     cat = catalog.scan(config.get().data)
     return templates.TemplateResponse(request, "home.html", {"title": "DataBoot", "folder": config.get().data, "cat": cat})
+
+
+@app.post("/upload")
+async def upload_begin(request: Request):
+    try:
+        body = await request.json()
+    except ValueError:
+        raise HTTPException(400, "body must be JSON")
+    files = body.get("files") if isinstance(body, dict) else body
+    return {"batch": upload.begin(files, config.get().upload_cap)}
+
+
+@app.put("/upload/{batch}")
+async def upload_file(request: Request, batch: str, path: str = ""):
+    return {"path": upload.safe(path), "bytes": await upload.write(batch, path, request.stream(), config.get().upload_cap)}
+
+
+@app.post("/upload/{batch}/done")
+def upload_done(batch: str):
+    upload.finish(batch)
+    catalog.scan.cache_clear()  # a Dataset compares equal across folders: stale rows would be served
+    catalog.load.cache_clear()
+    for cache in (_base, _view, _plain, _detected, _appview):
+        cache.cache_clear()
+    return {"next": "/scan"}
 
 
 @app.get("/health")

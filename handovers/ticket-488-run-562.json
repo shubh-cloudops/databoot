@@ -1,0 +1,91 @@
+{
+  "header": {
+    "ticket": 488,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1933749
+  },
+  "goal": "Upload backend (U1, docs/ARCHITECTURE.md 'Round 7: upload'): app/upload.py begin/write/finish/cleanup/empty/safe/cap_message/OWNED and the routes POST /upload, PUT /upload/{batch}, POST /upload/{batch}/done with lifespan cleanup; no python-multipart.",
+  "acceptance_criteria": [
+    {
+      "text": "POST /upload with [{path,size}] returns 200 {batch}; an empty list, a duplicate path and unsafe paths ('../x', '/x', 'C:x', 'a//b', NUL) return 400 and create nothing; backslashes become '/'; upload.safe returns None for unsafe paths",
+      "passes": false
+    },
+    {
+      "text": "PUT /upload/{batch}?path=... streams the body to disk in chunks (request.stream, no multipart); unknown batch 404; a path not in the batch's list 400; the file is written inside the batch folder, which lives under the system temp dir (prefix databoot-upload-), outside /work and outside any launcher folder",
+      "passes": false
+    },
+    {
+      "text": "POST /upload/{batch}/done returns {'next': '/scan'}, sets DATABOOT_DATA to the batch folder, deletes the previous upload folder (never a folder outside upload.OWNED), and clears catalog.scan, catalog.load and main._base/_view/_plain/_detected/_appview caches; unknown batch 404",
+      "passes": false
+    },
+    {
+      "text": "Uploading one file, several files, and files_of(data_dir) (a folder with sub/ and unreadable files) then GET /api/datasets lists the same path (sub/sales.csv kept), rows, columns and detected app as a client started on that folder; a second upload replaces the first one's data (no stale rows from a same-named file)",
+      "passes": false
+    },
+    {
+      "text": "AC-77: with DATABOOT_UPLOAD_CAP small, a declared total over the cap returns 413 at POST /upload; a PUT whose real bytes pass the cap returns 413 and deletes the whole batch folder; detail is upload.cap_message, which names '2 GB' at the default cap and the launcher's '-Folder' option (e.g. 'This upload is 2.4 GB and the limit is 2 GB. For larger drives, start DataBoot with the launcher's -Folder option.'); nothing of that upload is listed afterwards",
+      "passes": false
+    },
+    {
+      "text": "AC-76: using TestClient as a context manager, the temp folder exists during the run and is gone after exit; a launcher folder passed to launch.run is left unchanged; begin deletes a batch that was begun and never finished",
+      "passes": false
+    },
+    {
+      "text": "New tests in tests/test_upload.py use the existing conftest upload()/files_of() helpers; python3 -m pytest -q tests/test_upload.py tests/test_app.py passes",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-75, AC-76, AC-77 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": "(t.strip().endswith(\"10050\") or \"10050\" in t for t in tips), tips\nE               AssertionError: ['10045', '10045', '10047', '10048', '10049', '10049', ...]\nE               assert False\nE                +  where False = any(<generator object test_AC_59.<locals>.<genexpr> at 0x73a38d9d6260>)\n\ntests/test_acceptance.py:1795: AssertionError\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 37 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_upload.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED tests/test_acceptance.py::test_AC_59 - AssertionError: ['10045', '1004...\n1 failed, 421 passed, 113 warnings in 575.77s (0:09:35)\ntests failed\n"
+  },
+  "decisions": [
+    {
+      "what": "upload.py raises fastapi.HTTPException directly; main.py routes are thin and clear the route caches after upload.finish",
+      "why": "Importing main from upload would be circular; one status/detail path, no translation layer",
+      "evidence": "app/upload.py begin/write/finish; app/main.py upload_done"
+    },
+    {
+      "what": "POST /upload accepts {\"files\": [...]} (ARCHITECTURE.md contract and conftest helper) and also a bare list",
+      "why": "The ticket text says [{path,size}], the architecture and conftest say {files: [...]}",
+      "evidence": "docs/ARCHITECTURE.md L61; tests/conftest.py:261; app/main.py upload_begin"
+    },
+    {
+      "what": "The previous upload folder is the current config.get().data when it is in OWNED; it is deleted on done; begin deletes every unfinished batch",
+      "why": "Only folders in OWNED are ever deleted, so a launcher folder is safe",
+      "evidence": "app/upload.py finish/begin; tests/test_upload.py::test_launcher_folder_is_never_deleted"
+    },
+    {
+      "what": "Over-cap real bytes delete the batch folder and the batch record; a later done returns 404. The earlier finished upload is untouched",
+      "why": "AC-77: nothing of the failed upload is kept or listed",
+      "evidence": "tests/test_upload.py::test_cap_real_bytes_delete_batch"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Sizes are binary: 1 GB = 1024**3, and a size under 1 GB prints as '1,000 bytes'",
+    "A PUT replaying the same path counts its bytes once toward the cap"
+  ],
+  "open_questions": [
+    "app/launch.py is still on a required folder; the launcher ticket should switch it to upload.empty()"
+  ],
+  "lessons": [
+    {
+      "lesson": "Import the conftest helper named upload as an alias (from conftest import upload as send) when the test also imports app.upload",
+      "when": "Writing tests for a module that shares a name with a conftest helper",
+      "evidence": "tests/test_upload.py imports"
+    }
+  ],
+  "problems": []
+}
