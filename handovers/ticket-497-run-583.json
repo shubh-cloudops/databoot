@@ -1,0 +1,68 @@
+{
+  "header": {
+    "ticket": 497,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 2,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1890269
+  },
+  "goal": "Keyboard chart marks (K7): clickable bars and donut slices are reachable by Tab, show a focus ring, and Enter/Space act as a click.",
+  "acceptance_criteria": [
+    {
+      "text": "dashboard.js: crossFilter is split into apply(c, value) (today's URL toggle) called by plotly_click and the keyboard; keyboardMarks(plot, c) (same MutationObserver pattern as keyboardBar) runs only when clickable(c) and gives each trace-0 bar path and each donut slice path tabindex=0, role=button and aria-label '<x_label>: <category>'; the grey Other trace and last-level non-clickable leaderboard bars get none",
+      "passes": false
+    },
+    {
+      "text": "Enter or Space on a mark calls apply with the category from the trace by index (horizontal bars y[i], vertical x[i], donut labels[i]) with the same URL, chip and count change as a click; the mark shows a visible focus ring (outline from DESIGN.md: 3px --fg, offset 2px)",
+      "passes": false
+    },
+    {
+      "text": "Playwright (tests/test_keyboard_marks.py) on Explorer bars and donut, Business leaderboard, Survey question bars and Map top-region bars: Tab reaches a mark, getComputedStyle outline width > 0 when focused, Enter filters, Space filters",
+      "passes": false
+    },
+    {
+      "text": "python3 -m pytest -q tests/test_keyboard_marks.py tests/test_filter_browser.py tests/test_business_page.py passes",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-85 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Made no code change in attempt 2; attempt 1's commit already holds apply/keyboardMarks, the focus-ring CSS and tests/test_keyboard_marks.py",
+      "why": "The three ticket test files pass (18 passed)",
+      "evidence": "python3 -m pytest -q tests/test_keyboard_marks.py tests/test_filter_browser.py tests/test_business_page.py; app/static/js/dashboard.js:401-448; app/static/css/databoot.css:371"
+    },
+    {
+      "what": "Map top-region bars get no keyboard stop",
+      "why": "They have drill false (not clickable, gate 179), and the ticket says keyboardMarks runs only when clickable(c)",
+      "evidence": "app/geo.py:55; docs/DESIGN.md:387; tests/test_keyboard_marks.py:92"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The ticket's 'Map top-region bars' test item yields to 'only when clickable(c)', because a bar that does not filter on click should not filter on Enter"
+  ],
+  "open_questions": [
+    "AC-85 and the ticket list Map top-region bars among the Tab and Enter cases, but those bars are not clickable (drill false). Should they become clickable (a Map app change)? If so a follow-up ticket should flip drill and change the test to Enter and Space filters."
+  ],
+  "lessons": [
+    {
+      "lesson": "On a retry whose commit already holds the ticket's files, run the ticket's tests and report; rebuild nothing",
+      "when": "Ticket is attempt 2 or later",
+      "evidence": "git show --stat HEAD listed dashboard.js and test_keyboard_marks.py"
+    }
+  ],
+  "problems": []
+}
