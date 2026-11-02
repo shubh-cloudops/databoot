@@ -1,0 +1,77 @@
+{
+  "header": {
+    "ticket": 488,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 2,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1895700
+  },
+  "goal": "Upload backend (U1, docs/ARCHITECTURE.md 'Round 7: upload'): app/upload.py begin/write/finish/cleanup/empty/safe/cap_message/OWNED and the routes POST /upload, PUT /upload/{batch}, POST /upload/{batch}/done with lifespan cleanup; no python-multipart.",
+  "acceptance_criteria": [
+    {
+      "text": "POST /upload with [{path,size}] returns 200 {batch}; an empty list, a duplicate path and unsafe paths ('../x', '/x', 'C:x', 'a//b', NUL) return 400 and create nothing; backslashes become '/'; upload.safe returns None for unsafe paths",
+      "passes": true
+    },
+    {
+      "text": "PUT /upload/{batch}?path=... streams the body to disk in chunks (request.stream, no multipart); unknown batch 404; a path not in the batch's list 400; the file is written inside the batch folder, which lives under the system temp dir (prefix databoot-upload-), outside /work and outside any launcher folder",
+      "passes": true
+    },
+    {
+      "text": "POST /upload/{batch}/done returns {'next': '/scan'}, sets DATABOOT_DATA to the batch folder, deletes the previous upload folder (never a folder outside upload.OWNED), and clears catalog.scan, catalog.load and main._base/_view/_plain/_detected/_appview caches; unknown batch 404",
+      "passes": true
+    },
+    {
+      "text": "Uploading one file, several files, and files_of(data_dir) (a folder with sub/ and unreadable files) then GET /api/datasets lists the same path (sub/sales.csv kept), rows, columns and detected app as a client started on that folder; a second upload replaces the first one's data (no stale rows from a same-named file)",
+      "passes": true
+    },
+    {
+      "text": "AC-77: with DATABOOT_UPLOAD_CAP small, a declared total over the cap returns 413 at POST /upload; a PUT whose real bytes pass the cap returns 413 and deletes the whole batch folder; detail is upload.cap_message, which names '2 GB' at the default cap and the launcher's '-Folder' option (e.g. 'This upload is 2.4 GB and the limit is 2 GB. For larger drives, start DataBoot with the launcher's -Folder option.'); nothing of that upload is listed afterwards",
+      "passes": true
+    },
+    {
+      "text": "AC-76: using TestClient as a context manager, the temp folder exists during the run and is gone after exit; a launcher folder passed to launch.run is left unchanged; begin deletes a batch that was begun and never finished",
+      "passes": true
+    },
+    {
+      "text": "New tests in tests/test_upload.py use the existing conftest upload()/files_of() helpers; python3 -m pytest -q tests/test_upload.py tests/test_app.py passes",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-75, AC-76, AC-77 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 17%]\n........................................................................ [ 34%]\n........................................................................ [ 51%]\n........................................................................ [ 68%]\n........................................................................ [ 85%]\n..............................................................           [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 37 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 1 warning\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_upload.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n422 passed, 113 warnings in 551.07s (0:09:11)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Made no code change in attempt 2; the attempt 1 implementation already meets the ticket",
+      "why": "tests/test_upload.py plus tests/test_app.py pass (16) and the full suite passes (422); attempt 1's only failure was test_AC_59, which passes alone and in the full run",
+      "evidence": "python3 -m pytest -q tests/test_upload.py tests/test_app.py; python3 -m pytest -q (422 passed); python3 -m pytest -q tests/test_acceptance.py -k AC_59 (1 passed)"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "test_AC_59 failing in attempt 1's verify run was load flakiness in the hover step, unrelated to upload",
+    "POST /upload accepts {\"files\": [...]} and also a bare list"
+  ],
+  "open_questions": [
+    "app/launch.py still requires a folder; a launcher ticket should switch it to upload.empty()",
+    "test_AC_59 hovers each map point in a loop and can miss under load; it lives in the immutable tests/test_acceptance.py, so it needs the QA role to make it deterministic"
+  ],
+  "lessons": [
+    {
+      "lesson": "On a retry, first read the previous attempt's commit and handover and run the ticket's tests; if they pass and the only verify failure is an unrelated test that passes alone, do not rewrite the work",
+      "when": "A ticket is attempt 2+ after a verify failure outside the ticket's files",
+      "evidence": "handovers/ticket-488-run-562.json verify output_tail (only test_AC_59 failed); repeated runs pass"
+    }
+  ],
+  "problems": []
+}
