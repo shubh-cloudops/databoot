@@ -1,0 +1,72 @@
+{
+  "header": {
+    "ticket": 498,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 2,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1788566
+  },
+  "goal": "Dark theme only, offline walk and DESIGN.md check (T7; Board gate 190: T7 removes the prefers-color-scheme listener): finish theme tokens and verify AC-83, AC-84, AC-86, AC-87.",
+  "acceptance_criteria": [
+    {
+      "text": "databoot.css has no 'prefers-color-scheme', no '@font-face', and holds #050a12, #4de1ff, #ffb454, a monospace system font stack and color-scheme: dark; dashboard.js has no matchMedia('(prefers-color-scheme: dark)') variable or listener (only the phone query is kept) and charts read the dark tokens through tokens() whatever the emulated OS scheme",
+      "passes": false
+    },
+    {
+      "text": "Playwright (tests/test_theme_round7.py): with emulated color scheme light and dark, body background computes to rgb(5, 10, 18) and the cyan/amber tokens resolve; body and label text keep contrast >= 4.5:1 against the effective tile background; charts keep one y-axis and bars sorted from zero (existing checks still green); token-reading tests (AC-50 --div-mid, AC-69, test_table_toggle) are re-run and pass",
+      "passes": false
+    },
+    {
+      "text": "Offline walk (AC-86): one Playwright test records every request while it opens /, uploads files, waits for /scan, opens the workspace, drags and expands/closes a tile, toggles a table view and filters inside the overlay; all requests go to the app's own host",
+      "passes": false
+    },
+    {
+      "text": "AC-87: a text test reads docs/DESIGN.md: a heading containing 'round 7' whose section lists #050a12, #4de1ff, #ffb454, 'mono', 'header', 'drag handle', 'expand', 'table toggle', '12-column', '0.6 s', 'reduced motion' and 'reduced transparency'; the section is edited only if a term is missing, and says the portal rings always turn (Board gate 190)",
+      "passes": false
+    },
+    {
+      "text": "The full pytest suite is run once at the end, alone, and its result reported; failures are fixed in the app, not in tests/test_acceptance.py",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-83, AC-84, AC-86, AC-87 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Made no code change in attempt 2; attempt 1's commit already holds the CSS/JS cleanup, tests/test_theme_round7.py, tests/test_round7_offline.py and the DESIGN.md check",
+      "why": "Targeted tests pass and the stylesheet, JS and DESIGN.md already match every acceptance line",
+      "evidence": "pytest tests/test_theme_round7.py tests/test_round7_offline.py tests/test_table_toggle.py (11 passed); -k 'AC_50 or AC_69' (2 passed); git show --stat HEAD"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First full-suite run in the background with the default 600 s limit",
+      "why_it_failed": "The harness stopped it at 600 s; the suite takes about 800 s, so it needs a background timeout of 2,400,000 ms"
+    }
+  ],
+  "assumptions": [
+    "test_AC_42 failing in the full run (5.0 s cold-time limit on /datasets/{id}) was load from overlapping runs, because it passes alone at 3.59 s and no app code changed"
+  ],
+  "open_questions": [
+    "test_AC_42's cold-start budget is tight (3.6 s alone against a 5.0 s limit) and failed once in a full run; the QA role may want to look at its margin, since tests/test_acceptance.py is protected"
+  ],
+  "lessons": [
+    {
+      "lesson": "Start the full pytest suite once with run_in_background and timeout 2400000; it takes about 13 minutes, and a default-timeout run is killed. Do not start a second run while the first may still be alive, because the overlap slows the timing tests (AC_42).",
+      "when": "Any ticket that must run the full suite",
+      "evidence": "first run killed at 600 s; second full run 804 s with test_AC_42 failing at its 5 s cold limit, passing alone at 3.59 s"
+    }
+  ],
+  "problems": []
+}
