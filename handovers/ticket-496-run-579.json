@@ -1,0 +1,96 @@
+{
+  "header": {
+    "ticket": 496,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1925589
+  },
+  "goal": "Tile expand overlay, glow and entrance (I7b): native dialog expand with reopen after a filter click, pointer glow, entrance within 0.6 s, reduced motion and reduced transparency.",
+  "acceptance_criteria": [
+    {
+      "text": "tiles.js: .ws-expand moves the tile into #tile-dialog (placeholder left behind), showModal(), then Plotly.Plots.resize on each .js-plotly-plot inside; the plot is wider than 0.8 x viewport; Esc (native cancel), a click whose target is the dialog itself (backdrop) or the expand button closes it, the tile returns to its place, plots resize, and .ws-expand gets focus",
+      "passes": false
+    },
+    {
+      "text": "On pagehide with the dialog open sessionStorage['databoot.expand'] = '<dataset id>:<key>'; on load a matching present tile reopens expanded and the entry is deleted; clicking a bar inside the overlay (dashboard.js crossFilter unchanged) changes the URL (f.region=...), the chip and N of M counts, and after the load dialog[open] holds the same chart again",
+      "passes": false
+    },
+    {
+      "text": "pointermove on a tile sets --mx/--my on it (not wired under prefers-reduced-motion: reduce); CSS entrance: max delay + duration <= 0.6 s, so document.getAnimations() for the tile entrances all finish within 600 ms of load (Playwright)",
+      "passes": false
+    },
+    {
+      "text": "Under emulated prefers-reduced-motion: reduce no animation or transition runs (getAnimations() empty, glow variables never set); under prefers-reduced-transparency: reduce every element's computed backdropFilter is 'none' and the tile fill is opaque",
+      "passes": false
+    },
+    {
+      "text": "tests/test_tile_interactions.py gains the expand, Esc, backdrop, reopen-after-filter, entrance and glow tests on sales (?app=explorer); python3 -m pytest -q tests/test_tile_interactions.py tests/test_filter_browser.py passes",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-82, AC-84 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Only tiles.js and the tests changed; no CSS or template edits",
+      "why": "databoot.css already had the dialog, glow, entrance, reduced-motion and reduced-transparency rules, and dataset.html already had #tile-dialog",
+      "evidence": "app/static/css/databoot.css:307,312-324,359-368,427-442; app/templates/dataset.html:23"
+    },
+    {
+      "what": "Expanded tile gets is-settled when it moves into the dialog",
+      "why": "Moving a node in the DOM restarts its CSS animation, so the tile would replay its entrance on return",
+      "evidence": "app/static/js/tiles.js expand()"
+    },
+    {
+      "what": "One document-level click handler handles the expand button, the backdrop and the close button",
+      "why": "The dialog is the click target for the backdrop, and the same button closes it when the tile is inside the dialog",
+      "evidence": "app/static/js/tiles.js"
+    },
+    {
+      "what": "Reduced transparency is emulated through CDP Emulation.setEmulatedMedia",
+      "why": "Playwright's Python API has no option for prefers-reduced-transparency",
+      "evidence": "tests/test_tile_interactions.py test_reduced_transparency_no_blur_and_opaque_tile"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First test versions read the DOM right after Esc/backdrop click, and asserted no ws-tile animations remain after the entrance",
+      "why_it_failed": "The close event fires a task later, so the tile was not back yet; fill-mode both keeps finished animations in getAnimations(), so the test checks playState != finished instead"
+    }
+  ],
+  "assumptions": [
+    "Tile key chart-3 is the bar chart in the sales Explorer fixture (data_dir sales.csv)",
+    "The tile fill is checked opaque by its computed backgroundColor being rgb(...) or alpha 1 under reduced transparency"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "In Playwright tests of a native dialog, wait for the moved element (locator.wait_for) after Esc or a backdrop click before reading the DOM: the close event runs asynchronously",
+      "when": "Testing code that restores DOM in a dialog close handler",
+      "evidence": "tests/test_tile_interactions.py test_expand_esc_backdrop_and_button"
+    },
+    {
+      "lesson": "A reload fires pagehide too, so a test that sets a sessionStorage reopen key must close the dialog first or the handler overwrites the key",
+      "when": "Testing sessionStorage written on pagehide",
+      "evidence": "tests/test_tile_interactions.py test_pagehide_stores_key_and_other_dataset_is_ignored"
+    },
+    {
+      "lesson": "Scroll a tile into view before reading its bounding box for mouse.move, or the pointer lands off-screen and the test passes or fails vacuously",
+      "when": "Testing pointer glow on tiles below the fold",
+      "evidence": "tests/test_tile_interactions.py test_glow_follows_pointer"
+    }
+  ],
+  "problems": []
+}

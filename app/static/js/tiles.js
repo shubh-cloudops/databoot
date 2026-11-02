@@ -1,4 +1,5 @@
 // Tile reorder (I7a): pointer drag from a header or figcaption, Alt+Arrow on the move handle, order kept per dataset and app.
+// Expand (I7b): the tile moves into the native #tile-dialog, reopens after a filter reload; pointer glow.
 (function () {
   var grid = document.querySelector(".grid[data-dataset]");
   if (!grid) return;
@@ -58,6 +59,62 @@
     save();
     announce(t, j, all.length);
   });
+
+  // Expand: a placeholder comment keeps the tile's place while the tile lives in the dialog.
+  var dialog = document.getElementById("tile-dialog");
+  var shown = null, holder = null;
+  var resize = function (root) {
+    if (window.Plotly) Array.prototype.forEach.call(root.querySelectorAll(".js-plotly-plot"), function (p) { Plotly.Plots.resize(p); });
+  };
+
+  function expand(t) {
+    if (!dialog || shown || t.parentNode !== grid) return;
+    holder = document.createComment("tile " + t.dataset.tile);
+    t.before(holder);
+    dialog.appendChild(t);
+    shown = t;
+    settle(t);  // the move must not replay the entrance
+    t.querySelector(".ws-expand").setAttribute("data-open", "");
+    dialog.showModal();
+    resize(t);
+  }
+
+  if (dialog) {
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest(".ws-expand");
+      if (e.target === dialog) dialog.close();  // the backdrop
+      else if (b && shown) dialog.close();
+      else if (b) expand(b.closest(".grid > .ws-tile"));
+    });
+    dialog.addEventListener("close", function () {  // Esc (native cancel), backdrop or the button
+      var t = shown, btn = t.querySelector(".ws-expand");
+      shown = null;
+      btn.removeAttribute("data-open");
+      holder.replaceWith(t);
+      resize(t);
+      btn.focus();
+    });
+    window.addEventListener("pagehide", function () {
+      if (shown) try { sessionStorage.setItem("databoot.expand", grid.dataset.dataset + ":" + shown.dataset.tile); } catch (e) { /* no storage: no reopen */ }
+    });
+    try {
+      var want = sessionStorage.getItem("databoot.expand");
+      sessionStorage.removeItem("databoot.expand");
+      var found = want && tiles().filter(function (t) { return grid.dataset.dataset + ":" + t.dataset.tile === want; })[0];
+      if (found) expand(found);
+    } catch (e) { /* storage blocked */ }
+  }
+
+  // Glow: the tile's radial highlight follows the pointer (CSS reads --mx/--my); not wired under reduced motion.
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    document.addEventListener("pointermove", function (e) {
+      var t = e.target.closest && e.target.closest(".ws-tile");
+      if (!t) return;
+      var r = t.getBoundingClientRect();
+      t.style.setProperty("--mx", (e.clientX - r.left) + "px");
+      t.style.setProperty("--my", (e.clientY - r.top) + "px");
+    });
+  }
 
   function announce(t, i, n) {
     if (live) live.textContent = t.getAttribute("aria-label") + " moved to position " + (i + 1) + " of " + n;
