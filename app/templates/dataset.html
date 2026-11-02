@@ -1,4 +1,7 @@
 {% extends "base.html" %}
+{% block tabs %}<nav class="tabs" aria-label="Datasets"><ul>{% for t in tabs %}
+  <li><a href="/datasets/{{ t.id }}"{{ ' aria-current="page"'|safe if t.id == d.id }}>{{ t.path }}{% if t.sheet %} - {{ t.sheet }}{% endif %}</a></li>{% endfor %}
+</ul></nav>{% endblock %}
 {% block content %}
 <nav class="crumb"><a href="/">DataBoot</a> / {{ d.path }}</nav>
 <div class="page-head">
@@ -11,11 +14,14 @@
     <a class="btn" href="/datasets/{{ d.id }}/export.xlsx{{ "?" ~ query if query }}">Export XLSX</a>
   </div>
 </div>
+<div class="archetype">APP: {{ summary.app|upper }} · RULE {{ summary.rule }} · T{{ summary.T }} N{{ summary.N }} C{{ summary.C }}{% if summary.G %} G{{ summary.G }}{% endif %} · {{ d.rows|plural("row")|upper }}</div>
 {% if view_as %}<nav class="view-as" aria-label="View as"><span class="view-as-label">View as</span><ul>{% for name, href, current in view_as %}
   <li><a href="{{ href }}"{{ ' aria-current="page"'|safe if current }}>{{ name }}</a></li>{% endfor %}
 </ul></nav>
 {% endif %}
 {% include "app_" ~ shown ~ ".html" %}
+<dialog class="overlay" id="tile-dialog"></dialog>
+<div class="sr-only" id="ws-live" aria-live="polite"></div>
 {% endblock %}
 {% block scripts %}<script src="/static/vendor/plotly/plotly.min.js" defer></script>
 <script src="/static/js/dashboard.js" defer></script>{% endblock %}

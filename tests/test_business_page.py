@@ -148,7 +148,7 @@ def test_card_without_a_full_period_says_na_and_has_no_arrow(shop, browser):
 def test_page_order_and_markup(shop):
     base, i = shop
     html = urllib.request.urlopen(f"{base}/datasets/{i}").read().decode()
-    marks = ['<ul class="cards">', '<form class="filters"', '<nav class="crumbs" aria-label="Drill path">', 'class="trends"',
+    marks = ['<form class="filters"', '<nav class="crumbs" aria-label="Drill path">', '<ul class="cards">', 'class="ws-tile trends"',
              'data-leaderboard', '<table class="delta-table">', "<h2>Columns</h2>", "<h2>First 20 rows</h2>"]
     at = [html.index(m) for m in marks]
     assert at == sorted(at)

@@ -60,9 +60,11 @@ Type: still the system stack `--font` for text, titles and buttons. New `--mono`
 Consolas, Menlo, monospace`; Cascadia Mono on the Windows 11 target): **labels** (`--t-label` 0.75rem = 12px, letter-spacing 0.06 to
 0.08em): tile and table titles in `--accent`, sublabels, `View as`, field labels, KPI and card labels, chart rule and count, app badge,
 archetype caption, tabs, the brand; and **figures**: KPI and card values at `--t-xl` (28px; 24px at <= 599px, the prototype's 24 to 32px
-range), tile min/max values, scan log lines. **No CSS `text-transform` anywhere** (`tests/test_pages.py:87` forbids the word in the
-stylesheet and `th` shows names as read): the archetype caption is upper-cased by the server (`|upper`), titles keep their case and
-read as labels through the mono face and the letter-spacing. `th` stays in the sans font and in the file's case. Deltas are always
+range), tile min/max values, scan log lines. **`text-transform` is for tile titles only** (Board gate 190):
+`.ws-head h2` is mono, UPPERCASE (`text-transform: uppercase`) with letter-spacing, as in the prototype. The ban on `text-transform` applies to
+table column headers: `th` shows names as read, and `tests/test_pages.py::test_headers_keep_their_case` checks only the CSS rules whose selector
+targets `th`. Figure titles (`.chart-title`) and table caption `h2` also get **no** `text-transform`, because `tests/test_acceptance.py:481-488`
+and `:1382` compare their `inner_text` in real case. The archetype caption is upper-cased by the server (`|upper`), and omits `G<n>` when it is zero. `th` stays in the sans font and in the file's case. Deltas are always
 arrow + signed percent + word (`▲ +19.4% up`), never colour alone.
 
 ### Page shell
@@ -268,7 +270,7 @@ System stack `--font`: `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica
 | `--t-md` | 1rem, line-height 1.5 | body, chart title (650), table titles (`caption h2`, 650), side-panel heading |
 | `--t-sm` | 0.875rem | tables, `th` (650, `--muted`, original case), captions, notes |
 | `--t-xs` | 0.8125rem | badges |
-| `--t-label` | 0.75rem, `--mono`, letter-spacing 0.06 to 0.08em | round 7 labels: tile and table titles, field labels, sublabels, counts (no `text-transform`) |
+| `--t-label` | 0.75rem, `--mono`, letter-spacing 0.06 to 0.08em | round 7 labels: tile and table titles, field labels, sublabels, counts (`text-transform: uppercase` on tile titles `.ws-head h2` only) |
 Numbers in tables and counts use `font-variant-numeric: tabular-nums` and right-align (`.num`). Thousands
 separators are used on counts and amounts (Board gate 161) through the `num` filter, but **by column role, not by the look of the
 text** (gate 181, AC-59): a numerical amount shows `12,345`; a year-like column (name contains `year` or `yr`, or whole numbers all
@@ -608,8 +610,7 @@ I7 interactions, K7 marks); `.charts` keeps its old two-column rule only as `.ch
 `.grid`. Checked in a scratch page at 1280 and 375 (portal, scan log, tabs with a long name, a heading tile, a figure tile with a focusable
 bar, a table tile, the overlay): no sideways scroll, tiles sit at spans 12/6/6 from 900px, the SVG bar shows the 3px white ring, reduced
 motion sets `animation: none`. **Differences from the prototype description, for the Board**: (1) ~~the portal rings turn only while a drag
-is over or an upload runs~~ (reversed by Board gate 190: the rings always turn, only reduced motion stops them); (2) no "(dev only) sample" button (list wins); (3) tile titles keep their case in mono
-instead of CSS upper-case (a test forbids `text-transform`); (4) the table toggle stays a text button, not an icon, so it keeps its label
+is over or an upload runs~~ (reversed by Board gate 190: the rings always turn, only reduced motion stops them); (2) no "(dev only) sample" button (list wins); (3) ~~tile titles keep their case in mono~~ (reversed by Board gate 190: tile titles are mono UPPERCASE with letter-spacing; `text-transform` is banned on `th` only); (4) the table toggle stays a text button, not an icon, so it keeps its label
 and tab order. **Frontend notes**: `dashboard.js` still has `matchMedia("(prefers-color-scheme: dark)")` (T7 removes it); Plotly grid colour
 is `--line` (rgba, .16) and the hover label fill is `--surface`; the mode bar icons are `--muted` (6.9:1 on the tile); heights of plots are
 unchanged. The Min/Max example in Components now shows whole numbers (gate 186).

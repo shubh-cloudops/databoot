@@ -84,7 +84,10 @@ def test_big_csv_counts_have_separators(make_client, big_csv):
 
 
 def test_headers_keep_their_case():
-    assert "uppercase" not in (config.ROOT / "app/static/css/databoot.css").read_text(encoding="utf-8")
+    """Board gate 190: the ban on text-transform is for table column headers (th) only; tile titles may be upper-case."""
+    css = re.sub(r"/\*.*?\*/", "", (config.ROOT / "app/static/css/databoot.css").read_text(encoding="utf-8"), flags=re.S)
+    th = [(sel, body) for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css) if re.search(r"(^|[\s,>+~])th\b", sel)]
+    assert th and not [sel for sel, body in th if "uppercase" in body or "text-transform" in body]
 
 
 def test_orders_first_rows_keep_ids_and_years_plain(make_client, round6_dir):

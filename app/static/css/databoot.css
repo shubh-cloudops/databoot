@@ -325,7 +325,7 @@ section.block { margin-top: var(--s6); }
 .ws-head { display: flex; align-items: center; gap: var(--s1); user-select: none; cursor: grab; }
 .ws-head:has(h2) { margin: calc(var(--s2) * -1) calc(var(--s2) * -1) 0 0; }
 .ws-head:not(:has(h2)) { position: absolute; top: var(--s2); right: var(--s2); z-index: 2; }
-.ws-head h2 { flex: 1 1 auto; min-width: 0; margin: 0; font: 600 var(--t-label)/1.25 var(--mono); letter-spacing: 0.08em; color: var(--accent); }
+.ws-head h2 { flex: 1 1 auto; min-width: 0; margin: 0; font: 600 var(--t-label)/1.25 var(--mono); letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }  /* tile titles only (Board gate 190); th, .chart-title and caption h2 keep their case */
 .ws-move, .ws-expand { display: inline-grid; place-items: center; width: var(--tap); height: var(--tap); padding: 0; flex: none; color: var(--muted);
   background: transparent; border: 1px solid transparent; border-radius: var(--radius); cursor: pointer; font: inherit; }
 .ws-move { cursor: grab; touch-action: none; }
@@ -379,6 +379,8 @@ dialog.overlay .ws-tile .chart[data-leaderboard] .plot { height: max(420px, calc
   .grid { gap: var(--s3); }
   .grid > .ws-tile, dialog.overlay > .ws-tile { padding: var(--s3); }
   .ws-tile .table-wrap { margin: 0 calc(var(--s3) * -1) calc(var(--s3) * -1); }
+  .ws-tile > .chart { margin: 0 calc(var(--s3) * -1); }  /* the figure bleeds to the tile edge so the plot keeps its width (AC-34: > 95% of the grid) */
+  .ws-tile > .chart figcaption { padding-left: var(--s3); }
   .ws-tile .table-wrap caption { padding-left: var(--s3); }
   dialog.overlay { padding: var(--s2); }
   .portal-wrap { margin: var(--s4) 0 var(--s5); }

@@ -1,15 +1,13 @@
-{% from "_figure.html" import figure %}<dl class="kpis">
+{% from "_figure.html" import figure %}{% from "_tile.html" import tile %}{% set tiled = true %}{% include "_filters.html" %}
+<div class="grid charts" data-dataset="{{ d.id }}" data-app="{{ shown }}">
+{% call tile("kpis", "Key figures", 12) %}<dl class="kpis">
   <div><dt>Rows</dt><dd>{{ kpis.rows|num }}</dd></div>
   <div><dt>Columns</dt><dd>{{ kpis.columns|num }}</dd></div>
   <div><dt>Missing</dt><dd>{{ "%.1f"|format(kpis.missing_pct) }}%</dd></div>{% for s in kpis.sums %}
   <div><dt>{{ s.column }} (sum)</dt><dd>{{ s.sum|num if s.sum is not none }}</dd></div>{% endfor %}
-</dl>
-{% include "_filters.html" %}
-{% if charts %}
-<div class="charts">{% for c in charts %}
-  {{ figure(c, false, true) }}{% endfor %}
-</div>
+</dl>{% endcall %}{% if charts %}{% for c in charts %}
+{% call tile(c.id, c.title, 12 if loop.first else 6, "", false) %}{{ figure(c, false, true) }}{% endcall %}{% endfor %}
 {% else %}
-<div class="empty">No charts for this dataset</div>
-{% endif %}
+{% call tile("empty", "No charts for this dataset", 12, "empty") %}{% endcall %}{% endif %}
 {% include "_tables.html" %}
+</div>

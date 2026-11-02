@@ -1,4 +1,9 @@
-{% from "_figure.html" import figure %}{% from "_cards.html" import spark %}{% set n = {"month": 7, "year": 4}.get(biz.grain, 10) %}{% if biz.cards %}<ul class="cards">{% for c in biz.cards %}
+{% from "_figure.html" import figure %}{% from "_cards.html" import spark %}{% from "_tile.html" import tile %}{% set tiled = true %}{% set n = {"month": 7, "year": 4}.get(biz.grain, 10) %}{% include "_filters.html" %}
+<nav class="crumbs" aria-label="Drill path"><ol>{% for label, href in biz.crumbs %}
+  <li>{% if href is none %}<span aria-current="page">{{ label }}</span>{% else %}<a href="/datasets/{{ d.id }}{{ href.rstrip('?') }}">{{ label }}</a>{% endif %}</li>{% endfor %}
+</ol></nav>
+<div class="grid" data-dataset="{{ d.id }}" data-app="{{ shown }}">
+{% if biz.cards %}{% call tile("cards", "Key figures", 12) %}<ul class="cards">{% for c in biz.cards %}
   <li class="card">
     <div class="card-label">{{ c.column }}</div>
     <div class="card-value">{{ c.latest|fmt if c.latest is not none else "n/a" }}</div>{% if c.pct is not none %}
@@ -6,21 +11,16 @@
     <div class="card-period">{{ biz.grain }} {{ biz.latest[:n] }}{% if c.previous is not none %} vs {{ biz.previous[:n] }}{% endif %}</div>{% endif %}
     {{ spark(c, c.column ~ ", last " ~ c.spark|length ~ " " ~ biz.grain ~ "s") }}
   </li>{% endfor %}
-</ul>
-{% endif %}{% include "_filters.html" %}
-<nav class="crumbs" aria-label="Drill path"><ol>{% for label, href in biz.crumbs %}
-  <li>{% if href is none %}<span aria-current="page">{{ label }}</span>{% else %}<a href="/datasets/{{ d.id }}{{ href.rstrip('?') }}">{{ label }}</a>{% endif %}</li>{% endfor %}
-</ol></nav>
-{% set trends = biz.charts|selectattr("kind", "equalto", "line")|list %}{% if trends %}<div class="trends">{% for c in trends %}
-  {{ figure(c) }}{% endfor %}
-</div>
-{% endif %}{% set board = biz.charts|selectattr("kind", "equalto", "bar")|selectattr("total")|first %}{% if board %}<div class="biz-grid{{ "" if biz.changes else " solo" }}">
-  {{ figure(board) }}{% if biz.changes %}
-  <div class="table-wrap"><table class="delta-table">
+</ul>{% endcall %}
+{% endif %}{% set trends = biz.charts|selectattr("kind", "equalto", "line")|list %}{% for c in trends %}
+{% call tile(c.id, c.title, 6, "trends", false) %}{{ figure(c) }}{% endcall %}{% endfor %}
+{% set board = biz.charts|selectattr("kind", "equalto", "bar")|selectattr("total")|first %}{% if board %}
+{% call tile(board.id, board.title, 6 if biz.changes else 12, "", false) %}{{ figure(board) }}{% endcall %}{% if biz.changes %}
+{% call tile("changes", "Change", 6, "", false) %}<div class="table-wrap"><table class="delta-table">
     <caption><h2>Change</h2></caption>
     <thead><tr><th scope="col">Category</th><th scope="col" class="num">Previous</th><th scope="col" class="num">Latest</th><th scope="col" class="num">Delta</th></tr></thead>
     <tbody>{% for r in biz.changes %}{% set dv = r.delta|round(2) %}
       <tr><td>{{ r.category }}</td><td class="num">{{ r.previous|fmt }}</td><td class="num">{{ r.latest|fmt }}</td><td class="num delta {{ "pos" if dv > 0 else "neg" if dv < 0 else "zero" }}" style="--t: {{ r.t }}">{{ r.delta|signed }}</td></tr>{% endfor %}
-    </tbody></table></div>{% endif %}
-</div>
+    </tbody></table></div>{% endcall %}{% endif %}
 {% endif %}{% include "_tables.html" %}
+</div>
