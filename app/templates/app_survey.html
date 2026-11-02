@@ -1,7 +1,7 @@
 {% from "_figure.html" import figure %}{% from "_tile.html" import tile %}{% set tiled = true %}{% set qs = sur.charts|selectattr("kind", "in", ["bar", "likert"])|list %}{% set cross = sur.charts|selectattr("kind", "equalto", "crosstab")|first %}{% set people = sur.charts|selectattr("kind", "equalto", "histogram")|list %}{% include "_filters.html" %}
 <div class="grid" data-dataset="{{ d.id }}" data-app="{{ shown }}">{% for c in qs %}
 {% call tile(c.id, c.title, 6, "questions", false) %}{{ figure(c) }}{% endcall %}{% endfor %}
-{% if cross %}{% call tile("crosstab", "Cross-tab", 12) %}
+{% if cross %}{% call tile("crosstab", "Cross-tab", 12, "block") %}
   <form class="crosstab" method="get">{% if appq %}<input type="hidden" name="app" value="{{ shown }}">{% endif %}{% for k, v in filters %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
     <div class="field"><label for="ct-row">Row question</label><select id="ct-row" name="row">{% for q in sur.questions %}<option value="{{ q }}"{{ " selected" if q == sur.pick[0] }}>{{ q }}</option>{% endfor %}</select></div>
     <div class="field"><label for="ct-col">Column question</label><select id="ct-col" name="col">{% for q in sur.questions %}<option value="{{ q }}"{{ " selected" if q == sur.pick[1] }}>{{ q }}</option>{% endfor %}</select></div>
