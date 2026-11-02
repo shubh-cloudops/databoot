@@ -1,0 +1,78 @@
+{
+  "header": {
+    "ticket": 491,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1947926
+  },
+  "goal": "Scan screen script (S7 frontend, Board gate 189): scan.js reveals the log lines one after another and opens the first workspace by itself.",
+  "acceptance_criteria": [
+    {
+      "text": "app/static/js/scan.js (served locally, deferred from scan.html) hides all .scan-log li on load and reveals one every min(350, 2500/n) ms, so the last line shows within 2.5 s; #open-workspace is visible from the start; after the last line it calls location.assign with #open-workspace's href (nothing when href is '/')",
+      "passes": true
+    },
+    {
+      "text": "Playwright test (tests/test_scan_page.py): after an upload the page lands on /scan, line 2 appears later than line 1 (about 0.35 s apart), all lines are shown within 2.5 s plus tolerance, then the URL becomes /datasets/<first id>; with no JS all lines are in the HTML",
+      "passes": true
+    },
+    {
+      "text": "With prefers-reduced-motion: reduce the lines still appear in turn but have no fade/transition (computed transition-duration 0s); the scan page makes no request to any host except the app",
+      "passes": true
+    },
+    {
+      "text": "CSS for .scan-log in databoot.css is used as the Designer wrote it (docs/DESIGN.md 'Round 7'); any change stays within the file's round 7 block",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-78, AC-86 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": ".................................................................... [ 33%]\n........................................................................ [ 49%]\n........................................................................ [ 66%]\n........................................................................ [ 83%]\n........................................................................ [ 99%]\n.                                                                        [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 37 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 2 warnings\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_scan_page.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_upload.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n433 passed, 115 warnings in 574.34s (0:09:34)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "First line shows immediately; each later line after `step` ms; navigation fires after `n*step` ms",
+      "why": "Last line shows at (n-1)*step <= 2.5 s and stays visible one step before the workspace opens",
+      "evidence": "app/static/js/scan.js"
+    },
+    {
+      "what": "No CSS change",
+      "why": "databoot.css already has `.scan-log li` animation and the reduced-motion `transition: none !important` rule, so the computed transition-duration is 0s",
+      "evidence": "app/static/css/databoot.css:288,421-423"
+    },
+    {
+      "what": "Browser tests seed data through the upload HTTP routes on the live test server, then open /scan",
+      "why": "intake.js does not exist yet, so there is no page-driven upload to land on /scan",
+      "evidence": "tests/test_scan_page.py seed()"
+    },
+    {
+      "what": "Updated the old `<script` not-in-page assertion to allow exactly the scan.js tag",
+      "why": "The page now legitimately loads one script",
+      "evidence": "tests/test_scan_page.py test_open_workspace_and_plain_markup"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "'Lands on /scan after an upload' is covered by the server redirect contract (done returns next=/scan) and will be tested end to end with intake.js"
+  ],
+  "open_questions": [
+    "test_AC_59 and test_AC_52 were deselected in my full run, so they are unverified here; both are the known hover flakes that need the QA role"
+  ],
+  "lessons": [
+    {
+      "lesson": "To time a JS reveal in Playwright, record performance.now() with a MutationObserver from add_init_script instead of polling, and abort the redirect target so the page stays put",
+      "when": "testing staged reveals followed by an auto-navigation",
+      "evidence": "tests/test_scan_page.py RECORD and test_reveal_timing"
+    }
+  ],
+  "problems": []
+}
