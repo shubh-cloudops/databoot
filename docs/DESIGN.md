@@ -92,7 +92,7 @@ the tile has its own heading, then the move and expand buttons) > the body. Part
 1. **Surface**: `--glass` fill, 1px `--tile-edge` border, radius `--tile-radius`, `--glass-shadow`, `backdrop-filter: --blur`.
    Corner brackets: 16px L-shapes in `--accent`, top-left and bottom-right (`::before`, `::after`, 2px, decorative, `pointer-events:
    none`). Padding 16px (12px at <= 599px). Direct children of the grid only: `.grid > .ws-tile`.
-2. **Header** (`.ws-head`): title left, **move handle** and **expand** right, each a 44 x 44px button with a 16px inline SVG
+2. **Header** (`.ws-head`): title left, **move handle** (the drag handle) and **expand** right, each a 44 x 44px button with a 16px inline SVG
    (`aria-hidden`), `--muted`, hover `--accent` on `--accent-soft` with a `--line-strong` edge. Title = mono 12px 600 `--accent`
    (`h2` in the head, or `<h2 class="chart-h">` inside a figure's figcaption, or `caption h2` in a table). When the head has no
    `h2` (figure and table tiles) it floats in the tile's top-right corner (8px in) and the title row of the body keeps 96px

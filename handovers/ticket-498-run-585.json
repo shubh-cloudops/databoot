@@ -1,0 +1,51 @@
+{
+  "header": {
+    "ticket": 498,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1833835
+  },
+  "goal": "Dark theme only, offline walk and DESIGN.md check (T7; Board gate 190: T7 removes the prefers-color-scheme listener): finish theme tokens and verify AC-83, AC-84, AC-86, AC-87.",
+  "acceptance_criteria": [
+    {
+      "text": "databoot.css has no 'prefers-color-scheme', no '@font-face', and holds #050a12, #4de1ff, #ffb454, a monospace system font stack and color-scheme: dark; dashboard.js has no matchMedia('(prefers-color-scheme: dark)') variable or listener (only the phone query is kept) and charts read the dark tokens through tokens() whatever the emulated OS scheme",
+      "passes": false
+    },
+    {
+      "text": "Playwright (tests/test_theme_round7.py): with emulated color scheme light and dark, body background computes to rgb(5, 10, 18) and the cyan/amber tokens resolve; body and label text keep contrast >= 4.5:1 against the effective tile background; charts keep one y-axis and bars sorted from zero (existing checks still green); token-reading tests (AC-50 --div-mid, AC-69, test_table_toggle) are re-run and pass",
+      "passes": false
+    },
+    {
+      "text": "Offline walk (AC-86): one Playwright test records every request while it opens /, uploads files, waits for /scan, opens the workspace, drags and expands/closes a tile, toggles a table view and filters inside the overlay; all requests go to the app's own host",
+      "passes": false
+    },
+    {
+      "text": "AC-87: a text test reads docs/DESIGN.md: a heading containing 'round 7' whose section lists #050a12, #4de1ff, #ffb454, 'mono', 'header', 'drag handle', 'expand', 'table toggle', '12-column', '0.6 s', 'reduced motion' and 'reduced transparency'; the section is edited only if a term is missing, and says the portal rings always turn (Board gate 190)",
+      "passes": false
+    },
+    {
+      "text": "The full pytest suite is run once at the end, alone, and its result reported; failures are fixed in the app, not in tests/test_acceptance.py",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-83, AC-84, AC-86, AC-87 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [],
+  "tried_and_failed": [],
+  "assumptions": [],
+  "open_questions": [],
+  "lessons": [],
+  "problems": []
+}

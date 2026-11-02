@@ -1,5 +1,5 @@
 // Draws the charts of one dataset page from GET /api/datasets/<id>/app (the shown app's charts, same query string as the page) with the vendored Plotly.
-// Spec: docs/DESIGN.md "Charts". Colours come from the CSS tokens at draw time; the OS decides light or dark.
+// Spec: docs/DESIGN.md "Charts". Colours come from the CSS tokens at draw time (one dark theme, whatever the OS prefers).
 (function () {
   "use strict";
   // Keep the address clean: empty fields are not sent (re-enabled when Back restores the page from cache).
@@ -20,7 +20,6 @@
 
   var CONFIG = { topojsonURL: "/static/vendor/topojson/", displaylogo: false, responsive: true, displayModeBar: true };
   var phone = window.matchMedia("(max-width: 599px)");
-  var dark = window.matchMedia("(prefers-color-scheme: dark)");
   var charts = null;
 
   function tokens() {
@@ -522,7 +521,7 @@
       swapMaps(body.map3d);
       plots.forEach(function (p) { p.classList.remove("is-loading"); });
       draw();
-      [phone, dark].forEach(function (m) { m.addEventListener("change", draw); });
+      phone.addEventListener("change", draw);
     })
     .catch(function () { plots.forEach(fail); });
 })();
