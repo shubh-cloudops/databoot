@@ -141,7 +141,8 @@ section.block { margin-top: var(--s6); }
   border: 1px dashed var(--line-strong); border-radius: var(--radius); }
 
 /* round 5: app badge, View as, toggles. Markup: docs/DESIGN.md "Round 5". Spans/div/ul only, no <p> in main. */
-.page-title { display: grid; gap: var(--s2); justify-items: start; min-width: 0; }
+.page-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); min-width: 0; }
+.page-title h1 { flex: 1 0 100%; }  /* archetype caption and badge share one line under the h1, so the page head stays as tall as before round 7 */
 .app-badge { display: inline-block; padding: 2px var(--s3); border: 1px solid var(--amber); border-radius: 999px;
   font: 600 var(--t-label)/1.6 var(--mono); letter-spacing: 0.04em; color: var(--amber); background: var(--amber-soft); }
 .view-as, .periods { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin: 0 0 var(--s4); }
@@ -233,6 +234,7 @@ section.block { margin-top: var(--s6); }
 .chart figcaption > * { grid-column: 1; }
 .chart figcaption > .table-toggle { grid-column: 2; grid-row: 1 / span 3; }
 .chart .chart-title { font: 600 var(--t-label)/1.25 var(--mono); letter-spacing: 0.08em; color: var(--accent); overflow-wrap: anywhere; }
+.chart-h { margin: 0; font: 600 var(--t-label)/1.25 var(--mono); }  /* the figure's heading wraps .chart-title and adds no height outside tiles (Map, Monitoring, Survey) */
 .chart .chart-rule, .chart .chart-count { font: var(--t-label)/1.5 var(--mono); letter-spacing: 0.02em; color: var(--muted); }
 .chart .chart-count { font-variant-numeric: tabular-nums; }
 .chart .plot { height: 320px; min-height: 320px; width: 100%; }
@@ -335,7 +337,7 @@ section.block { margin-top: var(--s6); }
 .ws-expand[data-open]::before { content: "\00d7"; content: "\00d7" / ""; font-size: 1.75rem; line-height: 1; }
 /* a title row is 44px tall so it lines up with the two buttons; the title keeps clear of them */
 .ws-tile > .chart figcaption, .ws-tile caption { padding-right: 96px; }
-.ws-tile .chart-h { margin: 0; min-height: var(--tap); display: flex; align-items: center; font-size: inherit; }
+.ws-tile .chart-h { min-height: var(--tap); display: flex; align-items: center; }
 .ws-tile caption { padding-left: 0; padding-top: 0; min-height: var(--tap); }
 .ws-tile caption h2 { min-height: var(--tap); display: flex; align-items: center; }
 /* inside a tile the old cards flatten: the tile is the card */

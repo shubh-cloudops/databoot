@@ -76,7 +76,8 @@ arrow + signed percent + word (`▲ +19.4% up`), never colour alone.
   ellipsis (`max-width: 30ch`). Many tabs scroll sideways inside the nav (`overflow-x: auto`), never the page. At >= 900px the tabs sit
   on the brand's row; at <= 599px the tabs take their own full-width row under the brand (`order: 3`). Tab order: skip, brand, tabs.
 - **Page head** order: crumb, `.page-title` (h1, `.archetype`, `.app-badge`), actions, `View as`, controls (period links, filters,
-  chips, Business crumbs), then the grid.
+  chips, Business crumbs), then the grid. `.archetype` and `.app-badge` share one wrapping line under the h1, and the figure heading
+  `.chart-h` has no margin and the label font, so the shell adds no height above an untiled Map (test_AC_59 hovers every point at 1280x900).
 - **Archetype caption**: `<div class="archetype">APP: BUSINESS · RULE R2 · T1 N2 C2 · 288 ROWS</div>` (exactly the architecture's
   string: G only when non-zero, rows with the plural word). Mono 12px, 0.08em, `--accent`. Not a `<p>`. The badge under it,
   `<span class="app-badge">App: Business (rule R2)</span>`, is an amber pill (mono 12px 600, `--amber` text and edge, `--amber-soft`
