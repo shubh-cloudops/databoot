@@ -1,0 +1,67 @@
+{
+  "header": {
+    "ticket": 495,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 2,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1916352
+  },
+  "goal": "Tile drag and keyboard reorder (I7a, Board gate 189 keyboard reorder): tiles.js with pointer-event drag, Alt+Arrow on the move handle, aria-live announcement, per-dataset order store.",
+  "acceptance_criteria": [
+    {
+      "text": "app/static/js/tiles.js (local, deferred after dashboard.js in dataset.html): pointerdown on .ws-head or figcaption (not on a button, link, select or input) of tile A and pointerup over tile B moves A into B's place in the DOM (B.before(A) if A came after B, else B.after(A)); .ws-move has touch-action none",
+      "passes": false
+    },
+    {
+      "text": "Alt+ArrowLeft/ArrowUp on .ws-move moves its tile one place earlier, Alt+ArrowRight/ArrowDown one later; focus stays on the handle; #ws-live text contains '<label> moved to position <i> of <n>'",
+      "passes": false
+    },
+    {
+      "text": "After each move localStorage['databoot.order.<dataset id>.<app>'] holds the tile keys; on load stored keys come first in stored order and the rest follow in default order; another dataset keeps its default order; Tab order equals visual order",
+      "passes": false
+    },
+    {
+      "text": "Playwright on the survey fixture (tests/test_tile_interactions.py): drag_to from tile 3's header onto tile 1 changes the data-tile order as specified, a reload keeps it, the monitor dataset keeps its default order; focus .ws-move on tile 2, Alt+ArrowLeft makes it first, #ws-live contains 'position 1 of' and document.activeElement is still the handle",
+      "passes": false
+    },
+    {
+      "text": "No request leaves the app, no console errors; python3 -m pytest -q tests/test_tile_interactions.py tests/test_survey_page.py passes",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-81, AC-86 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Made no code change in attempt 2; attempt 1's commit already holds tiles.js, the dataset.html script tag and tests/test_tile_interactions.py",
+      "why": "The ticket's tests pass and the page behaves as specified in a real browser at 1280 and 375",
+      "evidence": "python3 -m pytest -q tests/test_tile_interactions.py tests/test_survey_page.py (12 passed); /tmp/shots/tiles-1280.png, tiles-375.png; app/static/js/tiles.js:27-60"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Drag also starts on .ws-move (survey tiles have no h2, so their header holds only buttons), as attempt 1 decided"
+  ],
+  "open_questions": [
+    "The full suite and tests/test_acceptance.py were not run here (time); the orchestrator's check covers them, including the known-flaky hover tests test_AC_52 and test_AC_59"
+  ],
+  "lessons": [
+    {
+      "lesson": "On a retry, run the ticket's test files and take one screenshot with a throwaway test file in tests/ (delete it after) before touching code; attempt 1's commit already held everything",
+      "when": "retry ticket whose previous commit already contains the ticket's files",
+      "evidence": "git show --stat bde8ff3; 12 passed"
+    }
+  ],
+  "problems": []
+}
