@@ -1,0 +1,70 @@
+{
+  "header": {
+    "ticket": 496,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 2,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1881577
+  },
+  "goal": "Tile expand overlay, glow and entrance (I7b): native dialog expand with reopen after a filter click, pointer glow, entrance within 0.6 s, reduced motion and reduced transparency.",
+  "acceptance_criteria": [
+    {
+      "text": "tiles.js: .ws-expand moves the tile into #tile-dialog (placeholder left behind), showModal(), then Plotly.Plots.resize on each .js-plotly-plot inside; the plot is wider than 0.8 x viewport; Esc (native cancel), a click whose target is the dialog itself (backdrop) or the expand button closes it, the tile returns to its place, plots resize, and .ws-expand gets focus",
+      "passes": false
+    },
+    {
+      "text": "On pagehide with the dialog open sessionStorage['databoot.expand'] = '<dataset id>:<key>'; on load a matching present tile reopens expanded and the entry is deleted; clicking a bar inside the overlay (dashboard.js crossFilter unchanged) changes the URL (f.region=...), the chip and N of M counts, and after the load dialog[open] holds the same chart again",
+      "passes": false
+    },
+    {
+      "text": "pointermove on a tile sets --mx/--my on it (not wired under prefers-reduced-motion: reduce); CSS entrance: max delay + duration <= 0.6 s, so document.getAnimations() for the tile entrances all finish within 600 ms of load (Playwright)",
+      "passes": false
+    },
+    {
+      "text": "Under emulated prefers-reduced-motion: reduce no animation or transition runs (getAnimations() empty, glow variables never set); under prefers-reduced-transparency: reduce every element's computed backdropFilter is 'none' and the tile fill is opaque",
+      "passes": false
+    },
+    {
+      "text": "tests/test_tile_interactions.py gains the expand, Esc, backdrop, reopen-after-filter, entrance and glow tests on sales (?app=explorer); python3 -m pytest -q tests/test_tile_interactions.py tests/test_filter_browser.py passes",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-82, AC-84 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Made no code change in attempt 2; attempt 1's commit already holds tiles.js expand/reopen/glow, the CSS entrance and reduced-motion/transparency rules, and tests/test_tile_interactions.py",
+      "why": "Lesson from ticket 474: on a retry whose commit already holds the ticket's files, run its tests and screenshot instead of rebuilding",
+      "evidence": "python3 -m pytest -q tests/test_tile_interactions.py tests/test_filter_browser.py (11 passed); python3 -m pytest -q (468 passed in 697 s); /tmp/shots/expand-1280.png, expand-375.png; app/static/js/tiles.js:63-117"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Full suite in the background with the default 600 s limit",
+      "why_it_failed": "The suite takes about 700 s, so the first run was killed by the background time limit; rerun with a 1500 s limit and it passed"
+    }
+  ],
+  "assumptions": [
+    "The temporary screenshot test file tests/test_zz_shot496.py was removed; git status showed a clean tree"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "The full suite now takes about 700 s: start it in the background with timeout 1500000 (or more), not the 600 s default, or it is killed",
+      "when": "Running python3 -m pytest -q in full at the end of a ticket",
+      "evidence": "first run killed at 600 s; second run: 468 passed in 697.76s"
+    }
+  ],
+  "problems": []
+}
