@@ -64,6 +64,22 @@ def health():
     return {"ok": True}
 
 
+def _summary(d):
+    """App, rule and the T/N/C/G role counts of the profile mapping of one dataset (scan log and archetype caption)."""
+    kinds = list(_base(d)[1].values())
+    det = _detected(d)
+    return {"app": det["app"], "rule": det["rule"], **{k: kinds.count(t) for k, t in
+            (("T", "temporal"), ("N", "numerical"), ("C", "categorical"), ("G", "geospatial"))}}
+
+
+@app.get("/scan")
+def scan(request: Request):
+    cat = catalog.scan(config.get().data)
+    return templates.TemplateResponse(request, "scan.html", {
+        "title": "DataBoot", "cat": cat, "lines": [(d, _summary(d)) for d in cat.datasets],
+        "first": cat.datasets[0].id if cat.datasets else None})
+
+
 def _dataset(id):
     for d in catalog.scan(config.get().data).datasets:
         if d.id == id:
@@ -99,6 +115,7 @@ def dashboard(request: Request, id: str):
         "geo": _appview(d, f, "map") if shown == "map" else {},
         "mon": _appview(d, f, "monitoring", None, pick) if shown == "monitoring" else {},
         "sur": _appview(d, f, "survey", None, pick) if shown == "survey" else {}, "pickq": pickq,
+        "tabs": catalog.scan(config.get().data).datasets, "summary": _summary(d),
         "kpis": v["kpis"], "options": v["options"], "labels": v["labels"], "filters": f, "chips": chips,
         "clear": url(*appq, *pickq), "query": urlencode(f + appq + pickq)})
 

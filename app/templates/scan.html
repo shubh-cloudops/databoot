@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="scan">
+<h1>DataBoot</h1>
+<ol class="scan-log" aria-live="polite">{% for d, s in lines %}
+  <li>{{ d.path }}{% if d.sheet %} - {{ d.sheet }}{% endif %}  {{ d.rows|plural("row") }}  T{{ s.T }} N{{ s.N }} C{{ s.C }} G{{ s.G }}  -&gt; {{ s.app|upper }} (rule {{ s.rule }})</li>{% endfor %}{% for u in cat.unreadable %}
+  <li class="bad">{{ u.path }}{% if u.sheet %} - {{ u.sheet }}{% endif %}  {{ u.reason }}</li>{% endfor %}
+  <li class="last">0 bytes uploaded to the internet</li>
+</ol>
+<a class="btn btn-primary" id="open-workspace" href="{{ '/datasets/' ~ first if first else '/' }}">Open workspace</a>
+</section>
+{% endblock %}
