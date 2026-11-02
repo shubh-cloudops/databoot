@@ -1,242 +1,248 @@
 [
  {
-  "goal": "Number format by column role and plurals on the server (F1, F2; Board gate 181 items 1-2, gate 183 year rule 'year' or 'yr', gate 184 all assumptions OK): apps.plain, apps.sep, apps.plural, cached _plain, plain axis keys, Map panel rows formatted server-side, PPTX count line singular at 1",
+  "goal": "Upload backend (U1, docs/ARCHITECTURE.md 'Round 7: upload'): app/upload.py begin/write/finish/cleanup/empty/safe/cap_message/OWNED and the routes POST /upload, PUT /upload/{batch}, POST /upload/{batch}/done with lifespan cleanup; no python-multipart.",
   "layer": "backend",
   "criteria": [
-   "apps.plain(columns, mapping, typed) returns the frozenset of numerical column indexes that never get separators: name (lower-cased, stripped) is id or ends in id/_id or contains code, zip or phone; or name contains year or yr; or every non-empty value is a whole number in 1900..2100",
-   "apps.sep(v) adds separators to the integer part of a number text and leaves other text alone (moved out of main.py; the Jinja filter 'sep' now uses it); apps.plural(n, word) gives '1 point', '2 points', '0 points', '1,200 rows'; main registers a 'plural' Jinja filter",
-   "main._plain(d) is an lru_cache of apps.plain on the unfiltered typed rows (a filter never changes a column's format) and make_client in tests/conftest.py clears it with the other caches",
-   "_appview sets c['plain'] = list of axis letters 'x'|'y'|'z' on every chart dict whose x_label, y_label or z_label is a plain column; on orders.csv the Explorer histogram of order_id has plain == ['x']",
-   "geo.view writes its side-panel rows through apps.sep for numerical non-plain columns only, so a pop of 20000 is sent as '20,000' and a year or order_id value as '2024' / '10045'",
-   "export.pptx count line uses plural: a 1-row file reads '1 of 1 row' semantics and no PPTX text matches \\b1 (points|rows)\\b",
-   "Unit tests: plain on orders.csv (order_id, year plain; amount not), plural cases, sep cases, geo panel cell strings; tests/test_geo.py and tests/test_export_pptx.py still pass"
+   "POST /upload with [{path,size}] returns 200 {batch}; an empty list, a duplicate path and unsafe paths ('../x', '/x', 'C:x', 'a//b', NUL) return 400 and create nothing; backslashes become '/'; upload.safe returns None for unsafe paths",
+   "PUT /upload/{batch}?path=... streams the body to disk in chunks (request.stream, no multipart); unknown batch 404; a path not in the batch's list 400; the file is written inside the batch folder, which lives under the system temp dir (prefix databoot-upload-), outside /work and outside any launcher folder",
+   "POST /upload/{batch}/done returns {'next': '/scan'}, sets DATABOOT_DATA to the batch folder, deletes the previous upload folder (never a folder outside upload.OWNED), and clears catalog.scan, catalog.load and main._base/_view/_plain/_detected/_appview caches; unknown batch 404",
+   "Uploading one file, several files, and files_of(data_dir) (a folder with sub/ and unreadable files) then GET /api/datasets lists the same path (sub/sales.csv kept), rows, columns and detected app as a client started on that folder; a second upload replaces the first one's data (no stale rows from a same-named file)",
+   "AC-77: with DATABOOT_UPLOAD_CAP small, a declared total over the cap returns 413 at POST /upload; a PUT whose real bytes pass the cap returns 413 and deletes the whole batch folder; detail is upload.cap_message, which names '2 GB' at the default cap and the launcher's '-Folder' option (e.g. 'This upload is 2.4 GB and the limit is 2 GB. For larger drives, start DataBoot with the launcher's -Folder option.'); nothing of that upload is listed afterwards",
+   "AC-76: using TestClient as a context manager, the temp folder exists during the run and is gone after exit; a launcher folder passed to launch.run is left unchanged; begin deletes a batch that was begun and never finished",
+   "New tests in tests/test_upload.py use the existing conftest upload()/files_of() helpers; python3 -m pytest -q tests/test_upload.py tests/test_app.py passes"
   ],
   "acceptance": [
-   "AC-59",
-   "AC-60",
-   "AC-55",
-   "AC-17"
+   "AC-75",
+   "AC-76",
+   "AC-77"
   ],
   "files": [
-   "app/apps.py",
+   "app/upload.py",
    "app/main.py",
-   "app/geo.py",
-   "app/export.py",
-   "tests/conftest.py",
-   "tests/test_apps.py",
-   "tests/test_geo.py",
-   "tests/test_export_pptx.py"
+   "tests/test_upload.py"
   ]
  },
  {
-  "goal": "PPTX title slide (F6, Board gate 181 item 6; Explorer first line 'Explorer', Board gate 184) plus verify week/year grain and Explorer-only exports (AC-72, AC-73 from gate 182)",
+  "goal": "Launcher folder optional (L7; Board gate 190: if the folder dialog is cancelled, start without a folder and open the home portal; Docker mode still requires a folder), plus verify AC-73's reworded text still holds.",
   "layer": "backend",
   "criteria": [
-   "export.pptx slide 0 box 1 is the title or 'Explorer' (40 pt bold), box 2 is the file name (with ' - <sheet>' for Excel) at a smaller run size (24 pt), then the Rows line and the Filters line move down one box height and stay inside the slide",
-   "sales.csv with app=explorer gives slide 0 texts ['Explorer', 'sales.csv', 'Rows: 6, 3 columns', 'Filters: none']; shop.csv app=business starts ['Business overview', 'shop.csv'], book.xlsx Revenue default starts ['Business overview', 'book.xlsx - Revenue']; box 2 font size is smaller than box 1",
-   "Existing tests updated in this ticket for the new slide 0 text order: tests/test_export_pptx.py slide 0 texts, tests/test_export_apps.py indexes for file name and Rows, tests/test_acceptance.py AC-40 slide 0 indexes",
-   "AC-72 verify: an inline file of daily sales over 100 days gives grain 'week' with Monday x values and per-ISO-week sums equal to the hand values; monthly rows spanning more than 1,096 days give grain 'year' with the partial last year left out and per-year sums equal to hand values; KPI card sums match (tests/test_business.py); fix business.py only if a check fails",
-   "AC-73 verify: measures.csv (Explorer only) XLSX sheets start 'Data' and end 'Summary', Summary A1 is 'Filters: none' (no 'overview'), at least one chart sheet; PPTX has 1 + number of /charts slides, each chart slide has a native chart or a table, slide 0 has no 'overview' text (tests/test_export_apps.py)"
+   "app/launch.py: the folder argument is optional (nargs='?'); with no folder it runs on upload.empty() (an owned empty temp folder deleted on exit) and the home page then has no dataset tables; with a folder behaviour is unchanged and test_missing_folder_exits_2_with_one_line still passes",
+   "A folder given to the launcher is never written or deleted (AC-76): a test records the tree before and after launch.run on it",
+   "Start-DataBoot.ps1: when the FolderBrowserDialog is cancelled the script starts without a folder instead of 'exit 1' (Board gate 190); it calls '-m app.launch' with the folder only when $Folder is set (an if, not an empty-string argument); -Docker without a folder still prints a message and 'exit 1'",
+   "tests/test_launcher_files.py keeps every old needle (FolderBrowserDialog, -m app.launch, exit 1) and gains needles for the cancelled-dialog branch; no test runs PowerShell (none in the image)",
+   "AC-73 is only reworded (Explorer-only XLSX Summary has no app title line, PPTX title slide first line 'Data overview'): no code change; python3 -m pytest -q tests/test_export_apps.py tests/test_export_pptx.py passes and an existing or new assertion checks both lines for an Explorer-only dataset"
   ],
   "acceptance": [
-   "AC-63",
-   "AC-72",
-   "AC-73"
+   "AC-73",
+   "AC-74",
+   "AC-76"
   ],
   "files": [
-   "app/export.py",
-   "app/business.py",
-   "tests/test_export_pptx.py",
-   "tests/test_export_apps.py",
-   "tests/test_business.py",
-   "tests/test_acceptance.py"
+   "app/launch.py",
+   "Start-DataBoot.ps1",
+   "tests/test_launch.py",
+   "tests/test_launcher_files.py"
   ]
  },
  {
-  "goal": "Monitoring figures (MO1): app/monitoring.py with points per timestamp, half-open period windows, tiles, 7-point rolling mean and 30-point spikes, export list (Board gate 183: 7-point mean; gate 184: tile cap 8 with note '8 of N measures', rolling mean includes the current point, spike z uses the population stdev of the previous 30)",
+  "goal": "Scan server side (S7 backend, Board gate 189 progressive log; Board gate 190: the scan log prints all four counts including G0): main._summary(d), GET /scan with scan.html holding every line, and tabs/summary in the dataset page context.",
   "layer": "backend",
   "criteria": [
-   "monitoring.view(columns, typed, mapping, period, settings) returns {'tiles','charts','period','periods':['7','30','90','all'],'latest'}; rows with empty time are dropped, repeated timestamps are averaged per numerical column, points sorted by time",
-   "Windows are half-open: current t > last - N days, previous last - 2N < t <= last - N; 'all' has no previous window",
-   "One tile per numerical column, capped at 8 (primary numeric first by the apps.MEASURE name rule, then column order); with more numerics the payload carries a note '8 of N measures'; tile has column, latest, min, max, mean, previous, pct (1 decimal, None for 'all', empty previous or previous 0), dir up/down/no change, spark (at most 60 points); tiles of plain columns are flagged so values print without separators",
-   "On monitor_rows() period 30: temperature latest 20.0, min 20.0, max 60.0, pct 5.1 up; humidity latest 54, min 50, max 54, pct 0.0 no change; quiet.csv temperature pct -0.4 down; period 'all' gives pct None for every tile; period 7 covers 7 points",
-   "Main line chart dict kind 'monitor' with x ISO times, y, mean (7-point trailing, includes the current point, partial at the start) and spike positions (i >= 30, population stdev of the previous 30 > 0, |z| > 3); monitor.csv spike is exactly 2024-04-10, 7-point mean there 28.4286 and last 23.0; quiet.csv spike == []; computed in O(n) so 200,000 rows stay fast; spike points survive stride sampling",
-   "monitoring.export(view) returns [tiles table (Column, Latest, Min, Max, Change %), a kind 'line' chart of the main line with x/y data only], ids chart-1..; tests/test_monitoring.py compares with values recomputed by hand from monitor_rows()"
+   "main._summary(d) returns {app, rule, T, N, C, G}: counts of temporal, numerical, categorical, geospatial in the profile mapping (_base(d)[1]), and app/rule from _detected(d); data_dir sales.csv gives app 'business', rule 'R2', T1 N1 C1 G0",
+   "GET /scan renders scan.html from catalog.scan(config.get().data): h1 DataBoot, <ol class='scan-log' aria-live='polite'> with one <li> per dataset '<path>[ - <sheet>]  <N rows>  T<n> N<n> C<n> G<n>  -> <APP> (rule <id>)' (the log always prints G, even G0; APP upper-case, matching /api/datasets/<id>/app), one <li> per unreadable file '<path>[ - <sheet>]  <reason>', and a last <li> '0 bytes uploaded to the internet'",
+   "The page has <a class='btn btn-primary' id='open-workspace' href='/datasets/<first id>'>Open workspace</a> (href '/' when there is no dataset); no <p> inside main; every line is in the server HTML (no JSON, no polling); only local assets in head",
+   "The dataset route passes tabs (all datasets of the scan) and summary (_summary) into the page context; the /api responses are unchanged",
+   "Tests in tests/test_scan_page.py: upload archetypes_dir + broken.xlsx and check one line per dataset, the unreadable line with its note, the '-> BUSINESS (rule R2)' line for shop.csv, and the 'Open workspace' href; python3 -m pytest -q tests/test_scan_page.py tests/test_pages.py passes"
   ],
   "acceptance": [
-   "AC-65",
-   "AC-66",
-   "AC-67",
-   "AC-71"
+   "AC-78",
+   "AC-79"
   ],
   "files": [
-   "app/monitoring.py",
-   "tests/test_monitoring.py"
-  ]
- },
- {
-  "goal": "Survey figures (SU1): app/survey.py with questions, Likert scales, question bars with Other, Likert and cross-tab kinds, Respondents histograms, export list (Board gate 183 scales agree/satisfied/likely/frequency/1-5/1-7 and Respondents; gate 184 amount guard and full scale with zero counts)",
-  "layer": "backend",
-  "criteria": [
-   "survey.questions(columns, mapping, typed) returns the categorical columns plus the whole-number 1..5/1..7 answer columns in column order; time, identifier and other numerical columns are not questions",
-   "survey.scale(values) returns (levels, neutral index) or None: ['Agree','neutral'] is the agree scale, [1,3,7] the 1..7 scale, ['Never','Often'] the frequency scale, ['yes','no'] gives None; all levels are kept even with a count of 0, in the data's own spelling when present",
-   "A non-Likert question gives a kind 'bar' dict with orientation 'h', counts per value sorted count desc then name, top 10 then one 'Other' (other: true); on survey_rows() city gives city00..city03 4, city04..city09 3, Other 6; gender female 14, male 13, other 13",
-   "A Likert question gives kind 'likert' with data levels, counts, pct (unrounded, sums to 100) and neutral index; q_service counts 6,6,6,16,6 and pct 15,15,15,40,15; q_visits 9,9,9,9,4",
-   "survey.pick(questions, row, col) returns the two names from the URL when both are questions, else the first two; the cross-tab dict kind 'crosstab' has x column levels, y row levels, z counts and row pct (each row sums to 100); gender x region gives female 3,4,3,4 (21.4, 28.6, 21.4, 28.6%), male 3,3,4,3, other 4,3,3,3; levels in scale order for Likert questions else count desc then name",
-   "Respondents: up to 2 numerical columns that are not answers and not plain (identifier/year-like), as histograms; survey.csv has age only (respondent_id is an identifier)",
-   "survey.export(view) returns one bar per question (Likert as a bar of counts in scale order), then the cross-tab as a table chart, then the Respondents histograms; payload has charts in order questions, cross-tab, Respondents with ids chart-1..N plus questions and pick; tests/test_survey.py checks the hand values recomputed from survey_rows()"
-  ],
-  "acceptance": [
-   "AC-68",
-   "AC-69",
-   "AC-70",
-   "AC-71"
-  ],
-  "files": [
-   "app/survey.py",
-   "tests/test_survey.py"
-  ]
- },
- {
-  "goal": "Rule order and request wiring for the new apps (D2, P2; Board gate 183 order R1 Map, R5 Survey, R2 Business, R4 Monitoring, R3 Explorer; gate 184 amount guard): roles L/cols, RULES, NAMES, TITLES, _pick in the cache key, /app payload, exports",
-  "layer": "backend",
-  "criteria": [
-   "apps.roles gains cols and L (numerical columns whose non-empty values are all whole numbers in 1..7), with L emptied when any other numerical column matches apps.MEASURE (amount guard); RULES order is R1, R5 survey (C+L >= 4, >= 60% of columns, N-L <= 2), R2, R4 monitoring (T, N, no C), R3; NAMES gains Monitoring and Survey",
-   "GET /api/datasets/<id>/app: monitor.csv and quiet.csv give monitoring/R4 with qualifies ['monitoring','explorer']; survey.csv gives survey/R5 with qualifies ['survey','business','explorer']; orders.csv explorer/R3; every data_dir, archetypes_dir, big_csv and big_sales_csv dataset keeps its round 5 app and rule (shop.csv stays business/R2); inline: survey.csv without its date still R5, 4 categoricals among 7 columns is not R5, shop.csv without revenue gives R5 (proves the guard); badges read 'App: Monitoring (rule R4)' and 'App: Survey (rule R5)'",
-   "main._pick validates period (7|30|90|all, else 30) and the survey row/col pair; it is part of the _appview cache key and is passed by dashboard, /app and _export; pickq carries the request's own period/row/col only when the URL had them (chips, Clear filters, export links, filter-form hidden inputs); View-as links do not carry it",
-   "main.TITLES gains 'Monitoring overview' and 'Survey overview'; _export maps monitoring and survey to their export lists; XLSX Data first and Summary last, Summary A1 holds the title, PPTX slide 0 title is the same, native charts present (monitor.csv: sheets Data, chart-1 table, chart-2 line, Summary; survey.csv: one bar sheet per question)",
-   "Empty app_monitoring.html and app_survey.html (comment only) exist so dataset pages for the new apps render until the frontend tickets fill them; make_client clears any new cache; existing tests/test_apps.py tests that list RULES or NAMES are updated here"
-  ],
-  "acceptance": [
-   "AC-64",
-   "AC-66",
-   "AC-70",
-   "AC-71",
-   "AC-73"
-  ],
-  "files": [
-   "app/apps.py",
    "app/main.py",
-   "app/templates/app_monitoring.html",
-   "app/templates/app_survey.html",
-   "tests/conftest.py",
-   "tests/test_apps.py",
-   "tests/test_export_apps.py",
-   "tests/test_archetype_fixtures.py"
+   "app/templates/scan.html",
+   "tests/test_scan_page.py"
   ]
  },
  {
-  "goal": "Number format and plural in templates and charts (F1, F2 front end; Board gate 181 items 1-2, gate 183 year rule): _tables.html, _figure.html count, hex hover text, plain axes in dashboard.js",
+  "goal": "Scan screen script (S7 frontend, Board gate 189): scan.js reveals the log lines one after another and opens the first workspace by itself.",
   "layer": "frontend",
   "criteria": [
-   "_tables.html First rows prints v|sep only when the column is numerical and not in plain (plain passed to the template); orders.csv First rows shows 10045, 2024 and 12,345 and the text '2,024' never appears on the page",
-   "_figure.html count reads '{{ shown|num }} of {{ total|plural(unit) }}' with unit point for map3d, line, scatter and monitor, row otherwise: a 1-row CSV shows '1 of 1 row', a 5-row file with 0 shown reads '0 of 5 rows', and no page text matches \\b1 (points|rows)\\b",
-   "dashboard.js drops its own sep() regex and prints the Map panel cells as the server sent them; a plain axis ('x'|'y'|'z' in c.plain) gets hoverformat '' and a %{z} hovertemplate (no ':,'), and tableOf prints String(v) for that column; sums and counts of non-plain columns keep separators",
-   "The hex (map2d) trace gets per-cell text built with the same plural rule and hovertemplate '%{text}<extra></extra>', so a cell with 1 point hovers '1 point'",
-   "Existing tests updated here: tests/test_map_page.py (hex hovertemplate now has text and '%{text}'; the no-bare-four-digit test still passes), tests/test_pages.py and tests/test_filter_ui.py captions; test_business_page.py and test_table_toggle.py still pass"
+   "app/static/js/scan.js (served locally, deferred from scan.html) hides all .scan-log li on load and reveals one every min(350, 2500/n) ms, so the last line shows within 2.5 s; #open-workspace is visible from the start; after the last line it calls location.assign with #open-workspace's href (nothing when href is '/')",
+   "Playwright test (tests/test_scan_page.py): after an upload the page lands on /scan, line 2 appears later than line 1 (about 0.35 s apart), all lines are shown within 2.5 s plus tolerance, then the URL becomes /datasets/<first id>; with no JS all lines are in the HTML",
+   "With prefers-reduced-motion: reduce the lines still appear in turn but have no fade/transition (computed transition-duration 0s); the scan page makes no request to any host except the app",
+   "CSS for .scan-log in databoot.css is used as the Designer wrote it (docs/DESIGN.md 'Round 7'); any change stays within the file's round 7 block"
   ],
   "acceptance": [
-   "AC-59",
-   "AC-60",
-   "AC-55",
-   "AC-17",
-   "AC-54"
+   "AC-78",
+   "AC-86"
   ],
   "files": [
+   "app/static/js/scan.js",
+   "app/templates/scan.html",
+   "app/static/css/databoot.css",
+   "tests/test_scan_page.py"
+  ]
+ },
+ {
+  "goal": "Home portal and upload client (H7; Board gate 190: portal rings always turn slowly, only prefers-reduced-motion stops them): home.html portal, intake.js, cap message.",
+  "layer": "frontend",
+  "criteria": [
+   "GET / keeps exactly one h1 'DataBoot' and shows one .portal (equal width and height in Playwright at 1280 and 375, border-radius >= half its width) with the title 'Give me your data', an <input type=file multiple> labelled 'Choose files' and an <input type=file webkitdirectory> labelled 'Choose folder'; no '(dev only) sample' button; when the app starts on a folder the dataset, 'Could not be read' and 'Other files' tables still follow the portal and / still has exactly one '<p' in main (tests/test_pages.py)",
+   "app/static/js/intake.js: files from Choose files, Choose folder or a drop event (including a dropped folder via webkitGetAsEntry) are sent as POST /upload (paths relative to the picked folder, first segment stripped when shared; single files use File.name), one PUT per file, then POST /upload/{batch}/done, then location to /scan; data-state on the portal is idle/over/busy and the status text shows real progress only",
+   "Playwright: set_input_files with 2 files ends on /scan listing both; a synthetic drop event with a DataTransfer File uploads too; a folder pick with sub/sales.csv lists 'sub/sales.csv'",
+   "AC-77 in the browser: intake.js sums File.size first and, over the cap (small DATABOOT_UPLOAD_CAP in the test), shows the cap message (names the limit and '-Folder') in a role='alert' box without sending the files; a server 413 shows the same detail; no dataset of that upload is listed",
+   "Board gate 190: .portal-rings i rotate slowly in every data-state (idle too), as in the prototype; only @media (prefers-reduced-motion: reduce) sets animation none; a Playwright computed-style check sees a running animation at rest and 'none' under emulated reduced motion; docs/DESIGN.md 'Home: the portal' and its Motion rules are corrected to say so",
+   "Home makes no request to a host other than the app (head src/href local, blank SVG favicon, DataBoot name, system fonts unchanged); python3 -m pytest -q tests/test_pages.py tests/test_app.py tests/test_home_portal.py passes"
+  ],
+  "acceptance": [
+   "AC-74",
+   "AC-75",
+   "AC-77",
+   "AC-86"
+  ],
+  "files": [
+   "app/templates/home.html",
+   "app/static/js/intake.js",
+   "app/static/css/databoot.css",
+   "docs/DESIGN.md",
+   "tests/test_home_portal.py"
+  ]
+ },
+ {
+  "goal": "Workspace shell and tiles, part 1 (W7a): _tile.html macro, dataset tabs, archetype caption (Board gate 190: omit G when zero), Explorer and Business re-cut into tiles; Board gate 190: tile titles mono UPPERCASE with letter-spacing, the text-transform ban scoped to <th>.",
+  "layer": "frontend",
+  "criteria": [
+   "app/templates/_tile.html macro tile(key,label,span,extra,heading) renders <section class='ws-tile {extra}' id='tile-{key}' data-tile data-span aria-label=label> with .ws-head (h2 unless heading=false, button.ws-move aria-label 'Move <label>', button.ws-expand aria-label 'Expand <label>' aria-haspopup=dialog) then the body; the aria-label equals the text of an h2 inside the tile (a region named by its heading, found by get_by_role('region', name=...))",
+   "base.html has a tabs block in .site-header after the brand; dataset.html fills it with <nav class='tabs' aria-label='Datasets'> one link per dataset (path[ - sheet]) with aria-current='page' on the current one, outside <main> (test_business_page's aria-current count in main stays 2); under the h1 a <div class='archetype'> reads 'APP: BUSINESS \u00b7 RULE R2 \u00b7 T1 N1 C1 \u00b7 6 ROWS' for data_dir sales.csv; G<n> is printed only when non-zero (Board gate 190, e.g. 'T1 N2 C2'); the 'App: Business (rule R2)' badge, View as, filters and chips stay; dataset.html also holds <dialog class='overlay' id='tile-dialog'> and <div class='sr-only' id='ws-live' aria-live='polite'> at the end of main",
+   "app_explorer.html and app_business.html each open one <div class='grid' data-dataset data-app> (12 columns at desktop, 1 column under 600 px; the Explorer grid keeps class 'charts') and wrap every chart, kpis/cards and table in a tile with the default keys and spans of the architecture table (Explorer: kpis 12, chart-1 12, chart-2..8 6, columns, rows; Business: cards, trend chart-N 6, leaderboard, changes, columns, rows); old wrapper classes ride on the tiles via extra; the '<caption><h2>X</h2></caption>' and '<span class=\"chart-title\">' strings stay byte for byte; Map, Monitoring and Survey templates are untouched and still render",
+   "Board gate 190: tile titles (.ws-head h2) are mono, UPPERCASE (text-transform) with letter-spacing; table <th> column headers keep their case; figure titles (.chart-title) and table caption h2 get NO text-transform because tests/test_acceptance.py:481-488 and :1382 compare their inner_text in real case; tests/test_pages.py test_headers_keep_their_case is scoped to CSS rules whose selector targets th (no 'uppercase'/text-transform in those rules) instead of the whole stylesheet; docs/DESIGN.md Type and tile sections state this",
+   "tests/test_tiles.py: for sales (?app=explorer) and shop (Business) every figure.chart, ul.cards, dl.kpis and table has a section.ws-tile ancestor whose aria-label equals an h2 inside it, each tile has .ws-move and .ws-expand, the grid has 12 tracks at 1280 and the page does not scroll sideways at 375, and /app and /charts of every dataset in tests/fixtures/round6_api.json equal the live responses (AC-80 'figures' data unchanged')",
+   "python3 -m pytest -q tests/test_pages.py tests/test_app_pages.py tests/test_business_page.py tests/test_filter_ui.py tests/test_table_toggle.py tests/test_tiles.py passes (no edit to tests/test_acceptance.py)"
+  ],
+  "acceptance": [
+   "AC-79",
+   "AC-80",
+   "AC-83"
+  ],
+  "files": [
+   "app/templates/_tile.html",
+   "app/templates/base.html",
+   "app/templates/dataset.html",
+   "app/templates/_figure.html",
    "app/templates/_tables.html",
-   "app/templates/_figure.html",
-   "app/static/js/dashboard.js",
-   "tests/test_map_page.py",
-   "tests/test_pages.py",
-   "tests/test_filter_ui.py"
-  ]
- },
- {
-  "goal": "Explorer-only score, bar cursor and automatic line y-range (F3, F4, F5; Board gate 181 items 3-5, reverses ticket 458's zero baseline on Business trends)",
-  "layer": "frontend",
-  "criteria": [
-   "figure(c, hidden=false, score=false) prints ' · score 0.NN' only when score is true and only app_explorer.html passes score=true; Explorer captions end with the API score to 2 decimals, shop (Business), places (Map), monitor.csv and survey.csv default pages show no 'score' in any .chart-rule",
-   "dashboard.js clickable(c) (bar or donut, c.drill not false, a filter select for x_label exists) drives barCursor: hovering an Explorer bar sets class bar-click (computed cursor pointer) like the Business leaderboard, and the Other trace gets no-pointer; Survey question bars use the same helper",
-   "The .trends rangemode 'tozero' line is deleted: a Business file with month sums 14,000..16,000 has trend _fullLayout.yaxis.range[0] > 0 and rangemode not 'tozero', while the leaderboard and every bar keep range[0] == 0",
-   "docs/DESIGN.md already holds the Cross-filter (AC-61), zero-baseline-for-bars-only (AC-62) text; a test reads it and finds 'Explorer' with 'bar-click' and 'zero baseline' with 'bars only'",
-   "Existing tests updated here: any Business/Map caption test expecting 'score' flips to no score, a test asserting rangemode 'tozero' on .trends flips (grep tozero in tests/test_business_page.py), tests/test_table_toggle.py bar-from-zero test still passes"
-  ],
-  "acceptance": [
-   "AC-35",
-   "AC-61",
-   "AC-62"
-  ],
-  "files": [
-   "app/templates/_figure.html",
    "app/templates/app_explorer.html",
-   "app/static/js/dashboard.js",
-   "tests/test_business_page.py",
-   "tests/test_filter_ui.py",
-   "tests/test_table_toggle.py"
-  ]
- },
- {
-  "goal": "Monitoring page (MO2, docs/DESIGN.md 'Monitoring and Survey (round 6)'): period links, tiles with SVG sparkline, main line with 7-point mean and spike labels; gate 184 tile cap note",
-  "layer": "frontend",
-  "criteria": [
-   "app_monitoring.html: nav.periods (aria-label Period) with links '7 days','30 days','90 days','All', current one aria-current, each href keeps f + appq + period=; filter form with date range and hidden pick inputs; ul.tiles li.card.tile per tile (label, value, min/max, change arrow + signed % + 'up'/'down'/'no change', svg.spark through the shared card macro); 'n/a' with no arrow for All or no previous period; '8 of N measures' note when capped",
-   "monitor.csv page: 30 days is aria-current by default; ?period=7 shows 7-point min/max; ?period=bad shows 30; Playwright: click '90 days' puts period=90 in the URL and Back returns; opening the URL shows the same period",
-   "dashboard.js monitor builder: three traces on one y-axis (value line --c1, dashed muted '7-point mean', spikes as markers+text 'spike' at top center), legend on, no yaxis2; monitor.csv has exactly one 'spike' label, quiet.csv has none; the view-table toggle lists time, value, 7-point mean and spike",
-   "Values on the page match the hand values: temperature ▲ +5.1% up, humidity ▶ 0.0% no change, quiet.csv ▼ -0.4% down; period 'all' tiles all read n/a",
-   "New tests/test_monitoring_page.py covers the above; CSS for .periods and .tile follows the stylesheet the Designer already wrote (app/static/css/databoot.css)"
-  ],
-  "acceptance": [
-   "AC-65",
-   "AC-66",
-   "AC-67",
-   "AC-54"
-  ],
-  "files": [
-   "app/templates/app_monitoring.html",
    "app/templates/app_business.html",
-   "app/static/js/dashboard.js",
    "app/static/css/databoot.css",
-   "tests/test_monitoring_page.py"
+   "docs/DESIGN.md",
+   "tests/test_tiles.py",
+   "tests/test_pages.py"
   ]
  },
  {
-  "goal": "Survey page (SU2, docs/DESIGN.md 'Monitoring and Survey (round 6)'): question grid, Likert stacked bars, cross-tab form and heatmap, Respondents histograms",
+  "goal": "Workspace tiles, part 2 (W7b): Map, Monitoring and Survey re-cut into tiles with the architecture's keys and spans.",
   "layer": "frontend",
   "criteria": [
-   "app_survey.html: filter form + chips, div.questions grid with one figure per question in column order (two per row at 1280 px sharing the same top, one per row at 375 px), cross-tab section, h2 'Respondents' with histograms of age (none: no section), Columns and First rows",
-   "dashboard.js likert builder: one horizontal 100% stacked bar (barmode stack, a trace per level incl. zero counts), levels before neutral from --div-neg, neutral --div-mid grey, after from --div-pos, x axis 0..100 with % suffix, hover 'level: count (pct%)'; on survey.csv the first and last level colours differ in hue and segment shares sum to 100",
-   "form.crosstab has two labelled selects 'Row question' and 'Column question' listing the questions plus an Apply button that works without JS; changing a select submits and puts row= and col= in the URL; ?row=q_easy&col=gender shows that pair, bad names show the first two",
-   "dashboard.js crosstab builder: one heatmap, one-hue sequential scale, cell text 'count (pct%)' with 1 decimal (gender x region female/East shows '3 (21.4%)'), colour bar titled count; question bars filter on click with the bar-click cursor and Other stays no-pointer",
-   "Every Survey figure has one y-axis, a hover tooltip and a working view-table toggle; no caption shows a score; tests/test_survey_page.py (new) covers the above with Playwright and server HTML checks"
+   "app_map.html: tile 'map' span 8 (extra 'map-layout', the 2D and hidden 3D figure, #map3d-toggle moved into the tile's .ws-head), tile 'panel' span 4 (aside.map-panel with the region bar figure; its <h2>Selected point</h2> kept), then columns and rows tiles",
+   "app_monitoring.html: tile 'tiles' (ul.tiles > li.card.tile and the .note inside, tile h2 'Measures'), each chart a 12-span tile with extra 'monitor-fig', then columns and rows; app_survey.html: each question a 6-span tile with extra 'questions' (figure a direct child of the section so '.questions > .chart' matches), 'crosstab' 12 (h2, form, figure) and 'respondents' 12 (h2 and the histograms), then columns and rows",
+   "Each template opens its own <div class='grid'>; every chart, card group and table of these apps sits in a tile whose aria-label equals an h2 in it (AC-80); the /app and /charts golden comparison in tests/test_tiles.py now covers the monitor, survey and places datasets too",
+   "tests/test_survey_page.py:28 order list is edited from '<div class=\"questions\">' to 'class=\"ws-tile questions\"' and nothing else in existing tests changes; no <p> in main, no bare 4+ digit numbers added to the page text",
+   "python3 -m pytest -q tests/test_map_page.py tests/test_monitoring_page.py tests/test_survey_page.py tests/test_tiles.py tests/test_app_pages.py tests/test_offline_apps.py passes; the full suite is run once at the end of this ticket because markup moved under old browser tests, and tests/test_speed.py numbers are reported, not loosened"
   ],
   "acceptance": [
-   "AC-68",
-   "AC-69",
-   "AC-70",
-   "AC-54"
+   "AC-80",
+   "AC-79"
   ],
   "files": [
+   "app/templates/app_map.html",
+   "app/templates/app_monitoring.html",
    "app/templates/app_survey.html",
-   "app/static/js/dashboard.js",
    "app/static/css/databoot.css",
-   "tests/test_survey_page.py"
+   "tests/test_survey_page.py",
+   "tests/test_tiles.py"
   ]
  },
  {
-  "goal": "Offline walk of the Monitoring and Survey apps and a keep-everything-passing sweep (AC-9, AC-58 for the new apps; Board gate 182 round 6 QA)",
+  "goal": "Tile drag and keyboard reorder (I7a, Board gate 189 keyboard reorder): tiles.js with pointer-event drag, Alt+Arrow on the move handle, aria-live announcement, per-dataset order store.",
   "layer": "frontend",
   "criteria": [
-   "tests/test_offline_apps.py gains one walk each for monitor.csv (change period, toggle table, hover) and survey.csv (change cross-tab pick, toggle table, click a bar) with a route handler that continues 127.0.0.1 and aborts and counts everything else: off-host request count is 0, no failed local asset, no 4xx/5xx, and len(page.local) > 5 so the zero is not vacuous",
-   "Both pages load with no console error",
-   "The full suite is run once at the end and any Monitoring/Survey/export regression found is fixed in the touched templates or dashboard.js only"
+   "app/static/js/tiles.js (local, deferred after dashboard.js in dataset.html): pointerdown on .ws-head or figcaption (not on a button, link, select or input) of tile A and pointerup over tile B moves A into B's place in the DOM (B.before(A) if A came after B, else B.after(A)); .ws-move has touch-action none",
+   "Alt+ArrowLeft/ArrowUp on .ws-move moves its tile one place earlier, Alt+ArrowRight/ArrowDown one later; focus stays on the handle; #ws-live text contains '<label> moved to position <i> of <n>'",
+   "After each move localStorage['databoot.order.<dataset id>.<app>'] holds the tile keys; on load stored keys come first in stored order and the rest follow in default order; another dataset keeps its default order; Tab order equals visual order",
+   "Playwright on the survey fixture (tests/test_tile_interactions.py): drag_to from tile 3's header onto tile 1 changes the data-tile order as specified, a reload keeps it, the monitor dataset keeps its default order; focus .ws-move on tile 2, Alt+ArrowLeft makes it first, #ws-live contains 'position 1 of' and document.activeElement is still the handle",
+   "No request leaves the app, no console errors; python3 -m pytest -q tests/test_tile_interactions.py tests/test_survey_page.py passes"
   ],
   "acceptance": [
-   "AC-9",
-   "AC-58"
+   "AC-81",
+   "AC-86"
   ],
   "files": [
-   "tests/test_offline_apps.py",
-   "app/static/js/dashboard.js"
+   "app/static/js/tiles.js",
+   "app/templates/dataset.html",
+   "app/static/css/databoot.css",
+   "tests/test_tile_interactions.py"
+  ]
+ },
+ {
+  "goal": "Tile expand overlay, glow and entrance (I7b): native dialog expand with reopen after a filter click, pointer glow, entrance within 0.6 s, reduced motion and reduced transparency.",
+  "layer": "frontend",
+  "criteria": [
+   "tiles.js: .ws-expand moves the tile into #tile-dialog (placeholder left behind), showModal(), then Plotly.Plots.resize on each .js-plotly-plot inside; the plot is wider than 0.8 x viewport; Esc (native cancel), a click whose target is the dialog itself (backdrop) or the expand button closes it, the tile returns to its place, plots resize, and .ws-expand gets focus",
+   "On pagehide with the dialog open sessionStorage['databoot.expand'] = '<dataset id>:<key>'; on load a matching present tile reopens expanded and the entry is deleted; clicking a bar inside the overlay (dashboard.js crossFilter unchanged) changes the URL (f.region=...), the chip and N of M counts, and after the load dialog[open] holds the same chart again",
+   "pointermove on a tile sets --mx/--my on it (not wired under prefers-reduced-motion: reduce); CSS entrance: max delay + duration <= 0.6 s, so document.getAnimations() for the tile entrances all finish within 600 ms of load (Playwright)",
+   "Under emulated prefers-reduced-motion: reduce no animation or transition runs (getAnimations() empty, glow variables never set); under prefers-reduced-transparency: reduce every element's computed backdropFilter is 'none' and the tile fill is opaque",
+   "tests/test_tile_interactions.py gains the expand, Esc, backdrop, reopen-after-filter, entrance and glow tests on sales (?app=explorer); python3 -m pytest -q tests/test_tile_interactions.py tests/test_filter_browser.py passes"
+  ],
+  "acceptance": [
+   "AC-82",
+   "AC-84"
+  ],
+  "files": [
+   "app/static/js/tiles.js",
+   "app/static/css/databoot.css",
+   "tests/test_tile_interactions.py"
+  ]
+ },
+ {
+  "goal": "Keyboard chart marks (K7): clickable bars and donut slices are reachable by Tab, show a focus ring, and Enter/Space act as a click.",
+  "layer": "frontend",
+  "criteria": [
+   "dashboard.js: crossFilter is split into apply(c, value) (today's URL toggle) called by plotly_click and the keyboard; keyboardMarks(plot, c) (same MutationObserver pattern as keyboardBar) runs only when clickable(c) and gives each trace-0 bar path and each donut slice path tabindex=0, role=button and aria-label '<x_label>: <category>'; the grey Other trace and last-level non-clickable leaderboard bars get none",
+   "Enter or Space on a mark calls apply with the category from the trace by index (horizontal bars y[i], vertical x[i], donut labels[i]) with the same URL, chip and count change as a click; the mark shows a visible focus ring (outline from DESIGN.md: 3px --fg, offset 2px)",
+   "Playwright (tests/test_keyboard_marks.py) on Explorer bars and donut, Business leaderboard, Survey question bars and Map top-region bars: Tab reaches a mark, getComputedStyle outline width > 0 when focused, Enter filters, Space filters",
+   "python3 -m pytest -q tests/test_keyboard_marks.py tests/test_filter_browser.py tests/test_business_page.py passes"
+  ],
+  "acceptance": [
+   "AC-85"
+  ],
+  "files": [
+   "app/static/js/dashboard.js",
+   "app/static/css/databoot.css",
+   "tests/test_keyboard_marks.py"
+  ]
+ },
+ {
+  "goal": "Dark theme only, offline walk and DESIGN.md check (T7; Board gate 190: T7 removes the prefers-color-scheme listener): finish theme tokens and verify AC-83, AC-84, AC-86, AC-87.",
+  "layer": "frontend",
+  "criteria": [
+   "databoot.css has no 'prefers-color-scheme', no '@font-face', and holds #050a12, #4de1ff, #ffb454, a monospace system font stack and color-scheme: dark; dashboard.js has no matchMedia('(prefers-color-scheme: dark)') variable or listener (only the phone query is kept) and charts read the dark tokens through tokens() whatever the emulated OS scheme",
+   "Playwright (tests/test_theme_round7.py): with emulated color scheme light and dark, body background computes to rgb(5, 10, 18) and the cyan/amber tokens resolve; body and label text keep contrast >= 4.5:1 against the effective tile background; charts keep one y-axis and bars sorted from zero (existing checks still green); token-reading tests (AC-50 --div-mid, AC-69, test_table_toggle) are re-run and pass",
+   "Offline walk (AC-86): one Playwright test records every request while it opens /, uploads files, waits for /scan, opens the workspace, drags and expands/closes a tile, toggles a table view and filters inside the overlay; all requests go to the app's own host",
+   "AC-87: a text test reads docs/DESIGN.md: a heading containing 'round 7' whose section lists #050a12, #4de1ff, #ffb454, 'mono', 'header', 'drag handle', 'expand', 'table toggle', '12-column', '0.6 s', 'reduced motion' and 'reduced transparency'; the section is edited only if a term is missing, and says the portal rings always turn (Board gate 190)",
+   "The full pytest suite is run once at the end, alone, and its result reported; failures are fixed in the app, not in tests/test_acceptance.py"
+  ],
+  "acceptance": [
+   "AC-83",
+   "AC-84",
+   "AC-86",
+   "AC-87"
+  ],
+  "files": [
+   "app/static/css/databoot.css",
+   "app/static/js/dashboard.js",
+   "docs/DESIGN.md",
+   "tests/test_theme_round7.py",
+   "tests/test_round7_offline.py"
   ]
  }
 ]
