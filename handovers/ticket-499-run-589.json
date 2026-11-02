@@ -1,0 +1,41 @@
+{
+  "header": {
+    "ticket": 499,
+    "project": "you-think-of-the-project-name",
+    "from_role": "designer",
+    "phase": "build",
+    "attempt": 2,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "1c53b4636107",
+    "tokens_left": 1813835
+  },
+  "goal": "Design review: open every page with the Playwright browser tools at desktop and phone width, compare with docs/DESIGN.md, and fix templates, CSS and front-end scripts directly where they fall short.",
+  "acceptance_criteria": [
+    {
+      "text": "Every page matches docs/DESIGN.md at desktop and phone width",
+      "passes": false
+    },
+    {
+      "text": "No page scrolls sideways at 375px",
+      "passes": false
+    },
+    {
+      "text": "All tests pass",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [],
+  "tried_and_failed": [],
+  "assumptions": [],
+  "open_questions": [],
+  "lessons": [],
+  "problems": [
+    "agent did not end with the handover JSON"
+  ]
+}
