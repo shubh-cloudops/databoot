@@ -1,0 +1,91 @@
+{
+  "header": {
+    "ticket": 489,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1945606
+  },
+  "goal": "Launcher folder optional (L7; Board gate 190: if the folder dialog is cancelled, start without a folder and open the home portal; Docker mode still requires a folder), plus verify AC-73's reworded text still holds.",
+  "acceptance_criteria": [
+    {
+      "text": "app/launch.py: the folder argument is optional (nargs='?'); with no folder it runs on upload.empty() (an owned empty temp folder deleted on exit) and the home page then has no dataset tables; with a folder behaviour is unchanged and test_missing_folder_exits_2_with_one_line still passes",
+      "passes": true
+    },
+    {
+      "text": "A folder given to the launcher is never written or deleted (AC-76): a test records the tree before and after launch.run on it",
+      "passes": true
+    },
+    {
+      "text": "Start-DataBoot.ps1: when the FolderBrowserDialog is cancelled the script starts without a folder instead of 'exit 1' (Board gate 190); it calls '-m app.launch' with the folder only when $Folder is set (an if, not an empty-string argument); -Docker without a folder still prints a message and 'exit 1'",
+      "passes": true
+    },
+    {
+      "text": "tests/test_launcher_files.py keeps every old needle (FolderBrowserDialog, -m app.launch, exit 1) and gains needles for the cancelled-dialog branch; no test runs PowerShell (none in the image)",
+      "passes": true
+    },
+    {
+      "text": "AC-73 is only reworded (Explorer-only XLSX Summary has no app title line, PPTX title slide first line 'Data overview'): no code change; python3 -m pytest -q tests/test_export_apps.py tests/test_export_pptx.py passes and an existing or new assertion checks both lines for an Explorer-only dataset",
+      "passes": true
+    },
+    {
+      "text": "Moves acceptance items AC-73, AC-74, AC-76 forward",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": true,
+    "output_tail": "........................................................................ [ 16%]\n........................................................................ [ 33%]\n........................................................................ [ 50%]\n........................................................................ [ 67%]\n........................................................................ [ 84%]\n.................................................................        [100%]\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 37 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_launch.py: 2 warnings\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_upload.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n425 passed, 114 warnings in 562.37s (0:09:22)\ncheck passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Launcher with no folder runs on upload.empty(); main() calls upload.cleanup() in a finally",
+      "why": "The owned temp folder must be deleted on exit even when the server never starts; the app lifespan already cleans on a normal shutdown",
+      "evidence": "app/launch.py main(); app/upload.py:40,108; docs/ARCHITECTURE.md 'Round 7: launcher (L7)'"
+    },
+    {
+      "what": "AC-73 needed no code or test change",
+      "why": "test_AC_73 already asserts the Summary has no 'overview' in A1 and the PPTX title slide reads 'Data overview'",
+      "evidence": "tests/test_acceptance.py:2230-2235; pytest tests/test_export_apps.py tests/test_export_pptx.py passed"
+    },
+    {
+      "what": "PS1: -Docker without a folder prints a message and exits 1 before docker info; the launch uses an if/else, not an empty argument",
+      "why": "Gate 190 and ARCHITECTURE L7: Windows PowerShell 5.1 drops empty string arguments",
+      "evidence": "Start-DataBoot.ps1; tests/test_launcher_files.py test_ps1_cancelled_dialog_starts_without_folder"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First version of the no-folder launch test used a helper that waited for the browser-opener callback",
+      "why_it_failed": "--no-browser never calls the opener, so the wait hung; rewrote the helper to poll launch.SERVER.started and read the port from SERVER.config.port"
+    },
+    {
+      "what": "A Python heredoc that rewrote app/launch.py and the PS1 with scripted multi-line replaces was blocked by the tool deny list",
+      "why_it_failed": "The deny list refused it; I used Edit instead, as the lessons advise"
+    }
+  ],
+  "assumptions": [
+    "test_AC_59 failing is flaky hover behaviour in the protected acceptance file, unrelated to the launcher"
+  ],
+  "open_questions": [
+    "test_AC_59 failed in the first full run and again when run alone this time; it needs the QA role to make the hover deterministic (gate 190)"
+  ],
+  "lessons": [
+    {
+      "lesson": "For a launcher test with --no-browser, poll launch.SERVER.started and read SERVER.config.port; do not wait on an open_browser callback",
+      "when": "Testing launch.main with --no-browser",
+      "evidence": "tests/test_launch.py _serve"
+    },
+    {
+      "lesson": "Write ps1 and test edits with Edit; a scripted heredoc that rewrote them was blocked",
+      "when": "Editing Start-DataBoot.ps1 or tests",
+      "evidence": "Bash deny list hook during ticket 489"
+    }
+  ],
+  "problems": []
+}

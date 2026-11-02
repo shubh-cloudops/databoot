@@ -17,15 +17,19 @@ if (-not $Folder) {
     Add-Type -AssemblyName System.Windows.Forms
     $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
     $dialog.Description = "Choose the folder or drive to explore"
-    if ($dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { exit 1 }
-    $Folder = $dialog.SelectedPath
+    # Cancel: start without a folder (the home portal takes uploads); -Docker below still needs one
+    if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $Folder = $dialog.SelectedPath }
 }
-if (-not (Test-Path -LiteralPath $Folder -PathType Container)) {
+if ($Folder -and -not (Test-Path -LiteralPath $Folder -PathType Container)) {
     Write-Host "Folder not found: $Folder"
     exit 1
 }
 
 if ($Docker) {
+    if (-not $Folder) {
+        Write-Host "Docker mode needs a folder. Run again and choose one."
+        exit 1
+    }
     docker info *> $null
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Docker is not running. Start Docker Desktop and try again."
@@ -64,4 +68,5 @@ if (-not (Test-Path .venv\Scripts\python.exe)) {
         if ($LASTEXITCODE -ne 0) { Fail "Could not install the packages (pip install -r requirements.txt)." }
     }
 }
-.venv\Scripts\python.exe -m app.launch $Folder
+if ($Folder) { .venv\Scripts\python.exe -m app.launch $Folder }
+else { .venv\Scripts\python.exe -m app.launch }

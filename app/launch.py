@@ -1,4 +1,5 @@
-"""One-click launcher: python -m app.launch <folder> [--port N] [--no-browser]. Starts uvicorn on 127.0.0.1, opens the browser."""
+"""One-click launcher: python -m app.launch [folder] [--port N] [--no-browser]. Starts uvicorn on 127.0.0.1, opens the browser.
+Without a folder it runs on an owned empty temp folder (deleted on exit)."""
 import argparse
 import os
 import socket
@@ -9,6 +10,8 @@ import webbrowser
 from pathlib import Path
 
 import uvicorn
+
+from app import upload
 
 HOST = "127.0.0.1"
 TRIES = 20
@@ -48,21 +51,23 @@ def run(folder, port=8765, open_browser=webbrowser.open):
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="python -m app.launch")
-    p.add_argument("folder")
+    p.add_argument("folder", nargs="?")
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--no-browser", action="store_true")
     a = p.parse_args(argv)
-    if not Path(a.folder).is_dir():
+    if a.folder and not Path(a.folder).is_dir():
         print(f"folder not found: {a.folder}", file=sys.stderr)
         return 2
     if not 0 < a.port < 65536:
         print(f"invalid port: {a.port}", file=sys.stderr)
         return 2
     try:
-        run(a.folder, a.port, None if a.no_browser else webbrowser.open)
+        run(a.folder or upload.empty(), a.port, None if a.no_browser else webbrowser.open)
     except OSError as e:
         print(str(e), file=sys.stderr)
         return 2
+    finally:
+        upload.cleanup()  # the app's shutdown does this too; this covers a start that failed
     return 0
 
 

@@ -54,6 +54,18 @@ def test_dockerfile():
         assert needle in d, needle
 
 
+def test_ps1_cancelled_dialog_starts_without_folder():
+    ps1 = text("Start-DataBoot.ps1")
+    assert "-eq [System.Windows.Forms.DialogResult]::OK) { $Folder = $dialog.SelectedPath }" in ps1
+    assert "-ne [System.Windows.Forms.DialogResult]::OK) { exit 1 }" not in ps1
+    assert "if ($Folder -and -not (Test-Path" in ps1
+    assert "if ($Folder) { .venv\\Scripts\\python.exe -m app.launch $Folder }" in ps1
+    assert "else { .venv\\Scripts\\python.exe -m app.launch }" in ps1
+    docker = ps1[ps1.index("if ($Docker) {"):]
+    guard = docker[:docker.index("docker info")]
+    assert "if (-not $Folder)" in guard and "Write-Host" in guard and "exit 1" in guard
+
+
 def test_ps1_exit_code_checks_before_launch():
     ps1 = text("Start-DataBoot.ps1")
     launch = ps1.index("-m app.launch")
