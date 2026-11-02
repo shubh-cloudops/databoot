@@ -1,0 +1,82 @@
+{
+  "header": {
+    "ticket": 493,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 2,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1794787
+  },
+  "goal": "Workspace shell and tiles, part 1 (W7a): _tile.html macro, dataset tabs, archetype caption (Board gate 190: omit G when zero), Explorer and Business re-cut into tiles; Board gate 190: tile titles mono UPPERCASE with letter-spacing, the text-transform ban scoped to <th>.",
+  "acceptance_criteria": [
+    {
+      "text": "app/templates/_tile.html macro tile(key,label,span,extra,heading) renders <section class='ws-tile {extra}' id='tile-{key}' data-tile data-span aria-label=label> with .ws-head (h2 unless heading=false, button.ws-move aria-label 'Move <label>', button.ws-expand aria-label 'Expand <label>' aria-haspopup=dialog) then the body; the aria-label equals the text of an h2 inside the tile (a region named by its heading, found by get_by_role('region', name=...))",
+      "passes": false
+    },
+    {
+      "text": "base.html has a tabs block in .site-header after the brand; dataset.html fills it with <nav class='tabs' aria-label='Datasets'> one link per dataset (path[ - sheet]) with aria-current='page' on the current one, outside <main> (test_business_page's aria-current count in main stays 2); under the h1 a <div class='archetype'> reads 'APP: BUSINESS \u00b7 RULE R2 \u00b7 T1 N1 C1 \u00b7 6 ROWS' for data_dir sales.csv; G<n> is printed only when non-zero (Board gate 190, e.g. 'T1 N2 C2'); the 'App: Business (rule R2)' badge, View as, filters and chips stay; dataset.html also holds <dialog class='overlay' id='tile-dialog'> and <div class='sr-only' id='ws-live' aria-live='polite'> at the end of main",
+      "passes": false
+    },
+    {
+      "text": "app_explorer.html and app_business.html each open one <div class='grid' data-dataset data-app> (12 columns at desktop, 1 column under 600 px; the Explorer grid keeps class 'charts') and wrap every chart, kpis/cards and table in a tile with the default keys and spans of the architecture table (Explorer: kpis 12, chart-1 12, chart-2..8 6, columns, rows; Business: cards, trend chart-N 6, leaderboard, changes, columns, rows); old wrapper classes ride on the tiles via extra; the '<caption><h2>X</h2></caption>' and '<span class=\"chart-title\">' strings stay byte for byte; Map, Monitoring and Survey templates are untouched and still render",
+      "passes": false
+    },
+    {
+      "text": "Board gate 190: tile titles (.ws-head h2) are mono, UPPERCASE (text-transform) with letter-spacing; table <th> column headers keep their case; figure titles (.chart-title) and table caption h2 get NO text-transform because tests/test_acceptance.py:481-488 and :1382 compare their inner_text in real case; tests/test_pages.py test_headers_keep_their_case is scoped to CSS rules whose selector targets th (no 'uppercase'/text-transform in those rules) instead of the whole stylesheet; docs/DESIGN.md Type and tile sections state this",
+      "passes": false
+    },
+    {
+      "text": "tests/test_tiles.py: for sales (?app=explorer) and shop (Business) every figure.chart, ul.cards, dl.kpis and table has a section.ws-tile ancestor whose aria-label equals an h2 inside it, each tile has .ws-move and .ws-expand, the grid has 12 tracks at 1280 and the page does not scroll sideways at 375, and /app and /charts of every dataset in tests/fixtures/round6_api.json equal the live responses (AC-80 'figures' data unchanged')",
+      "passes": false
+    },
+    {
+      "text": "python3 -m pytest -q tests/test_pages.py tests/test_app_pages.py tests/test_business_page.py tests/test_filter_ui.py tests/test_table_toggle.py tests/test_tiles.py passes (no edit to tests/test_acceptance.py)",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-79, AC-80, AC-83 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Made no code change in attempt 2; attempt 1's commit already holds _tile.html, tabs, archetype caption, dialog and live region, tiled Explorer and Business templates, CSS uppercase on .ws-head h2, test_pages th scoping, DESIGN.md text and tests/test_tiles.py",
+      "why": "The ticket's six test files pass and the pages render correctly at 1280 and 375",
+      "evidence": "python3 -m pytest -q tests/test_pages.py tests/test_app_pages.py tests/test_business_page.py tests/test_filter_ui.py tests/test_table_toggle.py tests/test_tiles.py (45 passed); /tmp/shots/t493-business-1280.png, t493-explorer-375.png; app/static/css/databoot.css:328"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Stopping the dev server with pkill, then with a /proc scan matching 'port 8493'",
+      "why_it_failed": "pkill is not installed; the /proc scan also matched my own background pytest command line (its command text contained the same string) and killed it, so the full suite had to be rerun"
+    }
+  ],
+  "assumptions": [
+    "test_AC_42 failed on its 5 s cold-load limit because an earlier full run was still running concurrently; alone it passes at 3.71 s, versus 3.63 s on the commit before this ticket",
+    "test_AC_59 is the known hover flake in the protected acceptance file"
+  ],
+  "open_questions": [
+    "test_AC_59 (and test_AC_52) hover loops need the QA role to be made deterministic (gate 190); they fail in full runs although they are unrelated to tiles"
+  ],
+  "lessons": [
+    {
+      "lesson": "Do not start a second full pytest run while another is in the background, and do not kill processes by matching a string that also appears in your own command line; there is no pkill or curl in this image, so save the server PID when starting it",
+      "when": "Stopping a temporary uvicorn server or running the long suite in the background",
+      "evidence": "A /proc scan for 'port 8493' killed the background pytest; two overlapping full runs made test_AC_42 exceed its 5 s timing limit"
+    },
+    {
+      "lesson": "On a retry whose commit already holds the ticket's files, run the ticket's tests and screenshot both widths instead of rebuilding",
+      "when": "Ticket says 'attempt 2' and git log shows attempt 1 commit",
+      "evidence": "git show --stat HEAD lists all the ticket's files; 45 tests pass"
+    }
+  ],
+  "problems": []
+}
