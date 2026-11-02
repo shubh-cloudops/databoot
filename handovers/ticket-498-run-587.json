@@ -1,0 +1,83 @@
+{
+  "header": {
+    "ticket": 498,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 3,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1721226
+  },
+  "goal": "Dark theme only, offline walk and DESIGN.md check (T7; Board gate 190: T7 removes the prefers-color-scheme listener): finish theme tokens and verify AC-83, AC-84, AC-86, AC-87.",
+  "acceptance_criteria": [
+    {
+      "text": "databoot.css has no 'prefers-color-scheme', no '@font-face', and holds #050a12, #4de1ff, #ffb454, a monospace system font stack and color-scheme: dark; dashboard.js has no matchMedia('(prefers-color-scheme: dark)') variable or listener (only the phone query is kept) and charts read the dark tokens through tokens() whatever the emulated OS scheme",
+      "passes": false
+    },
+    {
+      "text": "Playwright (tests/test_theme_round7.py): with emulated color scheme light and dark, body background computes to rgb(5, 10, 18) and the cyan/amber tokens resolve; body and label text keep contrast >= 4.5:1 against the effective tile background; charts keep one y-axis and bars sorted from zero (existing checks still green); token-reading tests (AC-50 --div-mid, AC-69, test_table_toggle) are re-run and pass",
+      "passes": false
+    },
+    {
+      "text": "Offline walk (AC-86): one Playwright test records every request while it opens /, uploads files, waits for /scan, opens the workspace, drags and expands/closes a tile, toggles a table view and filters inside the overlay; all requests go to the app's own host",
+      "passes": false
+    },
+    {
+      "text": "AC-87: a text test reads docs/DESIGN.md: a heading containing 'round 7' whose section lists #050a12, #4de1ff, #ffb454, 'mono', 'header', 'drag handle', 'expand', 'table toggle', '12-column', '0.6 s', 'reduced motion' and 'reduced transparency'; the section is edited only if a term is missing, and says the portal rings always turn (Board gate 190)",
+      "passes": false
+    },
+    {
+      "text": "The full pytest suite is run once at the end, alone, and its result reported; failures are fixed in the app, not in tests/test_acceptance.py",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-83, AC-84, AC-86, AC-87 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Made no code or test change in attempt 3; attempt 1's commit (6047d2a) already holds the dashboard.js listener removal, the DESIGN.md wording, tests/test_theme_round7.py and tests/test_round7_offline.py",
+      "why": "Every acceptance line is met and the full suite passes, so rebuilding would only add risk",
+      "evidence": "git log --stat -3; pytest tests/test_theme_round7.py tests/test_round7_offline.py tests/test_table_toggle.py (11 passed); full python -m pytest -q: 480 passed in 739.16s"
+    },
+    {
+      "what": "Checked the workspace in a real browser at 1280 and 375 wide",
+      "why": "Role rule: look at the pages; the dark tokens, cyan titles and amber chip render with no console errors",
+      "evidence": "/tmp/shots/t498-1280.png, /tmp/shots/t498-375.png; browser_console_messages: 0 errors"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Finding why attempts 1 and 2 failed verify",
+      "why_it_failed": "Their handovers carry an empty output_tail and the run folders have no verify log; the most likely cause is a timing test under load (attempt 2 saw test_AC_42 fail at its 5 s cold limit)"
+    }
+  ],
+  "assumptions": [
+    "The earlier verify failures were load-dependent timing or hover flakes in tests/test_acceptance.py, not this ticket's code, because a clean full run now passes"
+  ],
+  "open_questions": [
+    "The offline walk triggers the overlay filter with plotly_click from script, not a real mouse click on a bar; say if AC-86 needs a real pointer click",
+    "test_AC_42 (5.0 s cold limit) has little margin under load; QA may want to review it since tests/test_acceptance.py is protected"
+  ],
+  "lessons": [
+    {
+      "lesson": "On a retry with committed work and an empty verify tail, run the ticket's tests, then the full suite once in the background with a 2,400,000 ms timeout, and poll the log with a loop of 5 s sleeps instead of starting a second run",
+      "when": "Retry tickets whose earlier verify failed with no output",
+      "evidence": "full run 739 s, 480 passed"
+    },
+    {
+      "lesson": "Do not kill a server by scanning /proc cmdlines for the port string: the scanning shell matches itself and dies (exit 144). Start the server with a known PID file instead",
+      "when": "Stopping a local app started with nohup in an image without pkill or curl",
+      "evidence": "exit code 144 on the kill loop"
+    }
+  ],
+  "problems": []
+}
