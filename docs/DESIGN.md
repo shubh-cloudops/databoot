@@ -160,9 +160,9 @@ round 1 tables (Datasets, Could not be read, Other files) unchanged and below it
 </div>
 ```
 The two file inputs are `hidden` and opened by the buttons (`webkitdirectory` on the folder one); the buttons are the keyboard route.
-- **Portal**: a circle, `width: min(400px, 100% / 1.24)` (so 400px on a desktop, 277px at 375px) and `aspect-ratio: 1`, border 1.5px
+- **Portal**: a circle, `width: min(400px, 100% / 1.24)` (400px on a desktop; at <= 599px `100% / 1.3`, 264px at 375px, so the outer ring fits the column) and `aspect-ratio: 1`, border 1.5px
   `rgba(77,225,255,.5)`, a radial cyan glow inside (`.16` centre to transparent at 72%). Three dashed rings sit behind it at 4%, 8% and
-  12% outside the edge (cyan .35, cyan .24, amber .22). Title = the system sans at `--t-lg` 650 (an `h2`, because the page's h1 is
+  12% outside the edge (`.portal-wrap` has `overflow-x: clip`: a turning ring's box is wider than its circle and made Home scroll sideways at 375px, found in the round 7 design review, ticket 499) (cyan .35, cyan .24, amber .22). Title = the system sans at `--t-lg` 650 (an `h2`, because the page's h1 is
   the product name). Buttons are stacked, 220px wide at most (44px high). Contents are 70% of the width and centred.
 - **States** by `data-state`: `idle`, `over` (a drag is over the portal: the border goes solid `--accent`, the glow doubles, a 3px
   `--accent-soft` halo) and `busy` (an upload is running). **The rings always turn slowly (24 s, 36 s reversed, 52 s per turn) in every
@@ -174,7 +174,7 @@ The two file inputs are `hidden` and opened by the buttons (`webkitdirectory` on
   ignored (`intake.js` stops the browser from opening the file) and nothing else on the page highlights.
 
 ### Scan screen (`/scan`)
-`<h1>DataBoot</h1>` then `div.scan` (glass panel, 900px max, 16px padding) holding `<ol class="scan-log" aria-live="polite">` and the
+`section.scan` (glass panel, 900px max, 16px padding) holding `<h1>DataBoot</h1>` (the h1 is inside the panel, as built), `<ol class="scan-log" aria-live="polite">` and the
 link `<a class="btn btn-primary" id="open-workspace">Open workspace</a>` (always visible, first stop). Lines are mono `--t-sm`,
 `white-space: pre-wrap` so the double spaces of the architecture's format stay; each has a cyan `›` prompt (CSS, empty alt). Classes:
 `li` plain = a dataset line in `--fg`; `li.bad` = an unreadable file with its note, `--danger` (the words carry it, not the colour);

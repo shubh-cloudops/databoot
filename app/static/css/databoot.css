@@ -261,7 +261,7 @@ section.block { margin-top: var(--s6); }
 .archetype { font: var(--t-label)/1.5 var(--mono); letter-spacing: 0.08em; color: var(--accent); overflow-wrap: anywhere; }  /* the server upper-cases it; no text-transform here */
 
 /* home: the drop portal. State lives in data-state (idle, over, busy), set by intake.js from real drag and upload events */
-.portal-wrap { display: grid; justify-items: center; gap: var(--s4); margin: var(--s5) 0 var(--s6); }
+.portal-wrap { display: grid; justify-items: center; gap: var(--s4); margin: var(--s5) 0 var(--s6); overflow-x: clip; }  /* a turning ring's box is larger than its circle: never let it widen the page */
 .portal { position: relative; display: grid; place-items: center; width: min(400px, calc(100% / 1.24));  /* the outer ring reaches 12% past the circle, so the circle leaves room for it */ aspect-ratio: 1; border-radius: 50%;
   border: 1.5px solid rgba(77, 225, 255, 0.5); background: radial-gradient(circle, rgba(77, 225, 255, 0.16), rgba(77, 225, 255, 0.04) 55%, transparent 72%); }
 .portal[data-state="over"] { border-color: var(--accent); background: radial-gradient(circle, rgba(77, 225, 255, 0.30), rgba(77, 225, 255, 0.08) 60%, transparent 76%);
@@ -387,6 +387,7 @@ dialog.overlay .ws-tile .chart[data-leaderboard] .plot { height: max(420px, calc
   .ws-tile .table-wrap caption { padding-left: var(--s3); }
   dialog.overlay { padding: var(--s2); }
   .portal-wrap { margin: var(--s4) 0 var(--s5); }
+  .portal { width: calc(100% / 1.3); }  /* the outer ring (1.24 x) then fits inside the 343px column */
 }
 
 @media (min-width: 900px) {

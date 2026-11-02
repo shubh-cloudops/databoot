@@ -1,0 +1,81 @@
+{
+  "header": {
+    "ticket": 499,
+    "project": "you-think-of-the-project-name",
+    "from_role": "designer",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "1c53b4636107",
+    "tokens_left": 1813835
+  },
+  "goal": "Design review: open every page with the Playwright browser tools at desktop and phone width, compare with docs/DESIGN.md, and fix templates, CSS and front-end scripts directly where they fall short.",
+  "acceptance_criteria": [
+    {
+      "text": "Every page matches docs/DESIGN.md at desktop and phone width",
+      "passes": false
+    },
+    {
+      "text": "No page scrolls sideways at 375px",
+      "passes": false
+    },
+    {
+      "text": "All tests pass",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Clipped the portal wrapper horizontally and narrowed the portal to 100%/1.3 at <=599px",
+      "why": "The rotating outer ring (1.24x the circle) widened Home to 400px at 375px",
+      "evidence": "app/static/css/databoot.css .portal-wrap and the <=599px media block; sweep showed scrollWidth 375"
+    },
+    {
+      "what": "Replaced the move and expand SVGs in _tile.html with the exact ones in DESIGN.md",
+      "why": "Rendered icons differed from the spec (cross arrows, filled corners)",
+      "evidence": "app/templates/_tile.html:2; docs/DESIGN.md 'The tile' item 2"
+    },
+    {
+      "what": "Corrected DESIGN.md for the scan h1 inside section.scan and the phone portal width",
+      "why": "Doc should say what the code does after review",
+      "evidence": "docs/DESIGN.md 'Scan screen' and 'Home: the portal'"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "First sweep including /scan in the page loop",
+      "why_it_failed": "/scan auto-navigates to the workspace, destroying the evaluate context; shot it separately after 900 ms"
+    }
+  ],
+  "assumptions": [
+    "Chromium's :focus-visible reports outlineStyle none on date inputs only in my loop's moment of sampling; a direct check showed the date input focused with a solid outline",
+    "No change needed for 800px since the grid has one column up to 899px and nothing changed there"
+  ],
+  "open_questions": [
+    "Hover glow and drag states were not re-verified visually; tests/test_tile_interactions.py passes"
+  ],
+  "lessons": [
+    {
+      "lesson": "Sweep at 375px with scrollWidth, and treat decorative rotating or absolutely positioned rings as overflow suspects; clip them on their wrapper",
+      "when": "Reviewing a page with decorative elements larger than their box",
+      "evidence": "Home scrollWidth 400 before the fix, 375 after"
+    },
+    {
+      "lesson": "Compare rendered icons with the exact SVG markup in DESIGN.md, not only their presence",
+      "when": "Design review of icon buttons",
+      "evidence": "_tile.html move and expand icons differed from DESIGN.md"
+    },
+    {
+      "lesson": "Shoot /scan with a short wait (about 900 ms) in its own script, since scan.js navigates away",
+      "when": "Screenshotting the scan page",
+      "evidence": "Playwright evaluate error 'Execution context was destroyed'"
+    }
+  ],
+  "problems": []
+}
