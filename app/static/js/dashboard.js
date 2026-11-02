@@ -398,17 +398,54 @@
   // Click on a bar or donut slice of a categorical column sets f.<column> to that category (AND with the other
   // filters); clicking the active value again removes it. Only columns with a dropdown (<= 50 values) filter.
   // Leaderboard: no click at the last level (c.drill false), and the Other bar (trace 1) never clicks.
+  function apply(c, value) {
+    var key = "f." + c.x_label;
+    var p = new URLSearchParams(location.search);
+    if (p.get(key) === value) p.delete(key); else p.set(key, value);
+    location.assign(location.pathname + (p.toString() ? "?" + p : ""));
+  }
+
   function crossFilter(plot, c) {
     if (!clickable(c)) return;
-    var key = "f." + c.x_label;
     plot.on("plotly_click", function (ev) {
       var pt = ev.points && ev.points[0];
       if (!pt || c.other && pt.curveNumber > 0) return;
-      var value = String(c.kind === "donut" ? pt.label : pt.data && pt.data.orientation === "h" ? pt.y : pt.x);
-      var p = new URLSearchParams(location.search);
-      if (p.get(key) === value) p.delete(key); else p.set(key, value);
-      location.assign(location.pathname + (p.toString() ? "?" + p : ""));
+      apply(c, String(c.kind === "donut" ? pt.label : pt.data && pt.data.orientation === "h" ? pt.y : pt.x));
     });
+  }
+
+  // Keyboard marks: each trace-0 bar and donut slice is a tabbable button (same observer pattern as keyboardBar). The category
+  // comes from the trace by index, so the grey Other trace never gets a stop.
+  function keyboardMarks(plot, c) {
+    if (!clickable(c) || plot.dataset.km) return;
+    plot.dataset.km = "1";
+    var sel = c.kind === "donut" ? ".pielayer .slice path" : ".barlayer > .trace:first-child .point path";
+    var category = function (path) {
+      var t = plot.data[0], all = [].slice.call(plot.querySelectorAll(sel)), i = all.indexOf(path);
+      var d = path.parentNode.__data__;  // Plotly binds the point (with its trace index i) to the slice or bar group
+      if (d && typeof d.i === "number") i = d.i;
+      var v = c.kind === "donut" ? t.labels : t.orientation === "h" ? t.y : t.x;
+      return i < 0 || v[i] == null ? null : String(v[i]);
+    };
+    var fix = function () {
+      plot.querySelectorAll(sel).forEach(function (m) {
+        var cat = category(m);
+        if (cat === null || m.getAttribute("tabindex") === "0") return;
+        m.setAttribute("tabindex", "0");
+        m.setAttribute("role", "button");
+        m.setAttribute("aria-label", c.x_label + ": " + cat);
+      });
+    };
+    new MutationObserver(fix).observe(plot, { childList: true, subtree: true });
+    plot.addEventListener("keydown", function (e) {
+      var m = e.target.closest && e.target.closest(sel);
+      if (!m || e.key !== "Enter" && e.key !== " ") return;
+      var cat = category(m);
+      if (cat === null) return;
+      e.preventDefault();
+      apply(c, cat);
+    });
+    fix();
   }
 
   // Map app side panel: the clicked point's row from the payload (no request; numbers are formatted by the server), or a hex cell's count.
@@ -444,7 +481,7 @@
       var made = build[c.kind](c, t, layout(t, c));
       if (c.kind === "bar" && el.closest(".map-panel")) { made[1].xaxis.nticks = 3; made[1].xaxis.tickangle = 0; }  // 340px box: three ticks fit flat
       globalRules(made[0], made[1], c);
-      Plotly.newPlot(plot, made[0], made[1], c.kind === "map2d" ? Object.assign({}, CONFIG, { scrollZoom: false }) : CONFIG).then(function () { keyboardBar(plot); barCursor(plot, c); crossFilter(plot, c); mapPanel(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });
+      Plotly.newPlot(plot, made[0], made[1], c.kind === "map2d" ? Object.assign({}, CONFIG, { scrollZoom: false }) : CONFIG).then(function () { keyboardBar(plot); barCursor(plot, c); crossFilter(plot, c); keyboardMarks(plot, c); mapPanel(plot, c); tableToggle(el, plot, c); }).catch(function () { fail(plot); });
     } catch (e) { fail(plot); }
   }
 

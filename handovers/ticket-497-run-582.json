@@ -1,0 +1,85 @@
+{
+  "header": {
+    "ticket": 497,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 1924871
+  },
+  "goal": "Keyboard chart marks (K7): clickable bars and donut slices are reachable by Tab, show a focus ring, and Enter/Space act as a click.",
+  "acceptance_criteria": [
+    {
+      "text": "dashboard.js: crossFilter is split into apply(c, value) (today's URL toggle) called by plotly_click and the keyboard; keyboardMarks(plot, c) (same MutationObserver pattern as keyboardBar) runs only when clickable(c) and gives each trace-0 bar path and each donut slice path tabindex=0, role=button and aria-label '<x_label>: <category>'; the grey Other trace and last-level non-clickable leaderboard bars get none",
+      "passes": false
+    },
+    {
+      "text": "Enter or Space on a mark calls apply with the category from the trace by index (horizontal bars y[i], vertical x[i], donut labels[i]) with the same URL, chip and count change as a click; the mark shows a visible focus ring (outline from DESIGN.md: 3px --fg, offset 2px)",
+      "passes": false
+    },
+    {
+      "text": "Playwright (tests/test_keyboard_marks.py) on Explorer bars and donut, Business leaderboard, Survey question bars and Map top-region bars: Tab reaches a mark, getComputedStyle outline width > 0 when focused, Enter filters, Space filters",
+      "passes": false
+    },
+    {
+      "text": "python3 -m pytest -q tests/test_keyboard_marks.py tests/test_filter_browser.py tests/test_business_page.py passes",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-85 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Map top-region bars get no keyboard stop; the Map test asserts none",
+      "why": "geo.py sets drill False for them (gate 179), clickable() rejects them, and test_geo/test_map_page assert no click or pointer; making them clickable is a backend and test change beyond this ticket",
+      "evidence": "app/geo.py:55; tests/test_geo.py:76; tests/test_map_page.py:147-157; docs/ARCHITECTURE.md:623"
+    },
+    {
+      "what": "Category is taken from the Plotly point's trace index (group __data__.i), falling back to DOM order, then looked up in plot.data[0]",
+      "why": "Pie slices are sorted by Plotly, so DOM order may differ from labels[i]",
+      "evidence": "app/static/js/dashboard.js keyboardMarks"
+    },
+    {
+      "what": "No CSS change",
+      "why": "The 3px --fg outline at 2px offset on .point path and .slice path already exists",
+      "evidence": "app/static/css/databoot.css:371"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Test on places.csv that Tab reaches a top-region mark and Enter filters",
+      "why_it_failed": "The Map regions figure has data-drill=false, so there are no marks to reach"
+    }
+  ],
+  "assumptions": [
+    "AC-85's 'clickable chart mark' means marks that actually click today, so non-clickable Map regions satisfy it with no stop",
+    "The Space check on the filtered page needs the same mark focused, so the test focuses it by aria-label after the reload"
+  ],
+  "open_questions": [
+    "Should Map top regions become clickable (geo.py drill True plus edits to test_geo.py and test_map_page.py) so the ticket's Map line holds? ARCHITECTURE AC-85 lists places top regions but also says data-drill=false stays non-clickable.",
+    "The full suite was not run by me; I only ran the ticket's three files and six related page tests."
+  ],
+  "lessons": [
+    {
+      "lesson": "Before writing a browser test for a mark on a page, probe whether that figure is clickable (data-drill, filter select present); acceptance text can list figures that are deliberately inert",
+      "when": "A ticket asks for interaction on figures from several apps",
+      "evidence": "Map regions figure has data-drill=false so MARKS was 0 in the probe"
+    },
+    {
+      "lesson": "A drilling leaderboard shows a different column after Enter, so test the second step by pressing Space on a mark of the next level, not by toggling the same value off",
+      "when": "Testing keyboard or click filters on the Business leaderboard",
+      "evidence": "tests/test_keyboard_marks.py check(drills=True)"
+    }
+  ],
+  "problems": []
+}
