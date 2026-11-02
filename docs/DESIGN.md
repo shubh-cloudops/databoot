@@ -552,7 +552,7 @@ title, rule, count, then the `View as table` button full height 44px at the star
 
 **Map, 1280px**: shell, filters and chips, then `.map-layout` with two columns: the map figure left (card with title,
 rule, `N of M rows` and the `View as table` button on the right of the caption, then the 70vh
-plot; the `3D view` button is in its own `.map-head` row above the layout so it stays reachable while the 2D figure is hidden) and `aside.map-panel` right, 340px wide and sticky at 16px: a `.panel-box` `Selected point` (a `dl` of column
+plot; the `3D view` button is in the tile's head, an in-flow row above the map (round 7) so it stays reachable while the 2D figure is hidden) and `aside.map-panel` right, 340px wide and sticky at 16px: a `.panel-box` `Selected point` (a `dl` of column
 and value, label column 40%, or the empty text) and a `.panel-box` with the top-regions figure. A hidden
 `figure[data-kind="map3d"]` shares the map's place: `3D view` hides the 2D figure and shows it, pressed again swaps
 back; both have the same height so the page does not jump. Then Columns and First rows.
@@ -615,6 +615,15 @@ is over or an upload runs~~ (reversed by Board gate 190: the rings always turn, 
 and tab order. **Frontend notes**: `dashboard.js` still has `matchMedia("(prefers-color-scheme: dark)")` (T7 removes it); Plotly grid colour
 is `--line` (rgba, .16) and the hover label fill is `--surface`; the mode bar icons are `--muted` (6.9:1 on the tile); heights of plots are
 unchanged. The Min/Max example in Components now shows whole numbers (gate 186).
+
+Design review (ticket 499, round 7), 1280, 800 and 375 px, a demo folder (all conftest archetypes, round 6 files, unreadable files): no
+page scrolls sideways (scrollWidth equals the viewport everywhere), no console error, Tab shows a ring on every stop. Fixed in
+`databoot.css`: (1) the Home portal's turning ring widened the page to 400px at 375 (`.portal-wrap` clips x; the circle is `100% / 1.3`
+on the phone); (2) the map tile's `3D view` head floated over the figure title: a tile head with a tool button (`.ws-head:has(.btn)`)
+is now an in-flow row above the figure, right-aligned, as this file always said (`3D view` in its own row); (3) the map tile kept the
+round 4 `.map-layout { align-items: start }`, which shrank the map to 540 of 730px at 1280: the tile stretches it now; (4) the
+`Selected point` h2 is a 44px title row clear of the floating buttons; (5) Plotly's injected 22px rule beat the 28px mode bar buttons
+(selector now `.modebar .modebar-btn`). `_tile.html` move and expand icons match the SVGs in this file. **No token change.**
 
 Design review (ticket 476, round 6), 1280, 800 and 375 px, light and dark, a demo folder (monitor, quiet, survey, shop, places, measures,
 sales, an unreadable file, a 404): scrollWidth equals the viewport everywhere, no `.plot-error`, no console error but the expected 404, no

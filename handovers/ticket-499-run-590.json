@@ -1,0 +1,89 @@
+{
+  "header": {
+    "ticket": 499,
+    "project": "you-think-of-the-project-name",
+    "from_role": "designer",
+    "phase": "build",
+    "attempt": 3,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "1c53b4636107",
+    "tokens_left": 1717124
+  },
+  "goal": "Design review: open every page with the Playwright browser tools at desktop and phone width, compare with docs/DESIGN.md, and fix templates, CSS and front-end scripts directly where they fall short.",
+  "acceptance_criteria": [
+    {
+      "text": "Every page matches docs/DESIGN.md at desktop and phone width",
+      "passes": false
+    },
+    {
+      "text": "No page scrolls sideways at 375px",
+      "passes": false
+    },
+    {
+      "text": "All tests pass",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "A tile head without an h2 but with a tool button (.ws-head:has(.btn)) is an in-flow, right-aligned, full-width row",
+      "why": "The floating head put '3D view' over the map figure title at 375px; DESIGN.md says the 3D button has its own row",
+      "evidence": "app/static/css/databoot.css .ws-head:not(:has(h2)):has(.btn); /tmp/shots/map-375b.png; docs/DESIGN.md Map layout paragraph"
+    },
+    {
+      "what": ".ws-tile.map-layout { align-items: stretch }",
+      "why": "The round 4 .map-layout align-items:start (>=900px) shrank the map figure to 539 of 729px inside the flex tile",
+      "evidence": "Playwright computed widths before/after (FIGURE.chart 538.9 -> 728.7); databoot.css:402"
+    },
+    {
+      "what": "Selected point panel h2 is a 44px title row with 96px right padding",
+      "why": "Keeps the panel text clear of the floating move and expand buttons, like figure captions",
+      "evidence": "databoot.css .ws-tile .map-panel .panel-box > h2; /tmp/shots/map-375b.png"
+    },
+    {
+      "what": "Mode bar button selector raised to .js-plotly-plot .plotly .modebar .modebar-btn",
+      "why": "Plotly's injected 22px height rule beat the 28px rule from DESIGN.md Components at equal specificity",
+      "evidence": "measured 28x22 before, 28x28 after (/tmp/rv/mb.py)"
+    },
+    {
+      "what": "Recorded the review in DESIGN.md 'Changes this round' and corrected the map paragraph; no token change",
+      "why": "DESIGN.md must say what the code does after a review",
+      "evidence": "docs/DESIGN.md 'Design review (ticket 499, round 7)'"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "grid-template-columns: minmax(0,1fr) on .ws-tile.map-layout to widen the map",
+      "why_it_failed": "The tile is display:flex (column), not grid; the shrink came from align-items:start"
+    }
+  ],
+  "assumptions": [
+    "test_AC_42 (5.13 s vs a 5 s limit) failed only because my screenshot sweep loaded the machine; it passed in the following full run",
+    "Date inputs report no outline on the input element itself because Chromium rings the inner segments (as ticket 476 recorded)"
+  ],
+  "open_questions": [],
+  "lessons": [
+    {
+      "lesson": "When a component's wrapper class is reused on a new element (e.g. .map-layout on a flex tile), check old media-query rules such as align-items:start; they can silently shrink children",
+      "when": "Design review after a layout refactor into tiles",
+      "evidence": "map figure 539px of a 729px tile at 1280"
+    },
+    {
+      "lesson": "Measure Plotly modebar button heights in the browser: Plotly injects its own styles, and they win at equal specificity",
+      "when": "Restyling Plotly chrome from a stylesheet",
+      "evidence": "modebar-btn computed 22px despite a 28px rule"
+    },
+    {
+      "lesson": "Do not run a Playwright sweep at the same time as the full suite: the speed test test_AC_42 fails under the extra load",
+      "when": "Design review with a background suite",
+      "evidence": "test_AC_42 5.13 s during the sweep, passed in the next run"
+    }
+  ],
+  "problems": []
+}

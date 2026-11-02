@@ -57,7 +57,7 @@ code, .mono { font-family: var(--mono); font-size: 0.9em; overflow-wrap: anywher
    buttons are focusable (dashboard.js adds tabindex) and get the same ring as every control. The long selector
    outranks Plotly's own injected `.modebar-btn:focus-visible` (1px black), which would be invisible on dark. */
 .js-plotly-plot .plotly .modebar, .js-plotly-plot .plotly .modebar-group { opacity: 1; }
-.js-plotly-plot .plotly .modebar-btn { height: 28px; min-width: 28px; }
+.js-plotly-plot .plotly .modebar .modebar-btn { height: 28px; min-width: 28px; }  /* .modebar outranks Plotly's injected 22px rule */
 .js-plotly-plot .plotly .modebar .modebar-btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 0; border-radius: 4px; }
 
 /* layout */
@@ -327,6 +327,7 @@ section.block { margin-top: var(--s6); }
 .ws-head { display: flex; align-items: center; gap: var(--s1); user-select: none; cursor: grab; }
 .ws-head:has(h2) { margin: calc(var(--s2) * -1) calc(var(--s2) * -1) 0 0; }
 .ws-head:not(:has(h2)) { position: absolute; top: var(--s2); right: var(--s2); z-index: 2; }
+.ws-head:not(:has(h2)):has(.btn) { position: static; justify-content: flex-end; grid-column: 1 / -1; margin: calc(var(--s2) * -1) calc(var(--s2) * -1) 0 0; }  /* a head with a tool (3D view) is its own row, so it never covers the figure title */
 .ws-head h2 { flex: 1 1 auto; min-width: 0; margin: 0; font: 600 var(--t-label)/1.25 var(--mono); letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }  /* tile titles only (Board gate 190); th, .chart-title and caption h2 keep their case */
 .ws-move, .ws-expand { display: inline-grid; place-items: center; width: var(--tap); height: var(--tap); padding: 0; flex: none; color: var(--muted);
   background: transparent; border: 1px solid transparent; border-radius: var(--radius); cursor: pointer; font: inherit; }
@@ -346,8 +347,10 @@ section.block { margin-top: var(--s6); }
 .ws-tile .table-wrap caption { padding-left: var(--s4); }
 .ws-tile .cards, .ws-tile .tiles, .ws-tile .kpis { margin: 0; }
 .ws-tile .map-panel .panel-box { background: none; border: 0; padding: 0; }
+.ws-tile .map-panel .panel-box > h2 { min-height: var(--tap); display: flex; align-items: center; margin-top: 0; padding-right: 96px; }  /* a title row, like a figure's, clear of the floating buttons */
 .ws-tile .map-panel .chart, .ws-tile .questions > .chart { background: none; border: 0; border-radius: 0; padding: 0; box-shadow: none; }  /* the panel tile is the card, so the region chart gets the full width and its modebar stays on one row */
 .ws-tile .map-layout { margin: 0; }
+.ws-tile.map-layout { align-items: stretch; }  /* the panel is its own tile now: the old layout's align-items: start shrank the map to its content */
 .ws-tile .biz-grid, .ws-tile .trends, .ws-tile .questions, .ws-tile .monitor-fig { margin: 0; }
 .ws-tile .crosstab { margin: 0; }
 /* drag and drop of tiles: amber, because cyan is the focus ring */
