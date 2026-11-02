@@ -1,0 +1,57 @@
+{
+  "header": {
+    "ticket": 492,
+    "project": "you-think-of-the-project-name",
+    "from_role": "frontend",
+    "phase": "build",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "f4b78059bade",
+    "tokens_left": 2000000
+  },
+  "goal": "Home portal and upload client (H7; Board gate 190: portal rings always turn slowly, only prefers-reduced-motion stops them): home.html portal, intake.js, cap message.",
+  "acceptance_criteria": [
+    {
+      "text": "GET / keeps exactly one h1 'DataBoot' and shows one .portal (equal width and height in Playwright at 1280 and 375, border-radius >= half its width) with the title 'Give me your data', an <input type=file multiple> labelled 'Choose files' and an <input type=file webkitdirectory> labelled 'Choose folder'; no '(dev only) sample' button; when the app starts on a folder the dataset, 'Could not be read' and 'Other files' tables still follow the portal and / still has exactly one '<p' in main (tests/test_pages.py)",
+      "passes": false
+    },
+    {
+      "text": "app/static/js/intake.js: files from Choose files, Choose folder or a drop event (including a dropped folder via webkitGetAsEntry) are sent as POST /upload (paths relative to the picked folder, first segment stripped when shared; single files use File.name), one PUT per file, then POST /upload/{batch}/done, then location to /scan; data-state on the portal is idle/over/busy and the status text shows real progress only",
+      "passes": false
+    },
+    {
+      "text": "Playwright: set_input_files with 2 files ends on /scan listing both; a synthetic drop event with a DataTransfer File uploads too; a folder pick with sub/sales.csv lists 'sub/sales.csv'",
+      "passes": false
+    },
+    {
+      "text": "AC-77 in the browser: intake.js sums File.size first and, over the cap (small DATABOOT_UPLOAD_CAP in the test), shows the cap message (names the limit and '-Folder') in a role='alert' box without sending the files; a server 413 shows the same detail; no dataset of that upload is listed",
+      "passes": false
+    },
+    {
+      "text": "Board gate 190: .portal-rings i rotate slowly in every data-state (idle too), as in the prototype; only @media (prefers-reduced-motion: reduce) sets animation none; a Playwright computed-style check sees a running animation at rest and 'none' under emulated reduced motion; docs/DESIGN.md 'Home: the portal' and its Motion rules are corrected to say so",
+      "passes": false
+    },
+    {
+      "text": "Home makes no request to a host other than the app (head src/href local, blank SVG favicon, DataBoot name, system fonts unchanged); python3 -m pytest -q tests/test_pages.py tests/test_app.py tests/test_home_portal.py passes",
+      "passes": false
+    },
+    {
+      "text": "Moves acceptance items AC-74, AC-75, AC-77, AC-86 forward",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py tests",
+    "passed": false,
+    "output_tail": "       AssertionError: ['10045', '10046', '10046', '10048', '10049', '10049', ...]\nE               assert False\nE                +  where False = any(<generator object test_AC_59.<locals>.<genexpr> at 0x77d50c146f80>)\n\ntests/test_acceptance.py:1795: AssertionError\n=============================== warnings summary ===============================\n../usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1\n  /usr/local/lib/python3.11/dist-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\n    from starlette.testclient import TestClient as TestClient  # noqa\n\ntests/test_acceptance.py: 37 warnings\ntests/test_app_rules_r6.py: 1 warning\ntests/test_browser.py: 16 warnings\ntests/test_catalog.py: 5 warnings\ntests/test_export_apps.py: 3 warnings\ntests/test_export_pptx.py: 3 warnings\ntests/test_export_xlsx.py: 6 warnings\ntests/test_filter_browser.py: 3 warnings\ntests/test_filter_ui.py: 6 warnings\ntests/test_filters.py: 2 warnings\ntests/test_geo.py: 1 warning\ntests/test_home_portal.py: 11 warnings\ntests/test_launch.py: 2 warnings\ntests/test_pages.py: 4 warnings\ntests/test_profile.py: 3 warnings\ntests/test_rules.py: 5 warnings\ntests/test_rules_extra.py: 1 warning\ntests/test_scan_page.py: 1 warning\ntests/test_score.py: 1 warning\ntests/test_speed.py: 1 warning\ntests/test_table_toggle.py: 5 warnings\ntests/test_upload.py: 1 warning\ntests/test_xlsx_read.py: 7 warnings\n  /usr/local/lib/python3.11/dist-packages/openpyxl/styles/stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default\n    warn(\"Workbook contains no default style, apply openpyxl's default\")\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ============================\nFAILED tests/test_acceptance.py::test_AC_59 - AssertionError: ['10045', '1004...\n1 failed, 444 passed, 126 warnings in 575.10s (0:09:35)\ntests failed\n"
+  },
+  "decisions": [],
+  "tried_and_failed": [],
+  "assumptions": [],
+  "open_questions": [],
+  "lessons": [],
+  "problems": [
+    "agent did not end with the handover JSON"
+  ]
+}

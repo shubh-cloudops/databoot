@@ -2,6 +2,20 @@
 {% block content %}
 <h1>DataBoot</h1>
 <p class="muted mono">{{ folder }}</p>
+<div class="portal-wrap">
+  <div class="portal" id="portal" data-state="idle" data-cap="{{ cap }}">
+    <div class="portal-rings" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="portal-core">
+      <h2 class="portal-title">Give me your data</h2>
+      <div class="portal-actions">
+        <input class="sr-only" type="file" id="pick-files" multiple><label class="btn btn-primary" for="pick-files">Choose files</label>
+        <input class="sr-only" type="file" id="pick-folder" webkitdirectory><label class="btn" for="pick-folder">Choose folder</label>
+      </div>
+      <div class="portal-status" role="status"></div>
+    </div>
+  </div>
+  <div class="note note-error portal-msg" role="alert" hidden></div>
+</div>
 {% if cat.datasets %}
 <section class="block"><div class="table-wrap"><table>
   <caption><h2>Datasets</h2></caption>
@@ -27,3 +41,4 @@
   </tbody></table></div></section>
 {% endif %}
 {% endblock %}
+{% block scripts %}<script src="/static/js/intake.js" defer></script>{% endblock %}

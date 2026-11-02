@@ -161,12 +161,10 @@ The two file inputs are `hidden` and opened by the buttons (`webkitdirectory` on
   `rgba(77,225,255,.5)`, a radial cyan glow inside (`.16` centre to transparent at 72%). Three dashed rings sit behind it at 4%, 8% and
   12% outside the edge (cyan .35, cyan .24, amber .22). Title = the system sans at `--t-lg` 650 (an `h2`, because the page's h1 is
   the product name). Buttons are stacked, 220px wide at most (44px high). Contents are 70% of the width and centred.
-- **States** by `data-state`: `idle` = static; `over` (a drag is over the portal) = the border goes solid `--accent`, the glow doubles,
-  a 3px `--accent-soft` halo; `busy` (an upload is running) = same rings. **The rings turn (24 s, 36 s reversed, 52 s per turn) only in
-  `over` and `busy`**, which are real events. The prototype turned them all the time; an idle portal that spins suggests work that is
-  not happening (the honesty rule), so at rest they stand still. With reduced motion they never turn, and `over` still shows the
-  border and halo change. `.portal-status` (mono, `--muted`) shows real counts only: `3 of 12 files`, `Uploading 41 MB of 120 MB`; empty at
-  rest.
+- **States** by `data-state`: `idle`, `over` (a drag is over the portal: the border goes solid `--accent`, the glow doubles, a 3px
+  `--accent-soft` halo) and `busy` (an upload is running). **The rings always turn slowly (24 s, 36 s reversed, 52 s per turn) in every
+  state, idle too, as in the prototype (Board gate 190).** Only `@media (prefers-reduced-motion: reduce)` sets `animation: none`; `over`
+  still shows the border and halo change then. `.portal-status` (mono, `--muted`) shows real progress only: `3 of 12 files`; empty at rest.
 - **Cap and errors**: the message is a `.note.note-error.portal-msg` (`role="alert"`, max 560px, centred under the portal) with the
   server's text; the page keeps working. Nothing is listed or kept from a refused upload.
 - Focus order: skip, brand, `Choose files`, `Choose folder`, then the tables' links. Only the portal is a drop target: a drop elsewhere is
@@ -185,7 +183,7 @@ At 375px the lines wrap (`overflow-wrap: anywhere`); the panel is full width.
 
 ### Motion rules
 (Round 7: replaced; the full list is "Motion rules" in "Round 7 theme and tiles" above.) Short form: tiles enter one after another in
-under 0.6 s, the portal rings turn only during a real drag or upload, scan lines slide in as they appear, buttons fade 160 ms, the skeleton
+under 0.6 s, the portal rings always turn slowly (only reduced motion stops them), scan lines slide in as they appear, buttons fade 160 ms, the skeleton
 shimmers only while a fetch is pending; reduced motion removes all of it; reduced transparency removes every blur. Plotly never animates
 and nothing auto-rotates.
 
@@ -252,7 +250,7 @@ Everything below not mentioned here is as in round 2.
 (Round 7: replaced.) A dark holographic instrument panel: near-black blue page, translucent glass tiles with a cyan hairline and
 corner brackets, cyan as the one accent, amber for chips, the badge and drag targets, mono labels, and the charts carry the colour.
 One theme only; the OS light or dark preference is ignored (`color-scheme: dark`). Decoration (two static washes, brackets, ring
-dashes) is allowed but carries no meaning and never moves unless a real event drives it (Motion rules, Honesty rules).
+dashes) is allowed but carries no meaning; the portal rings always turn slowly and only reduced motion stops them (Motion rules, gate 190).
 
 ## Colour tokens
 (Round 7: replaced.) The light/dark token table of rounds 1 to 6 is gone; the one dark table is in "Round 7 theme and tiles" at the top.
@@ -602,15 +600,15 @@ bar, Respondents histograms one per row. A Likert bar's legend sits under the pl
 Round 7 (ticket 485, architecture/design phase, Board gate 189, no TRENDS): **new tokens** (dark only: #050a12, #4de1ff, #ffb454, mono labels,
 glass, glow, blur; `--delta-max` 35% to 30% because the cyan tint is brighter; chart palette re-cut around cyan and amber), **new
 components** (tabs, archetype caption, portal, scan log, `.grid`, `.ws-tile`, `.ws-head`, `.ws-move`, `.ws-expand`, `dialog.overlay`, mark focus
-ring) and **motion rules** (entrance under 0.6 s, state-driven rings, reduced motion, reduced transparency). `databoot.css`: the
+ring) and **motion rules** (entrance under 0.6 s, always-turning portal rings, reduced motion, reduced transparency). `databoot.css`: the
 `prefers-color-scheme` block is deleted and `:root` is the dark table, so **every existing page is already dark and re-skinned by tokens**
 (buttons, inputs, chips amber, badges, cards, tables and chart boxes use the glass). The rules for the tile, grid, portal, scan log, tabs and
 overlay are **inert until the frontend tickets emit exactly the markup in this file** (H7 portal, S7 scan, W7 tabs, archetype and tile macro,
 I7 interactions, K7 marks); `.charts` keeps its old two-column rule only as `.charts:not(.grid)`, so Explorer is unchanged until W7 adds
 `.grid`. Checked in a scratch page at 1280 and 375 (portal, scan log, tabs with a long name, a heading tile, a figure tile with a focusable
 bar, a table tile, the overlay): no sideways scroll, tiles sit at spans 12/6/6 from 900px, the SVG bar shows the 3px white ring, reduced
-motion sets `animation: none`. **Differences from the prototype description, for the Board**: (1) the portal rings turn only while a drag
-is over or an upload runs (idle rings are still); (2) no "(dev only) sample" button (list wins); (3) tile titles keep their case in mono
+motion sets `animation: none`. **Differences from the prototype description, for the Board**: (1) ~~the portal rings turn only while a drag
+is over or an upload runs~~ (reversed by Board gate 190: the rings always turn, only reduced motion stops them); (2) no "(dev only) sample" button (list wins); (3) tile titles keep their case in mono
 instead of CSS upper-case (a test forbids `text-transform`); (4) the table toggle stays a text button, not an icon, so it keeps its label
 and tab order. **Frontend notes**: `dashboard.js` still has `matchMedia("(prefers-color-scheme: dark)")` (T7 removes it); Plotly grid colour
 is `--line` (rgba, .16) and the hover label fill is `--surface`; the mode bar icons are `--muted` (6.9:1 on the tile); heights of plots are

@@ -264,22 +264,24 @@ section.block { margin-top: var(--s6); }
   border: 1.5px solid rgba(77, 225, 255, 0.5); background: radial-gradient(circle, rgba(77, 225, 255, 0.16), rgba(77, 225, 255, 0.04) 55%, transparent 72%); }
 .portal[data-state="over"] { border-color: var(--accent); background: radial-gradient(circle, rgba(77, 225, 255, 0.30), rgba(77, 225, 255, 0.08) 60%, transparent 76%);
   box-shadow: 0 0 0 3px var(--accent-soft); }
-.portal { margin-bottom: var(--s6); }  /* room for the rings below the circle */
+.portal { margin: var(--s4) 0 var(--s6); }  /* room for the rings above and below the circle */
 .portal-rings { position: absolute; inset: 0; pointer-events: none; }
 .portal-rings i { position: absolute; border-radius: 50%; border: 1px dashed rgba(77, 225, 255, 0.35); }
 .portal-rings i:nth-child(1) { inset: -4%; }
 .portal-rings i:nth-child(2) { inset: -8%; border-color: rgba(77, 225, 255, 0.24); }
 .portal-rings i:nth-child(3) { inset: -12%; border-color: rgba(255, 180, 84, 0.22); }
-/* honest motion: the rings turn only while a drag is over the portal or an upload is running, and stand still otherwise */
-.portal[data-state="over"] .portal-rings i, .portal[data-state="busy"] .portal-rings i { animation: ring-turn 24s linear infinite; }
-.portal[data-state="over"] .portal-rings i:nth-child(2), .portal[data-state="busy"] .portal-rings i:nth-child(2) { animation-duration: 36s; animation-direction: reverse; }
-.portal[data-state="over"] .portal-rings i:nth-child(3), .portal[data-state="busy"] .portal-rings i:nth-child(3) { animation-duration: 52s; }
+/* the rings always turn slowly (Board gate 190); only prefers-reduced-motion stops them (see the media query below) */
+.portal-rings i { animation: ring-turn 24s linear infinite; }
+.portal-rings i:nth-child(2) { animation-duration: 36s; animation-direction: reverse; }
+.portal-rings i:nth-child(3) { animation-duration: 52s; }
 @keyframes ring-turn { to { transform: rotate(360deg); } }
 .portal-core { position: relative; display: grid; justify-items: center; gap: var(--s3); width: 70%; text-align: center; }
 .portal-title { margin: 0; font: 650 var(--t-lg)/1.25 var(--font); }
 .portal-actions { display: grid; gap: var(--s2); width: min(100%, 220px); }
 .portal-status { min-height: 1.5em; font: var(--t-label)/1.5 var(--mono); letter-spacing: 0.04em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .portal-msg { max-width: 560px; }
+.portal-actions input:focus-visible + .btn { outline: 3px solid var(--accent); outline-offset: 2px; }  /* the file input is sr-only; its label is the button */
+.portal-actions .btn { cursor: pointer; }
 
 /* scan log: real catalog lines, mono, in a glass panel */
 .scan { max-width: 900px; margin: var(--s5) 0; padding: var(--s4); border: 1px solid var(--tile-edge); border-radius: var(--tile-radius);

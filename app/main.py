@@ -31,7 +31,7 @@ templates.env.filters.update(fmt=business.fmt, signed=business.signed, spark=bus
 @app.get("/")
 def home(request: Request):
     cat = catalog.scan(config.get().data)
-    return templates.TemplateResponse(request, "home.html", {"title": "DataBoot", "folder": config.get().data, "cat": cat})
+    return templates.TemplateResponse(request, "home.html", {"title": "DataBoot", "folder": config.get().data, "cat": cat, "cap": config.get().upload_cap})
 
 
 @app.post("/upload")
