@@ -1,7 +1,7 @@
 # DataBoot: project memory
 
 ## What it is
-Local web app: point it at a data folder (mounted folder or drive letter, no raw device access) and it profiles each file, picks charts by rules, and exports PPTX/XLSX with native editable charts. Windows 11 launcher (DataBoot.bat + Start-DataBoot.ps1 + venv), Dockerfile optional. Plain neutral style, system sans font, no logo, no theme toggle (OS colour preference only). Branding unchanged since gate 160. Trends are off (team setting only, gate 179).
+Local web app: point it at a data folder (mounted folder or drive letter, no raw device access) and it profiles each file, picks charts by rules, and exports PPTX/XLSX with native editable charts. Windows 11 launcher (DataBoot.bat + Start-DataBoot.ps1 + venv), Dockerfile optional. Dark console style since round 7, system sans font, no logo, no theme toggle. Branding unchanged since gate 160. Trends are off (team setting only, gate 179).
 Text allowed on pages: titles, axis labels, "N of M" counts, one-line "rule used" caption. No generated sentences. Thousands separators on counts and amounts (1,234 of 56,789) through the `num` Jinja filter, but never on identifier, temporal or year-like columns (no "2,024"): by column role, not regex (gate 181).
 
 ## Stack and layout
@@ -9,7 +9,7 @@ FastAPI + Jinja, Plotly.js served locally (app/static/vendor/plotly), world outl
 - app/readers.py (CSV, TSV, JSON, JSONL, GeoJSON), app/xlsx.py (openpyxl read_only reader with per-sheet isolation + xlsxwriter export + Summary sheet), app/parquet.py (pyarrow), app/catalog.py (scan, stable ids, unreadable list with `sheet` field, file inventory), app/profile.py (classify, first 10,000 rows only), app/rules.py (Explorer charts, 8-chart cap, stride sampling, `typed()`, `kpis`), app/score.py, app/filters.py, app/export.py (python-pptx), app/main.py (routes, cached `_view`, `_detected`, `_appview`, `dashboard`, `_download`, `sep`), app/launch.py.
 - Round 5 apps: app/apps.py (roles, `detect`, `measures`, primary amount by name rule), app/business.py (periods, KPI cards, trends, leaderboard with Other, drill order, change table; filters `fmt`/`signed`), app/geo.py (valid coordinates, points and hexbin modes, row details, top regions, Map 3D).
 - Templates: base, home, dataset, _filters, _figure (figure macro), _tables (Columns, First rows), app_explorer, app_business, app_map, app_monitoring, app_survey, _cards (spark macro). JS: app/static/js/dashboard.js (reads /app, `globalRules`, `render`, `tableToggle`/`tableOf`, `map2d`, `mapPanel`, `barCursor`). CSS: app/static/css/databoot.css. Favicon: app/static/blank.svg.
-- Docs: docs/ARCHITECTURE.md (Modules, Chart contract, Exports, Round 3 launcher, Round 4 filters, Round 5 apps), DESIGN.md, PRD.md, acceptance.json (AC-1..AC-73: AC-43..58 round 5 archetypes, Business, Map, exports, global rules, offline; AC-59..73 round 6 number format, plurals, Monitoring, Survey, rule order, grain, Explorer exports).
+- Docs: docs/ARCHITECTURE.md (Modules, Chart contract, Exports, Round 3 launcher, Round 4 filters, Round 5 apps), DESIGN.md, PRD.md, acceptance.json (AC-1..AC-87, AC-74..87 round 7 restyle, upload, tiles; AC-1..AC-73: AC-43..58 round 5 archetypes, Business, Map, exports, global rules, offline; AC-59..73 round 6 number format, plurals, Monitoring, Survey, rule order, grain, Explorer exports).
 - File types: CSV, TSV, Excel (.xlsx/.xlsm, one dataset per sheet), JSON/JSONL, Parquet, GeoJSON. .xls and unknown files go to the inventory table, no charts.
 - Xlsx isolation: `_load(path, keep=None)` blanks the other worksheet parts before `load_workbook`; a corrupt sheet is listed as 'book.xlsx - <sheet>' with 'not a valid xlsx'. [gates 171, 172]
 - Launcher: one `$Candidates` list (py -3.13, -3.12, -3.11, python), one `Fail` function (message, delete partial .venv, pause, exit 1), `$LASTEXITCODE` check after each pip install. Python 3.11-3.13 only. Windows PowerShell 5.1.
@@ -26,10 +26,10 @@ FastAPI + Jinja, Plotly.js served locally (app/static/vendor/plotly), world outl
 
 ## Run and test
 - Run: `python3 -m uvicorn app.main:app`, or `python3 -m app.launch`. Data folder env var DATABOOT_DATA.
-- Tests: `python3 -m pytest -q tests/<file>.py` while working; full suite once at the end (about 550 s with 407 tests: run it once, alone, in the background and poll for a DONE marker). Browser tests (test_browser, test_filter_*, test_business_page, test_map_page, test_table_toggle, test_offline_apps, Playwright parts of test_acceptance) use Python Playwright with uvicorn on port 0 in a thread; PLAYWRIGHT_BROWSERS_PATH=/opt/playwright. See skills playwright-tests-for-chart-pages, add-page-mode-keep-old-tests-green, acceptance-tests-per-item, office-export-with-library-and-reopen-tests, windows-launcher-script-text-tests.
+- Tests: `python3 -m pytest -q tests/<file>.py` while working; full suite once at the end (about 846 s with 494 tests: once, alone, in the background with a 2,400,000 ms timeout, poll a log; skill run-long-test-suite-once-in-background). Browser tests (test_browser, test_filter_*, test_business_page, test_map_page, test_table_toggle, test_offline_apps, Playwright parts of test_acceptance) use Python Playwright with uvicorn on port 0 in a thread; PLAYWRIGHT_BROWSERS_PATH=/opt/playwright. See skills playwright-tests-for-chart-pages, add-page-mode-keep-old-tests-green, acceptance-tests-per-item, office-export-with-library-and-reopen-tests, windows-launcher-script-text-tests.
 - Launcher tests are text checks (tests/test_launcher_files.py): no pwsh in the image.
 - Shared fixtures: tests/conftest.py (data_dir, big_csv, make_client, shop and places fixtures, archetypes_dir; write_xlsx is hand-written and takes a sheet as bytes). Two fixtures that each call make_client in one test break each other. Python is 3.11.
-- Temp scripts, servers and pip installs go in /tmp, never /work. No python, curl, ps, pkill: use python3 and stop servers via the Popen handle.
+- Temp scripts, servers and pip installs go in /tmp, never /work. No python, curl, ps, pkill, pgrep: use python3, urllib, and stop servers via a Popen handle or PID file (a /proc scan matching its own command line kills the shell).
 - openpyxl, python-pptx, xlsxwriter, pyarrow, pytest, httpx are baked into the verify image (gates 165, 172).
 - AC-42: 200,000-row CSV reaches the dashboard in <= 5 s cold (Business page measured about 1.7 s); filtered charts API under 1 s (AC-41).
 
@@ -51,12 +51,20 @@ FastAPI + Jinja, Plotly.js served locally (app/static/vendor/plotly), world outl
 - Exports: PPTX title slide first line is "Data overview" for EVERY Explorer export, including ?app=explorer (app/main.py:227, app/export.py:114); XLSX Summary has no app title line for Explorer. [gates 184, 187, 188, ticket 480]
 - Roles: PM rewords garbled ACs (59, 62, 64-71, 73 reworded after gate 187). Docs: acceptance.json AC-1..AC-73.
 
-## Open state at start of round 7
-- Board verifies on Windows: Explorer PPTX title "Data overview"; any miss is the first round 7 ticket. [gate 188]
-- Open design question: DESIGN.md tile example shows "Min 20.0 Max 60.0" but the page prints whole numbers; Board accepted whole numbers, the designer corrects the DESIGN.md example (check it is done). [gate 186]
-- Suite takes about 550 s (407 tests); Board accepted this. Run the qa check once, in the background. [gate 187]
-- Still not tested by agents: AC-25 corrupt-sheet isolation beyond truncated XML (gate 170 candidate), Board's own Windows launcher tests (3.12 + 3.14, Python hidden) and real Excel/PowerPoint opens. No agent action.
-- Handover JSON was missing on tickets 464, 470, 474: end every reply with it.
+## Round 7: console restyle, upload, tiles (accepted, gates 189, 190, 193, 194, 197)
+- Dark theme only (prefers-color-scheme removed), DataBoot name, system fonts, blank SVG favicon. Tile = `section.ws-tile` (macro `_tile.html`) with aria-label equal to its h2; old wrapper classes ride on tiles via `extra`; tabs sit outside `<main>`. Tile titles mono UPPERCASE letter-spaced (only `th` stays in case); figure titles and table captions keep real case because tests read inner_text. [gates 189, 190]
+- Archetype caption "APP: BUSINESS · RULE R2 · T1 N2 C2 · 288 ROWS" omits G when zero; the scan log (GET /scan, scan.js, lines ~0.35 s apart, max 2.5 s, auto-opens the workspace) prints all four counts. [gate 190]
+- Upload: POST /upload, one streamed PUT per file, POST /upload/{batch}/done (no python-multipart); 2 GB cap; a new upload replaces the previous temp folder; a launcher folder is never written or deleted (app/upload.py, lifespan cleanup). Launcher: a cancelled folder dialog starts without a folder (upload.empty()); Docker still needs one. [gates 189, 190]
+- Home portal rings always turn slowly, only prefers-reduced-motion stops them. Keyboard reorder: Alt+Arrow on a tile header, aria-live announcement, order in localStorage databoot.order.<id>.<app>; expand = native `<dialog>`, reopens after a filter click via sessionStorage; Tab reaches clickable bars and donut slices. [gate 190]
+- Map top-region bars stay non-clickable (gate 179, AC-85); a script-triggered plotly_click is enough for AC-86; the Map tile at 1280 shows the 2D map small: out of scope, note for later. [gate 193]
+- tests/fixtures/round6_api.json is a golden snapshot of /app and /charts for 16 datasets (AC-80: data unchanged). The prototype docs/reference/databoot-console.html was never on disk; work follows the gate 189 description.
+
+## Open state for round 8
+- FIRST TASK before any feature: make the suite faster. Mark slow Playwright and speed tests with a pytest marker so per-ticket verify runs the fast set and only QA runs everything; fast set under 5 min; delete or loosen no test. [gate 197]
+- Full suite is 494 tests, ~846 s (was 550 s): parked tickets 493-503 were verify timeouts, not bugs. Run it once, alone, in the background with a 2,400,000 ms timeout; never beside a browser sweep (test_AC_42 5 s cold-start limit fails under load). [gates 193, 197]
+- test_AC_52, test_AC_59 (hover) and test_AC_42 were reworked by QA in ticket 502: deterministic waits, the 5.0 s number unchanged. [gate 194]
+- Store the verify output_tail in the handover. The handover JSON was missing on 486, 492, 493, 499, 500, 501, 503: end every reply with it. [gates 193, 194]
+- Board verifies on Windows: Explorer PPTX title "Data overview" and real Excel/PowerPoint opens; AC-25 corrupt-sheet beyond truncated XML is untested. No agent action.
 
 ## Pitfalls
 - Chart counts: records.json gives a histogram too; a lone numeric column gives a histogram. When adding a rule, grep tests for exact chart lists and `chart-N` ids.

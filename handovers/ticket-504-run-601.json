@@ -1,0 +1,66 @@
+{
+  "header": {
+    "ticket": 504,
+    "project": "you-think-of-the-project-name",
+    "from_role": "coach",
+    "phase": "learn",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "847e9e9f8b68",
+    "tokens_left": 1913140
+  },
+  "goal": "Learn from round 7: update the shared skills and lessons and this project's MEMORY.md from /logs/digest.md.",
+  "acceptance_criteria": [
+    {
+      "text": "Skills and lessons come only from evidence in the digest",
+      "passes": true
+    },
+    {
+      "text": "MEMORY.md is current and short",
+      "passes": true
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py learn",
+    "passed": true,
+    "output_tail": "check passed\n"
+  },
+  "decisions": [
+    {
+      "what": "Added skill run-long-test-suite-once-in-background and extended two existing skills instead of adding near-duplicates",
+      "why": "Round 7 tickets 493-503 were parked by verify timeouts on a 700-846 s suite, and agents repeatedly lost background runs and handovers",
+      "evidence": "/logs/digest.md tickets 493-503, gate 197"
+    },
+    {
+      "what": "Dropped five older project-specific lines from LESSONS.md to fit the 80-line cap",
+      "why": "Newer round 7 lessons took the space; the dropped lines were single-project facts (float bins, partner lists, new role, ffmpeg, client copy) or covered by a newer lesson",
+      "evidence": "/learning/LESSONS.md"
+    },
+    {
+      "what": "Rewrote the MEMORY.md open-state section as round 7 plus round 8 open state",
+      "why": "Gate 197 sets the first round 8 task and the suite time changed from 550 s to 846 s",
+      "evidence": "/logs/digest.md gate 197, ticket 503"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Editing MEMORY.md with a python heredoc",
+      "why_it_failed": "The ProdAgents pretool deny list blocked it; I used the Edit tool instead"
+    }
+  ],
+  "assumptions": [
+    "The digest has no Faded history list, so there was nothing to re-confirm or delete"
+  ],
+  "open_questions": [
+    "Cause of the test_AC_52 and test_AC_59 hover flakes is unconfirmed: ticket 502 could not reproduce them under CPU load"
+  ],
+  "lessons": [
+    {
+      "lesson": "Write multi-edit scripts with the Edit or Write tool, not a Bash heredoc, since the deny list blocks heredocs",
+      "when": "Coach or any role editing several files",
+      "evidence": "pretool hook block on the MEMORY.md python heredoc in ticket 504"
+    }
+  ],
+  "problems": []
+}
