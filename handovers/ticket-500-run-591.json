@@ -1,0 +1,37 @@
+{
+  "header": {
+    "ticket": 500,
+    "project": "you-think-of-the-project-name",
+    "from_role": "qa",
+    "phase": "qa",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "e14d1b175e03",
+    "tokens_left": 2000000
+  },
+  "goal": "Write or extend tests/test_acceptance.py with one test per acceptance item and run them.",
+  "acceptance_criteria": [
+    {
+      "text": "One test per acceptance item, named after its id",
+      "passes": false
+    },
+    {
+      "text": "Failures are reported, not hidden",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [],
+  "tried_and_failed": [],
+  "assumptions": [],
+  "open_questions": [],
+  "lessons": [],
+  "problems": [
+    "agent did not end with the handover JSON"
+  ]
+}

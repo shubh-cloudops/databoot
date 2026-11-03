@@ -1170,6 +1170,22 @@ def _settle(page):
         return p.length > 0 && p.every(e => e.classList.contains('js-plotly-plot')); }""")
 
 
+def _hover(page, target):
+    """Hover the middle of a locator once its box has stopped moving (entrance animations, scroll); return the tooltip text."""
+    target.scroll_into_view_if_needed()
+    handle = target.element_handle()
+    page.wait_for_function("""([e, n]) => { const r = e.getBoundingClientRect(), k = r.x + ',' + r.y + ',' + r.width + ',' + r.height;
+        e.__k = e.__k && e.__k[0] === k ? [k, e.__k[1] + 1] : [k, 0]; return e.__k[1] >= n; }""", arg=[handle, 6], polling=50)
+    box = target.bounding_box()
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    page.mouse.move(1, 1)
+    page.wait_for_function("document.querySelectorAll('.hoverlayer .hovertext').length === 0")  # a previous tooltip is gone
+    page.mouse.move(x - 3, y)
+    page.mouse.move(x, y, steps=4)
+    page.wait_for_selector(".hoverlayer .hovertext")
+    return page.locator(".hoverlayer .hovertext").first.text_content()
+
+
 def _query(page):
     return parse_qs(urlparse(page.url).query)
 
@@ -1457,11 +1473,7 @@ def test_AC_52(arch, big_csv, make_client, tmp_path):
             t = page.evaluate("document.querySelector('.map-layout .js-plotly-plot').data.map(t => [t.type, t.z.reduce((a, b) => a + b, 0), t.hovertemplate + t.text[0]])")
             assert len(t) == 1 and t[0][0] == "choropleth" and t[0][1] == 60_000 and "points" in t[0][2]
             cells = page.locator(".map-layout .choroplethlayer path")
-            cells.nth(cells.count() // 2).scroll_into_view_if_needed()
-            box = cells.nth(cells.count() // 2).bounding_box()
-            page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-            page.wait_for_selector(".hoverlayer .hovertext")
-            label = page.locator(".hoverlayer .hovertext").text_content()
+            label = _hover(page, cells.nth(cells.count() // 2))
             assert re.fullmatch(r"[\d,]+ points?", label.strip()), label
             assert page.errors == []
     finally:
@@ -1769,12 +1781,7 @@ def test_AC_59(make_client, tmp_path):
             _click_point(page, 3)
             d = _details(page)
             assert d["pop"] == "12,348" and d["year"] == "2003" and d["place_id"] == "10048" and d["season"] == "1953", d
-            point = page.locator("figure[data-kind=map2d] .js-plotly-plot .point").nth(5)
-            box = point.bounding_box()
-            page.mouse.move(box["x"] + box["width"] / 2 - 2, box["y"] + box["height"] / 2)
-            page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-            page.wait_for_selector(".hoverlayer .hovertext")
-            tip = page.locator(".hoverlayer .hovertext").first.text_content()
+            tip = _hover(page, page.locator("figure[data-kind=map2d] .js-plotly-plot .point").nth(5))
             label = page.evaluate("document.querySelector('figure[data-kind=map2d] .js-plotly-plot').data[0].name")
             page.get_by_role("button", name="View as table").first.click()
             table = page.locator("table.plot-table").first.inner_text()
@@ -1787,11 +1794,7 @@ def test_AC_59(make_client, tmp_path):
             pts = page.locator("figure[data-kind=map2d] .js-plotly-plot .point")
             tips = []
             for k in range(pts.count()):
-                box = pts.nth(k).bounding_box()
-                page.mouse.move(box["x"] + box["width"] / 2 - 2, box["y"] + box["height"] / 2)
-                page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
-                page.wait_for_selector(".hoverlayer .hovertext")
-                tips.append(page.locator(".hoverlayer .hovertext").first.text_content())
+                tips.append(_hover(page, pts.nth(k)))
             assert any(t.strip().endswith("10050") or "10050" in t for t in tips), tips
             assert not any(s in t for t in tips for s in separated), tips
 
@@ -2233,3 +2236,602 @@ def test_AC_73(make_client, tmp_path, archetypes_dir, round6_dir):
     assert sum(s.has_chart for sl in slides for s in sl.shapes) == len([c for c in charts if c["kind"] not in ("heatmap", "table")]) > 0
     # Board gate 186: the client-facing title slide says "Data overview", not the internal word "Explorer"
     assert [s.text_frame.text for s in slides[0].shapes if s.has_text_frame][0] == "Data overview"
+
+
+# ---- Round 7: portal, upload, scan, tiles, theme (AC-74 .. AC-87; Board gates 189, 190, 193) ----------------------
+# Self-contained copies of the engineers' browser checks. Round 7 pages are opened with _ctx7 (own context options,
+# off-host requests aborted and listed in page.external).
+
+@contextmanager
+def _ctx7(base, width=1280, height=900, **ctx):
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        page = b.new_context(viewport={"width": width, "height": height}, **ctx).new_page()
+        page.external, page.errors = [], []
+
+        def route(r):
+            if r.request.url.startswith(base):
+                r.continue_()
+            else:
+                page.external.append(r.request.url)
+                r.abort()
+        page.route("**/*", route)
+        page.on("console", lambda m: m.type == "error" and page.errors.append(m.text))
+        page.on("pageerror", lambda e: page.errors.append(str(e)))
+        yield page
+        b.close()
+
+
+def _stay_on_scan(page, base):
+    page.route(f"{base}/datasets/**", lambda r: r.abort())
+
+
+def _tile_order(page):
+    return page.evaluate("[...document.querySelectorAll('.grid > .ws-tile')].map(t => t.dataset.tile)")
+
+
+def _listing(client):
+    return sorted((d["path"], d["rows"], d["columns"]) for d in client.get("/api/datasets").json())
+
+
+def _apps(client):
+    return {d["path"]: client.get(f"/api/datasets/{d['id']}/app").json()["app"] for d in client.get("/api/datasets").json()}
+
+
+def test_AC_74(make_client, data_dir, tmp_path):
+    html = make_client(data_dir).get("/").text  # started on a folder: the two tables still follow the portal
+    at = html.index('class="portal"')
+    assert html.count("<h1>DataBoot</h1>") == 1 and html.count('class="portal"') == 1
+    for caption in ("Could not be read", "Other files"):
+        assert html.index(f"<caption><h2>{caption}</h2></caption>") > at
+    assert re.search(r'<input[^>]*type="file"[^>]* multiple>\s*<label[^>]*>Choose files</label>', html)
+    assert re.search(r'<input[^>]*type="file"[^>]* webkitdirectory>\s*<label[^>]*>Choose folder</label>', html)
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    (tmp_path / "a.csv").write_text("x,y\n1,2\n3,4\n")
+    (tmp_path / "b.csv").write_text("p,q\n5,6\n7,8\n")
+    (tmp_path / "picked" / "sub").mkdir(parents=True)
+    (tmp_path / "picked" / "sub" / "c.csv").write_text("x,y\n1,2\n3,4\n")
+    make_client(empty)
+    with _server() as base:
+        for width in (1280, 375):
+            with _ctx7(base, width) as page:
+                page.goto(base + "/")
+                box = page.locator(".portal").bounding_box()
+                assert abs(box["width"] - box["height"]) < 1, box
+                radius = page.evaluate("getComputedStyle(document.querySelector('.portal')).borderTopLeftRadius")
+                assert float(radius.rstrip("%px")) * (box["width"] / 100 if radius.endswith("%") else 1) >= box["width"] / 2 - 1, radius
+                assert page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
+                assert page.get_by_text("Choose files").is_visible() and page.get_by_text("Choose folder").is_visible()
+                assert page.locator("h1").count() == 1 and page.locator("h1").inner_text() == "DataBoot"
+                assert page.external == [] and page.errors == []
+        with _ctx7(base) as page:  # Choose files: several at once
+            _stay_on_scan(page, base)
+            page.goto(base + "/")
+            page.set_input_files("#pick-files", [str(tmp_path / "a.csv"), str(tmp_path / "b.csv")])
+            page.wait_for_url(base + "/scan")
+            log = page.locator(".scan-log").text_content()
+            assert "a.csv" in log and "b.csv" in log and page.errors == []
+        with _ctx7(base) as page:  # Choose folder
+            _stay_on_scan(page, base)
+            page.goto(base + "/")
+            page.set_input_files("#pick-folder", str(tmp_path / "picked"))
+            page.wait_for_url(base + "/scan")
+            assert "sub/c.csv" in page.locator(".scan-log").text_content() and page.errors == []
+        with _ctx7(base) as page:  # a dropped file
+            _stay_on_scan(page, base)
+            page.goto(base + "/")
+            page.evaluate("""() => { const dt = new DataTransfer(); dt.items.add(new File(['x,y\\n1,2\\n3,4\\n'], 'dropped.csv', {type: 'text/csv'}));
+                document.getElementById('portal').dispatchEvent(new DragEvent('drop', {dataTransfer: dt, bubbles: true, cancelable: true})); }""")
+            page.wait_for_url(base + "/scan")
+            assert "dropped.csv" in page.locator(".scan-log").text_content() and page.errors == []
+
+
+def test_AC_75(make_client, data_dir, tmp_path):
+    from tests.conftest import files_of, upload
+    for pick in ("one", "several", "folder"):
+        if pick == "folder":
+            files, want = files_of(data_dir), data_dir
+        else:
+            names = ("sales.csv",) if pick == "one" else ("sales.csv", "points.tsv")
+            files = {n: (data_dir / n).read_bytes() for n in names}
+            want = tmp_path / pick
+            want.mkdir()
+            for n, b in files.items():
+                (want / n).write_bytes(b)
+        folder_run = make_client(want)
+        expected = (_listing(folder_run), _apps(folder_run))
+        c = make_client(tmp_path / f"empty-{pick}")
+        assert upload(c, files).status_code == 200, pick
+        assert (_listing(c), _apps(c)) == expected, pick
+        if pick == "folder":
+            assert "sub/records.json" in [p for p, _, _ in _listing(c)]  # the relative path is kept
+    # through the home page: a picked folder keeps sub/sales.csv, and the scan lists it like a folder run
+    (tmp_path / "picked" / "sub").mkdir(parents=True)
+    (tmp_path / "picked" / "sub" / "sales.csv").write_text("region,amount\nN,1\nS,2\nE,3\n")
+    make_client(tmp_path / "empty-browser")
+    with _server() as base:
+        with _ctx7(base) as page:
+            _stay_on_scan(page, base)
+            page.goto(base + "/")
+            page.set_input_files("#pick-folder", str(tmp_path / "picked"))
+            page.wait_for_url(base + "/scan")
+            line = page.locator(".scan-log li").first.text_content()
+            got = json.load(urllib.request.urlopen(base + "/api/datasets"))
+            assert [(d["path"], d["rows"], d["columns"]) for d in got] == [("sub/sales.csv", 3, 2)]
+            assert line.startswith("sub/sales.csv") and "3 rows" in line, line
+            assert page.errors == []
+    expect = make_client(tmp_path / "picked")
+    assert _listing(expect) == [("sub/sales.csv", 3, 2)]
+
+
+def test_AC_76(tmp_path, monkeypatch, data_dir):
+    import tempfile
+    from fastapi.testclient import TestClient
+    from tests.conftest import files_of, upload
+    from app import config, main, upload as up
+    monkeypatch.setenv("DATABOOT_DATA", str(data_dir))
+    monkeypatch.setenv("DATABOOT_OUT", str(tmp_path / "out"))
+    before = files_of(data_dir)
+    with TestClient(main.app) as c:
+        assert upload(c, {"a.csv": b"x\n1\n"}).status_code == 200
+        first = config.get().data
+        assert upload(c, {"b.csv": b"y\n2\n"}).status_code == 200
+        folder = config.get().data
+        assert folder != first and not first.exists()  # an earlier upload folder is deleted when the next one is done
+        assert folder.is_dir() and folder.is_relative_to(tempfile.gettempdir())
+        assert not folder.is_relative_to(config.ROOT) and not folder.is_relative_to(data_dir)
+    assert not folder.exists() and not up.OWNED  # the app stopped
+    assert files_of(data_dir) == before  # the launcher folder is unchanged
+    assert not list(Path(tempfile.gettempdir()).glob(f"{folder.name}*"))
+
+
+def test_AC_77(make_client, tmp_path, monkeypatch):
+    import tempfile
+    from tests.conftest import upload
+    from app import upload as up
+    tmp = Path(tempfile.gettempdir())
+    # default cap: 2 GB (declared sizes only, nothing big is sent)
+    c = make_client(tmp_path)
+    before = set(tmp.glob("databoot-upload-*"))
+    r = c.post("/upload", json={"files": [{"path": "big.bin", "size": 3 * 1024 ** 3}]})
+    assert r.status_code == 413 and "2 GB" in r.json()["detail"] and "-Folder" in r.json()["detail"], r.text
+    assert set(tmp.glob("databoot-upload-*")) == before and not up.OWNED and c.get("/api/datasets").json() == []
+    # a small cap: declared total over the cap, and real bytes over the declared size; none of it is kept or listed
+    monkeypatch.setenv("DATABOOT_UPLOAD_CAP", "10")
+    r = c.post("/upload", json={"files": [{"path": "a.csv", "size": 6}, {"path": "b.csv", "size": 6}]})
+    assert r.status_code == 413 and "-Folder" in r.json()["detail"] and not up.OWNED
+    batch = c.post("/upload", json={"files": [{"path": "a.csv", "size": 4}, {"path": "b.csv", "size": 4}]}).json()["batch"]
+    (folder,) = up.OWNED
+    assert c.put(f"/upload/{batch}", params={"path": "a.csv"}, content=b"1234").status_code == 200
+    assert c.put(f"/upload/{batch}", params={"path": "b.csv"}, content=b"1234567890").status_code == 413
+    assert not folder.exists() and not up.OWNED and c.post(f"/upload/{batch}/done").status_code == 404
+    assert c.get("/api/datasets").json() == []
+    # the page shows the message and sends nothing
+    monkeypatch.setenv("DATABOOT_UPLOAD_CAP", "1000")
+    for n in ("big", "big2"):
+        (tmp_path / f"{n}.csv").write_text("x\n" + "1\n" * 800)
+    make_client(tmp_path / "nothing")
+    with _server() as base:
+        with _ctx7(base) as page:
+            page.goto(base + "/")
+            sent = []
+            page.on("request", lambda q: "/upload" in q.url and sent.append(q.url))
+            page.set_input_files("#pick-files", [str(tmp_path / "big.csv"), str(tmp_path / "big2.csv")])
+            alert = page.locator("[role=alert]")
+            alert.wait_for()
+            assert "1,000 bytes" in alert.inner_text() and "-Folder" in alert.inner_text()
+            assert sent == [] and page.url == base + "/" and "big.csv" not in page.locator("main").inner_text()
+        with _ctx7(base) as page:  # the server refuses when the page's own check is skipped
+            page.goto(base + "/")
+            page.evaluate("document.getElementById('portal').dataset.cap = '999999'")
+            page.set_input_files("#pick-files", str(tmp_path / "big.csv"))
+            alert = page.locator("[role=alert]")
+            alert.wait_for()
+            assert "-Folder" in alert.inner_text() and "big.csv" not in page.locator("main").inner_text()
+        assert json.load(urllib.request.urlopen(base + "/api/datasets")) == []
+
+
+SCAN_LINE = re.compile(r"^(?P<path>.+?)(?: - (?P<sheet>.+?))?  [\d,]+ rows?  T\d+ N\d+ C\d+ G\d+  -> (?P<app>[A-Z]+) \(rule (?P<rule>R\d)\)$")
+SCAN_RECORD = """() => { window.__t = {}; new MutationObserver(ms => ms.forEach(m => {
+    const li = m.target; if (li.tagName !== 'LI' || li.hidden) return;
+    const i = [...li.parentNode.children].indexOf(li); window.__t[i] = window.__t[i] || performance.now(); }))
+    .observe(document, {attributes: true, subtree: true, attributeFilter: ['hidden']}); }"""
+
+
+def test_AC_78(make_client, archetypes_dir):
+    import html as htmllib
+    from tests.conftest import files_of, upload
+    client = make_client(archetypes_dir)
+    assert upload(client, {**files_of(archetypes_dir), "broken.xlsx": b"not a zip file"}).status_code == 200
+    page_html = client.get("/scan").text
+    got = [htmllib.unescape(m) for m in re.findall(r"<li[^>]*>(.*?)</li>", page_html.split("</ol>")[0])]
+    datasets = client.get("/api/datasets").json()
+    assert len(got) == len(datasets) + 2
+    for line, d in zip(got, datasets):
+        m = SCAN_LINE.match(line)
+        assert m and m["path"] == d["path"], line
+        app = client.get(f"/api/datasets/{d['id']}/app").json()
+        assert (m["app"], m["rule"]) == (app["app"].upper(), app["rule"])
+        assert f"{d['rows']:,} row" in line
+    assert any(re.match(r"^shop\.csv  [\d,]+ rows  T1 N\d C\d G0  -> BUSINESS \(rule R2\)$", x) for x in got)
+    assert got[-2] == "broken.xlsx  not a valid xlsx" and got[-1] == "0 bytes uploaded to the internet"
+    first = datasets[0]["id"]
+    assert f'id="open-workspace" href="/datasets/{first}">Open workspace</a>' in page_html
+    with _server() as base:
+        with _ctx7(base) as page:  # lines appear one after another, all within 2.5 s
+            _stay_on_scan(page, base)
+            page.add_init_script("(" + SCAN_RECORD + ")()")
+            t0 = time.monotonic()
+            page.goto(base + "/scan")
+            n = page.locator(".scan-log li").count()
+            assert n == len(got) and n > 3
+            assert page.locator("#open-workspace").is_visible()  # visible from the start
+            page.wait_for_function(f"Object.keys(window.__t).length === {n}", timeout=5000)
+            assert time.monotonic() - t0 < 2.5 + 1.5
+            t = page.evaluate("window.__t")
+            step = min(350, 2500 / n)
+            assert t["1"] - t["0"] > step * 0.6 and t[str(n - 1)] - t["0"] < 2500 + 300, t
+            assert page.external == [] and page.errors == []
+        with _ctx7(base) as page:  # the first dataset opens by itself after the last line
+            page.goto(base + "/scan")
+            page.wait_for_url(f"{base}/datasets/{first}", timeout=6000)
+            assert page.errors == []
+
+
+def test_AC_79(make_client, data_dir, archetypes_dir):
+    client = make_client(data_dir)
+    ids = _ids(client)
+    i = ids[("sales.csv", None)]
+    html = client.get(f"/datasets/{i}").text
+    header, main = html.split("<main", 1)
+    links = re.findall(r'<a href="/datasets/(\w+)"( aria-current="page")?>([^<]*)</a>', header)
+    assert len(links) == len(ids) and [k for k, cur, _ in links if cur] == [i]
+    assert "sub/book.xlsx - Lookup" in [n for _, _, n in links]
+    assert 'class="app-badge">App: Business (rule R2)<' in html
+    assert re.search(r'<div class="archetype">APP: BUSINESS · RULE R2 · T1 N1 C1 · [\d,]+ ROWS</div>', html), re.findall(r'class="archetype">[^<]*', html)
+    client = make_client(archetypes_dir)
+    ids = _ids(client)
+    shop = client.get(f"/datasets/{ids[('shop.csv', None)]}").text
+    assert '<div class="archetype">APP: BUSINESS · RULE R2 · T1 N2 C3 · ' in shop
+    places = client.get(f"/datasets/{ids[('places.csv', None)]}").text
+    assert re.search(r'class="archetype">APP: MAP · RULE R\d · T\d N\d C\d G2 · [\d,]+ ROWS</div>', places)
+    with _server() as base:
+        for width, tracks in ((1280, 12), (375, 1)):
+            with _ctx7(base, width) as page:
+                page.goto(f"{base}/datasets/{_ids6(base)[('shop.csv', None)]}")
+                _settle(page)
+                cols = page.evaluate("getComputedStyle(document.querySelector('.grid')).gridTemplateColumns.split(' ').length")
+                assert cols == tracks and page.evaluate("document.documentElement.scrollWidth <= innerWidth"), (width, cols)
+                assert page.errors == []
+
+
+def test_AC_80(make_client, data_dir, archetypes_dir, round6_dir):
+    figures = "figure.chart, ul.cards, ul.tiles, dl.kpis, table"
+    cases = (("sales.csv", "?app=explorer", data_dir), ("shop.csv", "", archetypes_dir), ("places.csv", "", archetypes_dir),
+             ("monitor.csv", "", round6_dir), ("survey.csv", "", round6_dir))
+    for name, query, folder in cases:
+        make_client(folder)
+        with _server() as base:
+            with _ctx7(base) as page:
+                page.goto(f"{base}/datasets/{_ids6(base)[(name, None)]}{query}")
+                page.wait_for_selector(".js-plotly-plot")
+                found = page.evaluate("""(sel) => [...document.querySelectorAll(sel)].map(el => {
+                    const t = el.closest('section.ws-tile');
+                    return t && {label: t.getAttribute('aria-label'), h2s: [...t.querySelectorAll('h2')].map(h => h.textContent.trim()),
+                                 move: !!t.querySelector('.ws-move'), expand: !!t.querySelector('.ws-expand')}})""", figures)
+                assert len(found) >= 3 and all(found), (name, found)
+                for f in found:
+                    assert f["label"] in f["h2s"] and f["move"] and f["expand"], (name, f)
+                for label in {f["label"] for f in found}:
+                    assert page.get_by_role("region", name=label, exact=True).count() == 1, (name, label)
+                assert page.errors == [], name
+    golden = json.loads((ROOT / "tests/fixtures/round6_api.json").read_text(encoding="utf-8"))
+    for fixture, folder in (("data_dir", data_dir), ("archetypes_dir", archetypes_dir), ("round6_dir", round6_dir)):
+        client = make_client(folder)
+        ids = _ids(client)
+        mine = {k: v for k, v in golden.items() if k.startswith(fixture + "/")}
+        assert mine and len(ids) == len(mine), fixture
+        for key, want in mine.items():
+            path, sheet = key.split("/", 1)[1].split("|")
+            for part in ("app", "charts"):
+                got = client.get(f"/api/datasets/{ids[(path, sheet or None)]}/{part}").json()
+                assert {k: v for k, v in got.items() if k != "dataset"} == {k: v for k, v in want[part].items() if k != "dataset"}, (key, part)
+
+
+def test_AC_81(make_client, round6_dir):
+    make_client(round6_dir)
+    with _server() as base:
+        ids = _ids6(base)
+        survey, monitor = (f"{base}/datasets/{ids[(n, None)]}" for n in ("survey.csv", "monitor.csv"))
+        with _ctx7(base) as page:
+            page.goto(monitor)
+            _settle(page)
+            monitor_default = _tile_order(page)
+        with _ctx7(base) as page:
+            page.goto(survey)
+            _settle(page)
+            first = _tile_order(page)
+            assert len(first) >= 3
+            src = page.locator(".grid > .ws-tile").nth(2).locator("figcaption .chart-title, .ws-head h2").first
+            page.locator(".grid > .ws-tile").nth(0).scroll_into_view_if_needed()
+            src.drag_to(page.locator(".grid > .ws-tile").nth(0))  # drag by the header onto the first tile's place
+            moved = [first[2], first[0], first[1], *first[3:]]
+            assert _tile_order(page) == moved
+            page.reload()
+            _settle(page)
+            assert _tile_order(page) == moved  # after reload the dataset shows the new order
+            page.goto(monitor)
+            _settle(page)
+            assert _tile_order(page) == monitor_default  # another dataset keeps its default order
+            page.goto(survey)
+            _settle(page)
+            handle = page.locator(".grid > .ws-tile").nth(1).locator(".ws-move")  # keyboard: Alt+Arrow on the move handle
+            handle.focus()
+            page.keyboard.press("Alt+ArrowLeft")
+            assert _tile_order(page) == [moved[1], moved[0], *moved[2:]]
+            assert "position 1 of" in page.inner_text("#ws-live")
+            assert page.evaluate("document.activeElement.classList.contains('ws-move')")
+            page.keyboard.press("Alt+ArrowDown")
+            assert _tile_order(page) == moved and "position 2 of" in page.inner_text("#ws-live")
+            assert page.external == [] and page.errors == []
+
+
+CHART3 = ".grid > .ws-tile[data-tile=chart-3]"  # the bar chart of the sales Explorer
+
+
+def test_AC_82(make_client, data_dir):
+    make_client(data_dir)
+    is_open = lambda page: page.evaluate("document.querySelector('dialog#tile-dialog').open")  # noqa: E731
+    with _server() as base:
+        url = f"{base}/datasets/{_ids6(base)[('sales.csv', None)]}?app=explorer"
+        with _ctx7(base) as page:
+            page.goto(url)
+            _settle(page)
+            tile, btn = page.locator(CHART3), page.locator(f"{CHART3} .ws-expand")
+            place = _tile_order(page)
+            assert btn.get_attribute("aria-haspopup") == "dialog" and not is_open(page)
+            btn.click()
+            page.wait_for_selector("dialog[open] .js-plotly-plot svg.main-svg")
+            assert is_open(page) and page.evaluate("document.querySelector('dialog[open] .js-plotly-plot').offsetWidth") > 0.8 * 1280
+            page.keyboard.press("Escape")  # Esc closes and focus returns to the expand control
+            tile.wait_for()
+            assert not is_open(page) and _tile_order(page) == place
+            assert page.evaluate("document.activeElement.classList.contains('ws-expand') && !!document.activeElement.closest('.grid')")
+            btn.click()
+            assert is_open(page)
+            page.mouse.click(4, 4)  # the backdrop
+            tile.wait_for()
+            assert not is_open(page) and page.evaluate("document.activeElement.classList.contains('ws-expand')")
+            before = (page.locator(".chips").count(), page.locator(".kpis dd").first.inner_text())
+            btn.click()
+            page.wait_for_selector("dialog[open] .js-plotly-plot svg.main-svg")
+            page.wait_for_timeout(300)
+            with page.expect_navigation():  # a bar click inside the overlay filters (script-triggered click, gate 193)
+                page.evaluate("""() => document.querySelector('dialog[open] [data-kind="bar"] .plot')
+                    .emit('plotly_click', {points: [{x: 'South', label: 'South', data: {}}]})""")
+            page.wait_for_load_state("networkidle")
+            assert _query(page)["f.region"] == ["South"]
+            assert (page.locator(".chips").count(), page.locator(".kpis dd").first.inner_text()) == (1, "2") and before == (0, "6")
+            page.wait_for_selector("dialog[open] #chart-3")  # the filtered tile is shown expanded again
+            assert page.errors == []
+
+
+def _lin(c):
+    c /= 255
+    return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _contrast(a, b):
+    lum = lambda rgb: 0.2126 * _lin(rgb[0]) + 0.7152 * _lin(rgb[1]) + 0.0722 * _lin(rgb[2])  # noqa: E731
+    hi, lo = sorted((lum(a), lum(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _nums(s):
+    return [float(x) for x in re.findall(r"[\d.]+", s)]
+
+
+def test_AC_83(make_client, data_dir):
+    client = make_client(data_dir)
+    css = client.get("/static/css/databoot.css").text
+    js = client.get("/static/js/dashboard.js").text
+    assert "@font-face" not in css and "prefers-color-scheme" not in css and "prefers-color-scheme" not in js
+    for token in ("#050a12", "#4de1ff", "#ffb454", "color-scheme: dark", "monospace"):
+        assert token in css, token
+    with _server() as base:
+        url = f"{base}/datasets/{_ids6(base)[('sales.csv', None)]}?app=explorer"
+        for scheme in ("light", "dark"):
+            with _ctx7(base, color_scheme=scheme) as page:
+                page.goto(url)
+                _settle(page)
+                got = page.evaluate("""() => { const root = getComputedStyle(document.documentElement), tile = document.querySelector('.ws-tile');
+                    const tint = e => getComputedStyle(e).color;
+                    return {bg: getComputedStyle(document.body).backgroundColor, body: tint(document.body), scheme: root.colorScheme,
+                      accent: root.getPropertyValue('--accent').trim(), amber: root.getPropertyValue('--amber').trim(),
+                      label: tint(document.querySelector('.chart-title, .ws-head h2')),
+                      muted: tint(document.querySelector('.muted, .chart-rule, .chart-count') || document.body),
+                      mono: getComputedStyle(document.querySelector('.ws-head h2')).fontFamily,
+                      tile: getComputedStyle(tile).backgroundImage, font: document.querySelector('.js-plotly-plot')._fullLayout.font.color,
+                      fg: root.getPropertyValue('--fg').trim(), bar: document.querySelector('[data-kind=bar] .js-plotly-plot').data[0].marker.color,
+                      axes: Object.keys(document.querySelector('[data-kind=bar] .js-plotly-plot')._fullLayout).filter(k => k.startsWith('yaxis')),
+                      range: document.querySelector('[data-kind=bar] .js-plotly-plot')._fullLayout.yaxis.range,
+                      y: document.querySelector('[data-kind=bar] .js-plotly-plot').data[0].y}; }""")
+                assert got["bg"] == "rgb(5, 10, 18)" and got["scheme"] == "dark", (scheme, got["bg"])
+                assert got["accent"] == "#4de1ff" and got["amber"] == "#ffb454" and "mono" in got["mono"].lower()
+                assert got["font"] == got["fg"] == "#e6f1fa" and got["bar"] == "#4de1ff"
+                assert got["axes"] == ["yaxis"] and got["range"][0] == 0 and got["y"] == sorted(got["y"], reverse=True)
+                page_bg = _nums(got["bg"])
+                stops = [_nums(s) for s in re.findall(r"rgba?\(([^)]*)\)", got["tile"])]
+                assert len(stops) >= 2
+                for s in stops:  # the tile gradient over the page, and with the cursor glow at its peak
+                    alpha = s[3] if len(s) > 3 else 1
+                    eff = [t * alpha + u * (1 - alpha) for t, u in zip(s[:3], page_bg)]
+                    for e in (eff, [g * 0.12 + v * 0.88 for g, v in zip([77, 225, 255], eff)]):
+                        for key in ("body", "label", "muted"):
+                            assert _contrast(_nums(got[key])[:3], e) >= 4.5, (scheme, key, got[key], e)
+                assert page.errors == []
+
+
+def test_AC_84(make_client, data_dir):
+    make_client(data_dir)
+    with _server() as base:
+        url = f"{base}/datasets/{_ids6(base)[('sales.csv', None)]}?app=explorer"
+        with _ctx7(base) as page:
+            page.add_init_script("""addEventListener('DOMContentLoaded', () => { window.__ends = document.getAnimations()
+                .filter(a => a.effect.target && a.effect.target.classList.contains('ws-tile')).map(a => a.effect.getComputedTiming().endTime); })""")
+            page.goto(url)
+            ends = page.evaluate("window.__ends")
+            assert len(ends) >= 3 and max(ends) <= 600, ends
+            assert len(set(ends)) > 1  # one after another
+            page.wait_for_timeout(700)
+            assert page.evaluate("document.getAnimations().filter(a => a.effect.target.classList.contains('ws-tile') && a.playState !== 'finished').length") == 0
+            _settle(page)
+            assert page.evaluate("document.querySelector('.ws-tile').style.getPropertyValue('--mx')") == ""
+            page.locator(CHART3).scroll_into_view_if_needed()
+            box = page.locator(CHART3).bounding_box()
+            page.mouse.move(box["x"] + 40, box["y"] + 30)
+            page.mouse.move(box["x"] + 60, box["y"] + 50)
+            assert page.evaluate("['--mx', '--my'].map(v => document.querySelector('.grid > .ws-tile[data-tile=chart-3]').style.getPropertyValue(v))") == ["60px", "50px"]
+            assert page.evaluate("getComputedStyle(document.querySelector('.ws-tile')).backdropFilter") != "none"
+            page.context.new_cdp_session(page).send("Emulation.setEmulatedMedia", {"features": [{"name": "prefers-reduced-transparency", "value": "reduce"}]})
+            page.locator(f"{CHART3} .ws-expand").click()
+            assert page.evaluate("[...document.querySelectorAll('*')].filter(e => getComputedStyle(e).backdropFilter !== 'none').length") == 0
+            assert page.evaluate("getComputedStyle(document.querySelector('dialog[open]'), '::backdrop').backdropFilter") == "none"
+            assert page.errors == []
+        with _ctx7(base, reduced_motion="reduce") as page:
+            page.goto(url)
+            _settle(page)
+            page.locator(CHART3).scroll_into_view_if_needed()
+            box = page.locator(CHART3).bounding_box()
+            page.mouse.move(box["x"] + 40, box["y"] + 30)
+            page.mouse.move(box["x"] + 60, box["y"] + 50)
+            assert page.evaluate("document.getAnimations().length") == 0
+            assert page.evaluate("document.querySelector('.grid > .ws-tile[data-tile=chart-3]').style.getPropertyValue('--mx')") == ""
+            assert page.evaluate("getComputedStyle(document.querySelector('.ws-expand')).transitionDuration") == "0s"
+
+
+def _reach_mark(page, scope):
+    """Tab from the top of the page until a chart mark inside `scope` has focus; return its aria-label."""
+    page.evaluate("document.activeElement.blur(); window.scrollTo(0, 0)")
+    for _ in range(150):
+        page.keyboard.press("Tab")
+        label = page.evaluate("""s => { const a = document.activeElement;
+            return a && a.matches('path[role=button]') && a.closest(s) ? a.getAttribute('aria-label') : null; }""", scope)
+        if label:
+            return label
+    raise AssertionError("Tab never reached a mark in " + scope)
+
+
+def _press_navigates(page, key):
+    with page.expect_navigation():
+        page.keyboard.press(key)
+    _settle(page)
+
+
+def _keyboard_mark(page, scope, drills=False):
+    """Tab to a mark, see its ring, Enter filters; then Space on the same mark removes the filter (a drilling leaderboard
+    shows the next column on the filtered page, so Space adds that column's filter instead)."""
+    column, category = _reach_mark(page, scope).split(": ", 1)
+    width, style = page.evaluate("(() => { const s = getComputedStyle(document.activeElement); return [parseFloat(s.outlineWidth), s.outlineStyle]; })()")
+    assert width == 3 and style == "solid", (scope, width, style)
+    _press_navigates(page, "Enter")
+    assert _query(page)["f." + column] == [category]
+    if drills:
+        column2, category2 = _reach_mark(page, scope).split(": ", 1)
+        _press_navigates(page, "Space")
+        assert _query(page)["f." + column2] == [category2] and column2 != column
+        return
+    page.evaluate("l => [...document.querySelectorAll('path[role=button]')].find(p => p.getAttribute('aria-label') === l).focus()", f"{column}: {category}")
+    _press_navigates(page, "Space")
+    assert "f." + column not in _query(page)
+
+
+def test_AC_85(make_client, data_dir, archetypes_dir, round6_dir):
+    make_client(data_dir)
+    with _server() as base:
+        with _ctx7(base) as page:  # Explorer bars and donut slices
+            page.goto(f"{base}/datasets/{_ids6(base)[('sales.csv', None)]}?app=explorer")
+            _settle(page)
+            page.wait_for_selector('[data-kind="donut"] .slice path[role=button]')
+            assert page.locator('[data-kind="bar"] path[role=button]').count() == 3
+            _keyboard_mark(page, '[data-kind="bar"]')
+            page.wait_for_selector('[data-kind="donut"] .slice path[role=button]')
+            _keyboard_mark(page, '[data-kind="donut"]')
+            assert page.errors == []
+    make_client(archetypes_dir)
+    with _server() as base:
+        ids = _ids6(base)
+        with _ctx7(base) as page:  # Business leaderboard (drills into the next column)
+            page.goto(f"{base}/datasets/{ids[('shop.csv', None)]}")
+            _settle(page)
+            _keyboard_mark(page, "[data-leaderboard]", drills=True)
+            assert page.errors == []
+        with _ctx7(base) as page:  # Map top-region bars are not clickable today (gate 179, 193): no Tab stop either
+            page.goto(f"{base}/datasets/{ids[('places.csv', None)]}")
+            _settle(page)
+            assert page.locator(".map-panel .barlayer .point path").count() == 4
+            assert page.locator(".map-panel path[role=button], .map-panel path[tabindex]").count() == 0
+    make_client(round6_dir)
+    with _server() as base:
+        with _ctx7(base) as page:  # Survey question bars
+            page.goto(f"{base}/datasets/{_ids6(base)[('survey.csv', None)]}")
+            _settle(page)
+            _keyboard_mark(page, '.questions [data-kind="bar"]')
+            assert page.errors == []
+
+
+def test_AC_86(make_client, tmp_path):
+    (tmp_path / "in").mkdir()
+    (tmp_path / "in" / "sales.csv").write_text("date,region,channel,amount\n" + "".join(
+        f"2024-01-{1 + i % 6:02d},{('North', 'South', 'East')[i % 3]},{('web', 'shop')[i % 2]},{10 + i}\n" for i in range(12)))
+    (tmp_path / "in" / "z_other.csv").write_text("x,y\n1,2\n3,4\n")
+    make_client(tmp_path / "empty")
+    with _server() as base:
+        with _ctx7(base) as page:
+            seen = []
+            page.on("request", lambda r: seen.append(r.url))
+            page.on("response", lambda r: r.status >= 400 and page.errors.append(f"{r.status} {r.url}"))
+            page.goto(base + "/")
+            page.set_input_files("#pick-files", [str(tmp_path / "in" / "sales.csv"), str(tmp_path / "in" / "z_other.csv")])
+            page.wait_for_url(base + "/scan")
+            page.locator("#open-workspace").click()
+            page.wait_for_url("**/datasets/**")
+            _settle(page)
+            tiles = page.locator(".grid > .ws-tile")  # drag, expand and close a tile
+            first = _tile_order(page)
+            tiles.nth(0).scroll_into_view_if_needed()
+            tiles.nth(2).locator(".ws-move").drag_to(tiles.nth(0))
+            assert _tile_order(page) != first
+            bar = page.locator(".grid > .ws-tile", has=page.locator("[data-kind=bar]")).first
+            bar.locator(".ws-expand").click()
+            page.wait_for_selector("dialog[open] [data-kind=bar] svg.main-svg")
+            fig = page.locator("dialog[open] [data-kind=bar]")
+            page.wait_for_timeout(300)
+            fig.locator(".table-toggle").click()  # toggle the table view
+            assert fig.locator("table.plot-table tbody tr").count() > 0 and fig.locator(".plot").is_hidden()
+            fig.locator(".table-toggle").click()
+            with page.expect_navigation():  # filter inside the overlay (script-triggered click, gate 193)
+                page.evaluate("""() => { const p = document.querySelector('dialog[open] [data-kind="bar"] .plot'), t = p.data[0];
+                    p.emit('plotly_click', {points: [{x: t.x && t.x[0], y: t.y[0], label: t.y[0], data: {orientation: t.orientation}}]}); }""")
+            page.wait_for_selector("dialog[open] [data-kind=bar]")
+            assert [k for k in _query(page) if k.startswith("f.")]
+            page.locator("dialog[open] .ws-expand").click()
+            page.wait_for_selector("dialog[open]", state="detached")
+            own = urlparse(base).netloc
+            assert len(seen) > 10 and [u for u in seen if urlparse(u).netloc != own and not u.startswith(("data:", "blob:"))] == []
+            assert page.external == [] and page.errors == []
+
+
+def test_AC_87():
+    doc = (ROOT / "docs/DESIGN.md").read_text(encoding="utf-8")
+    heads = [m for m in re.finditer(r"^(#+) (.*)$", doc, re.M) if "round 7" in m.group(2).lower() and "theme" in m.group(2).lower()]
+    assert heads, "no DESIGN.md heading for the round 7 theme and tiles"
+    found = []
+    for m in heads:  # a section runs to the next heading of the same or a higher level
+        nxt = re.search(rf"^#{{1,{len(m.group(1))}}} ", doc[m.end():], re.M)
+        found.append(doc[m.start(): m.end() + (nxt.start() if nxt else len(doc))].lower())
+    text = max(found, key=len)
+    terms = ["#050a12", "#4de1ff", "#ffb454", "mono", "header", "drag handle", "expand", "table toggle", "12-column", "0.6 s",
+             "reduced motion", "reduced transparency"]
+    assert [t for t in terms if t not in text] == []
