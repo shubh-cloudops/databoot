@@ -55,8 +55,9 @@ def _trend(columns, typed, mapping):
         periods.append(p)
         p = nxt(p, g)
     sums = {m: {} for m in cols}
+    starts = {}  # dates repeat: one start() per distinct date
     for d, r in dated:
-        k = start(d, g)
+        k = starts.get(d) or starts.setdefault(d, start(d, g))
         for m in cols:
             v = _num(r[m])
             if v is not None:
@@ -93,8 +94,9 @@ def view(columns, rows, typed, mapping, f, options, app=None):
     out["changes"] = None
     m = apps.measures(columns, mapping)
     if free and m:
-        out["charts"].append(_leaderboard(columns, typed, mapping, out, free, m[0]))
-        out["changes"] = _changes(columns, typed, mapping, out, free[0], m[0])
+        sums = _sums(columns, typed, free[0], m[0])
+        out["charts"].append(_leaderboard(sums, columns, out, free, m[0]))
+        out["changes"] = _changes(columns, typed, mapping, out, free[0], m[0], sums)
     keep = [(k, v) for k, v in f if k in ("from", "to")] + ([("app", app)] if app else [])
     crumbs, shown = [["All", keep]], []
     for c in order:
@@ -105,12 +107,12 @@ def view(columns, rows, typed, mapping, f, options, app=None):
     return out
 
 
-def _sums(columns, typed, c, m, keep=lambda r: True):
+def _sums(columns, typed, c, m):
     sums = {}
     ci = columns.index(c)
     for r in typed:
         v = _num(r[m])
-        if r[ci] not in (None, "") and v is not None and keep(r):
+        if r[ci] not in (None, "") and v is not None:
             sums[str(r[ci])] = sums.get(str(r[ci]), 0) + v
     return sums
 
@@ -122,9 +124,8 @@ def _ranked(sums):
     return top + ([("Other", sum(v for _, v in rest))] if rest else [])
 
 
-def _leaderboard(columns, typed, mapping, out, free, m):
+def _leaderboard(sums, columns, out, free, m):
     c = free[0]
-    sums = _sums(columns, typed, c, m)
     bars = _ranked(sums)
     return {"id": f"chart-{len(out['charts']) + 1}", **_chart(
         "bar", f"{columns[m]} by {c}", c, f"{columns[m]} (sum)",
@@ -133,16 +134,24 @@ def _leaderboard(columns, typed, mapping, out, free, m):
         "orientation": "h", "baseline": 0, "drill": len(free) > 1, "other": len(sums) > TOP}
 
 
-def _changes(columns, typed, mapping, out, c, m):
-    """Rows (category, previous, latest, delta, t) for the leaderboard's categories, Other included."""
+def _changes(columns, typed, mapping, out, c, m, sums):
+    """Rows (category, previous, latest, delta, t) for the leaderboard's categories, Other included; sums = _sums of all rows."""
     if out["latest"] is None or out["previous"] is None:
         return None
     t = next(i for i, h in enumerate(columns) if mapping.get(h) == "temporal")
     g = out["grain"]
-    period = lambda iso: (lambda r: r[t] is not None and start(r[t].date(), g).isoformat() == iso)
-    latest = _sums(columns, typed, c, m, period(out["latest"]))
-    previous = _sums(columns, typed, c, m, period(out["previous"]))
-    names = [k for k, _ in _ranked(_sums(columns, typed, c, m))]
+    latest, previous, iso, ci = {}, {}, {}, columns.index(c)  # one pass; iso memoises the period of each timestamp
+    want = {out["latest"]: latest, out["previous"]: previous}
+    for r in typed:
+        v, k = _num(r[m]), r[ci]
+        if r[t] is None or v is None or k in (None, ""):
+            continue
+        if r[t] not in iso:
+            iso[r[t]] = start(r[t].date(), g).isoformat()
+        s = want.get(iso[r[t]])
+        if s is not None:
+            s[str(k)] = s.get(str(k), 0) + v
+    names = [k for k, _ in _ranked(sums)]
     top = names[:TOP]
     rest = lambda d: sum(v for k, v in d.items() if k not in top)
     rows = [(k, previous.get(k, 0), latest.get(k, 0)) for k in top]

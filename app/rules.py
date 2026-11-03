@@ -18,6 +18,8 @@ HEATMAP_COLS = 12
 
 def _num(v):
     """Finite float of a number or numeric string, else None (bool, text, NaN and inf are None)."""
+    if type(v) is float:  # already typed: the common case, skip the checks below
+        return v if math.isfinite(v) else None
     if isinstance(v, str) and NUMBER.match(v.strip()):
         v = float(v)
     if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
@@ -48,7 +50,11 @@ def _time(v):
 
 def typed(columns, rows, mapping):
     """Copy of rows with numerical and geospatial cells as _num(v), temporal cells as _time(v); rules accept both."""
-    cast = [(i, _num if mapping.get(c) in ("numerical", "geospatial") else _time)
+    def once(f):  # dates repeat: parse each distinct string once (datetimes are immutable, so sharing is safe)
+        seen = {}
+        return lambda v: (seen[v] if v in seen else seen.setdefault(v, f(v))) if type(v) is str else f(v)
+
+    cast = [(i, _num if mapping.get(c) in ("numerical", "geospatial") else once(_time))
             for i, c in enumerate(columns) if mapping.get(c) in ("numerical", "geospatial", "temporal")]
     out = []
     for r in rows:
