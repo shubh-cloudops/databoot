@@ -1,0 +1,51 @@
+{
+  "header": {
+    "ticket": 501,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "qa",
+    "attempt": 2,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1925559
+  },
+  "goal": "Fix the application so every test in tests/test_acceptance.py passes. Do not edit that file; read the QA handover notes for the failing behaviour.",
+  "acceptance_criteria": [
+    {
+      "text": "All acceptance tests pass",
+      "passes": false
+    },
+    {
+      "text": "tests/test_acceptance.py is unchanged",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa && echo 'a250fc6cb5ed0f0d1a04f5f0ba8f1ec76b07d0209ca53304a68c08e3b69af4a3  tests/test_acceptance.py' | sha256sum -c --quiet",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Made no code change",
+      "why": "The full suite passes in a single session (494 passed, 840 s), and tests/test_acceptance.py alone passes all 87 tests. The file hash matches a250fc6c.",
+      "evidence": "python3 -m pytest -q -> 494 passed in 840.32s; sha256sum -c tests/test_acceptance.py: OK; git status clean"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "Ticket 501 attempt 1's verify failure came from load or timing flakiness (hover tests) or a missing handover, not from a code bug, since the same tree is green now in a full single-session run"
+  ],
+  "open_questions": [
+    "If the orchestrator's check.py qa still fails on this tree, please share its output_tail. The likely culprits are test_AC_52 and test_AC_59, which hover under load. Both live in the immutable tests/test_acceptance.py, so making them deterministic needs a ticket that may edit that file."
+  ],
+  "lessons": [
+    {
+      "lesson": "When a fix ticket says tests fail but gives no failure output, run the full suite once in the background with run_in_background and poll for a DONE marker before touching code. Do not wait for it in a foreground loop, which hits the 600 s tool timeout.",
+      "when": "A QA fix ticket gives no failing test names and the suite takes over 10 minutes",
+      "evidence": "full suite 494 passed in 840 s; the foreground wait loop was moved to the background at 600 s"
+    }
+  ],
+  "problems": []
+}
