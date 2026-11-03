@@ -4,6 +4,7 @@ Playwright is used where only a browser can show the result (drawn charts).
 Board gate 165 gave the work items G-1..G-7 and the thousands-separator item the ids AC-14..AC-21; AC-13 and
 AC-6 were reworded in acceptance.json (Start-DataBoot.ps1, Plotly 3D scatter).
 """
+import gc
 import io
 import json
 import re
@@ -1075,8 +1076,11 @@ def test_AC_41(big_sales_csv, make_client):
 
 def test_AC_42(big_sales_csv, make_client, tmp_path):
     for url in ("/api/datasets/{id}/charts", "/datasets/{id}"):
+        client = r = None  # drop the previous 200,000-row load so the garbage collector has nothing left to do while timing
+        gc.collect()
         client = make_client(big_sales_csv)  # clears the caches; the file stays on disk
         i = client.get("/api/datasets").json()[0]["id"]  # scan only
+        gc.collect()  # one cold start, nothing else running: no pending garbage inside the timed request
         start = time.perf_counter()
         r = client.get(url.format(id=i))
         took = time.perf_counter() - start
@@ -1171,7 +1175,8 @@ def _settle(page):
 
 
 def _hover(page, target):
-    """Hover the middle of a locator once its box has stopped moving (entrance animations, scroll); return the tooltip text."""
+    """Hover the middle of a locator once it is visible and its box has stopped moving (entrance animations, scroll); return the tooltip text."""
+    target.wait_for(state="visible")
     target.scroll_into_view_if_needed()
     handle = target.element_handle()
     page.wait_for_function("""([e, n]) => { const r = e.getBoundingClientRect(), k = r.x + ',' + r.y + ',' + r.width + ',' + r.height;

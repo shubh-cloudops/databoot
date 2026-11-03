@@ -1,0 +1,68 @@
+{
+  "header": {
+    "ticket": 502,
+    "project": "you-think-of-the-project-name",
+    "from_role": "qa",
+    "phase": "qa",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "e14d1b175e03",
+    "tokens_left": 1942861
+  },
+  "goal": "Revise your earlier work for the qa phase. The Board rejected it with this comment: QA phase rejected only to unblock the verify step. The application is accepted as built.\r\nQA (ticket 500) may edit tests/test_acceptance.py in this round for exactly these changes:\r\n1. test_AC_52 and test_AC_59: make the hover tests deterministic. Wait for the hover target (element visible and stable), move the mouse, wait for the tooltip. No retries, no skips, no xfail.\r\n2. test_AC_42: keep the 5.0 s limit. Only fix how it measures (one cold start, nothing else running). Do not loosen the number.\r\nEverything else in that file stays unchanged.\r\nEngineer (ticket 501): only act if a test still fails after QA's change. Do not touch tests.\r\nHandover: both agents must end with the handover JSON, and the Tech Lead must store the verify output_tail so failures are visible.\r\nDo not run the full suite more than once per ticket.",
+  "acceptance_criteria": [
+    {
+      "text": "One test per acceptance item, named after its id",
+      "passes": false
+    },
+    {
+      "text": "Failures are reported, not hidden",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Added target.wait_for(state='visible') to _hover, keeping the existing box-stability wait, then move and wait for tooltip",
+      "why": "Board gate 194: deterministic hover (visible, stable, move, wait for tooltip), no retries/skips/xfail; both AC_52 and AC_59 use this helper",
+      "evidence": "tests/test_acceptance.py:1173-1187"
+    },
+    {
+      "what": "AC_42: gc.collect() before and after building each cold client, previous client/response dropped; 5.0 s limit unchanged",
+      "why": "Garbage from the previous 200,000-row load or earlier tests must not fall inside the timed cold request",
+      "evidence": "tests/test_acceptance.py:1077-1088; python3 -m pytest -s -k AC_42: 2.15 s and 3.61 s"
+    },
+    {
+      "what": "Did not run the full suite or the Playwright browser sweep",
+      "why": "Board scoped this round to three test edits; the orchestrator runs check.py qa (full suite) itself and one full run per ticket is the limit",
+      "evidence": "ticket 502 goal"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Reproduce the hover flake under CPU load (32 busy loops on 16 cores)",
+      "why_it_failed": "AC_52 and AC_59 passed under load and alone, so the flake's cause is unconfirmed"
+    }
+  ],
+  "assumptions": [
+    "The flake is load-related timing in the hover step; no hit-test was added because overlapping map points could make an elementFromPoint check hang",
+    "The AC_42 gc change is enough; if the full-suite run still exceeds 5.0 s, the timing is machine load from the earlier tests, to be reported as measured"
+  ],
+  "open_questions": [
+    "If test_AC_52 or test_AC_59 fail again in the orchestrator's full run, I could not confirm the cause. Please store the verify output_tail so the failing step is visible.",
+    "test_AC_42 page route (/datasets/{id}) measures about 3.6 s against the 5.0 s limit, the least margin of the two routes."
+  ],
+  "lessons": [
+    {
+      "lesson": "Do not loosen a timing limit to fix a flaky speed test: collect garbage before the timer and keep one cold start per route, then report the measured numbers.",
+      "when": "A QA ticket asks to fix how a time-bound acceptance test measures",
+      "evidence": "tests/test_acceptance.py test_AC_42; gate 194"
+    }
+  ],
+  "problems": []
+}
