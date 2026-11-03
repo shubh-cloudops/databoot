@@ -1,0 +1,56 @@
+{
+  "header": {
+    "ticket": 503,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "qa",
+    "attempt": 3,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1947383
+  },
+  "goal": "Fix the application so every test in tests/test_acceptance.py passes. Do not edit that file; read the QA handover notes for the failing behaviour.",
+  "acceptance_criteria": [
+    {
+      "text": "All acceptance tests pass",
+      "passes": false
+    },
+    {
+      "text": "tests/test_acceptance.py is unchanged",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa && echo '8127bf0d87a32cb5b163a20403e1241c4c1cdb14855e7294787c51977f830e05  tests/test_acceptance.py' | sha256sum -c --quiet",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Made no code change; the current tree already passes every acceptance test",
+      "why": "One full run on an otherwise idle machine passed every test, AC_42, AC_52 and AC_59 included, and the protected file's hash matches the verify command",
+      "evidence": "python3 -m pytest -q --durations=15 -> 494 passed in 846.05s (/tmp/full.log); sha256sum tests/test_acceptance.py = 8127bf0d...0e05"
+    },
+    {
+      "what": "Took the earlier attempts' failures to be agent timeouts and API errors, not failing tests",
+      "why": "Runs 596 and 597 are recorded as timeouts at about 2400 s, runs 598 and 599 as network_error (API 502 upstream_unreachable), and none stored a test-failure output",
+      "evidence": "/logs/live.db runs table, ids 596-599; /live/runs/599/agent.stdout"
+    }
+  ],
+  "tried_and_failed": [],
+  "assumptions": [
+    "The speed-up that attempt 1 committed to app/business.py and app/rules.py (commit 7dc912b) is the fix this ticket needed; it is in the tree that now passes"
+  ],
+  "open_questions": [
+    "The full suite takes about 14 minutes (846 s), a large share of the 2400 s agent limit; QA and engineer tickets that must run it once are at risk of timing out"
+  ],
+  "lessons": [
+    {
+      "lesson": "On a retried QA-fix ticket, first look in /logs/live.db (runs.outcome) and /live/runs/<run>/agent.stdout to see whether earlier attempts failed on tests or on timeouts or API errors. Then start the single full run early in the background: write to a /tmp log with a DONE marker and poll it with sleep loops.",
+      "when": "Ticket retries whose earlier handovers have no output_tail",
+      "evidence": "runs 596-599 were timeout and network_error; the suite passed with no change"
+    }
+  ],
+  "problems": []
+}
