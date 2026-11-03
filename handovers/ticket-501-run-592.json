@@ -1,0 +1,62 @@
+{
+  "header": {
+    "ticket": 501,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "qa",
+    "attempt": 1,
+    "model": "claude-sonnet-5-5",
+    "effort": "high",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1962404
+  },
+  "goal": "Fix the application so every test in tests/test_acceptance.py passes. Do not edit that file; read the QA handover notes for the failing behaviour.",
+  "acceptance_criteria": [
+    {
+      "text": "All acceptance tests pass",
+      "passes": false
+    },
+    {
+      "text": "tests/test_acceptance.py is unchanged",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa && echo 'a250fc6cb5ed0f0d1a04f5f0ba8f1ec76b07d0209ca53304a68c08e3b69af4a3  tests/test_acceptance.py' | sha256sum -c --quiet",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [
+    {
+      "what": "Made no code change",
+      "why": "All 87 tests in tests/test_acceptance.py pass on the current tree, and the other 407 tests pass when run separately",
+      "evidence": "python3 -m pytest -q tests/test_acceptance.py (87 passed, 409.94s); python3 -m pytest -q --ignore=tests/test_acceptance.py (407 passed, 470.25s); sha256sum of tests/test_acceptance.py matches a250fc6c\u2026"
+    }
+  ],
+  "tried_and_failed": [
+    {
+      "what": "Started the full suite with a trailing & inside a background Bash call",
+      "why_it_failed": "The shell exited and the pytest process did not survive; the log stayed empty. I used run_in_background on the pytest command itself instead."
+    }
+  ],
+  "assumptions": [
+    "Ticket 500's only recorded problem was a missing handover JSON, not a test failure",
+    "Running the acceptance file and the rest separately is equivalent to the single-session check.py qa run"
+  ],
+  "open_questions": [
+    "If the orchestrator's check.py qa still fails, the cause is probably load or ordering flakiness (the hover tests test_AC_52 and test_AC_59 were flaky in earlier tickets) that only shows in one combined session. Please share its output_tail."
+  ],
+  "lessons": [
+    {
+      "lesson": "When a fix ticket's QA handover has no failing tests listed, run the acceptance file and the rest of the suite before changing code. The cause may be a missing handover JSON, not a bug.",
+      "when": "A ticket says to fix failing acceptance tests but gives no failure output",
+      "evidence": "handovers/ticket-500-run-591.json problems: 'agent did not end with the handover JSON'; both test runs green"
+    },
+    {
+      "lesson": "Start long test runs with run_in_background on the pytest command itself, then wait with an until-grep DONE loop. A backgrounded & inside a foreground command is killed when the shell exits.",
+      "when": "Running the roughly 8-minute test suites",
+      "evidence": "first attempt left /tmp/full.log empty"
+    }
+  ],
+  "problems": []
+}
