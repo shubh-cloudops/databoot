@@ -1,0 +1,37 @@
+{
+  "header": {
+    "ticket": 501,
+    "project": "you-think-of-the-project-name",
+    "from_role": "engineer",
+    "phase": "qa",
+    "attempt": 3,
+    "model": "claude-opus-5-5",
+    "effort": "medium",
+    "prompt_version": "c5dc2c9b334c",
+    "tokens_left": 1925559
+  },
+  "goal": "Fix the application so every test in tests/test_acceptance.py passes. Do not edit that file; read the QA handover notes for the failing behaviour.",
+  "acceptance_criteria": [
+    {
+      "text": "All acceptance tests pass",
+      "passes": false
+    },
+    {
+      "text": "tests/test_acceptance.py is unchanged",
+      "passes": false
+    }
+  ],
+  "verify": {
+    "command": "python3 /opt/prodagents/check.py qa && echo 'a250fc6cb5ed0f0d1a04f5f0ba8f1ec76b07d0209ca53304a68c08e3b69af4a3  tests/test_acceptance.py' | sha256sum -c --quiet",
+    "passed": false,
+    "output_tail": ""
+  },
+  "decisions": [],
+  "tried_and_failed": [],
+  "assumptions": [],
+  "open_questions": [],
+  "lessons": [],
+  "problems": [
+    "agent did not end with the handover JSON"
+  ]
+}
