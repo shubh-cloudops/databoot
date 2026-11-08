@@ -111,7 +111,7 @@ look where every chart is the same kind of tile the user can move, enlarge and r
 - Team (IDEA): designer, frontend and backend; trends off.
 
 ## Branding
-No business website capture and no docs/brand/ folder: docs/reference/ holds captures of deck.gl and
-unstructured.io (third-party libraries from the round 1 idea, not the client's site). The Board chose (gate 160):
+No business website capture and no docs/brand/ folder: docs/reference/ held captures of deck.gl and
+unstructured.io (third-party libraries from the round 1 idea, not the client's site; since removed). The Board chose (gate 160):
 name DataBoot, system font, no logo, blank SVG favicon. This round the Board asks for a new theme (dark
 holographic); name, no-logo and favicon stay. The prototype named as the visual contract is not in the repository.

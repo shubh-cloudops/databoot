@@ -9,7 +9,7 @@ says otherwise.
 
 No docs/TRENDS.md this round (docs/team.json: trends off; IDEA: "trends off"), so I used no trend advice.
 **The prototype `docs/reference/databoot-console.html` is not on disk** (`find / -name 'databoot-console*'` finds
-nothing; docs/reference/ holds only deck.gl and unstructured.io). Gate 189 says to build from its description in
+nothing; docs/reference/ held only third-party deck.gl and unstructured.io captures, since removed). Gate 189 says to build from its description in
 that case; the Designer turns the description into DESIGN.md tokens. Where it and the IDEA's numbered list differ,
 the list wins (gate 189), so the prototype's "(dev only) sample" button is **not built** (no list item asks for it).
 
